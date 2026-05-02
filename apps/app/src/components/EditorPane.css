@@ -1,0 +1,724 @@
+.editor-pane {
+  --editor-accent: var(--note-accent, var(--gold));
+  --editor-title-font: var(--font-note-default);
+  --editor-title-size: 1rem;
+  --editor-title-weight: 600;
+  --editor-copy-font: var(--font-note-default);
+  --editor-copy-size: 0.95rem;
+  --editor-copy-leading: 1.8;
+  --editor-copy-tracking: 0;
+  --editor-heading-font: var(--font-note-display);
+  --editor-heading-weight: 650;
+  --editor-heading-tracking: -0.016em;
+  --editor-content-padding-top: 28px;
+  --editor-content-padding-right: clamp(22px, 4vw, 46px);
+  --editor-content-padding-bottom: 60px;
+  --editor-content-padding-left: clamp(54px, 6vw, 78px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px 14px 14px;
+  background:
+    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--editor-accent) 12%, transparent), transparent 32%),
+    radial-gradient(circle at 88% 14%, rgba(115, 247, 255, 0.035), transparent 30%);
+}
+
+.editor-pane.is-reading {
+  --editor-title-font: var(--font-note-reading);
+  --editor-title-size: 1.03rem;
+  --editor-copy-font: var(--font-note-reading);
+  --editor-copy-size: 1rem;
+  --editor-copy-leading: 1.92;
+  --editor-copy-tracking: 0.002em;
+  --editor-heading-font: var(--font-note-default);
+  --editor-heading-tracking: -0.022em;
+  --editor-content-padding-right: clamp(28px, 9vw, 180px);
+  --editor-content-padding-left: clamp(56px, 11vw, 210px);
+}
+
+.editor-pane.is-immersive {
+  gap: 8px;
+  padding: 8px 10px 10px;
+}
+
+.editor-pane-toolbar {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 20%, rgba(147, 173, 255, 0.1));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 8%, transparent), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
+    rgba(8, 10, 22, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 16px 38px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+.editor-pane.is-immersive .editor-pane-toolbar {
+  padding: 7px;
+  border-radius: 21px;
+}
+
+.editor-pane-toolbar-main {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.editor-pane-title-stack {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.editor-pane-title-field {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgba(147, 173, 255, 0.11));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.018)),
+    rgba(7, 9, 20, 0.78);
+  color: var(--text);
+  font-family: var(--editor-title-font);
+  font-size: var(--editor-title-size);
+  font-weight: var(--editor-title-weight);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.028);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.editor-pane-title-field:focus {
+  border-color: color-mix(in srgb, var(--editor-accent) 44%, rgba(115, 247, 255, 0.2));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.02)),
+    rgba(8, 11, 24, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 0 0 1px color-mix(in srgb, var(--editor-accent) 18%, transparent);
+}
+
+.editor-pane-toolbar-meta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.editor-pane-typography-switch {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.editor-pane-typography-option {
+  min-height: 23px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--text-dim) 92%, rgba(255, 255, 255, 0.14));
+  font: inherit;
+  font-size: 0.63rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.editor-pane-typography-option:hover {
+  color: var(--text);
+}
+
+.editor-pane-typography-option.is-active {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--editor-accent) 12%, rgba(255, 255, 255, 0.02));
+  color: color-mix(in srgb, var(--text) 88%, var(--editor-accent) 12%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.editor-pane-chip,
+.editor-pane-markdown-status,
+.editor-pane-contextmeta {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 23px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  color: color-mix(in srgb, var(--text) 82%, var(--text-dim) 18%);
+  font-size: 0.62rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor-pane-chip {
+  max-width: min(220px, 100%);
+}
+
+.editor-pane-chip.is-warm,
+.editor-pane-save-pill.is-saved {
+  border-color: color-mix(in srgb, var(--editor-accent) 30%, rgba(255, 224, 138, 0.14));
+  background: color-mix(in srgb, var(--editor-accent) 13%, rgba(255, 255, 255, 0.03));
+  color: color-mix(in srgb, var(--text) 88%, var(--editor-accent) 12%);
+}
+
+.editor-pane-save-pill.is-saving {
+  border-color: rgba(115, 247, 255, 0.22);
+  background: rgba(115, 247, 255, 0.08);
+}
+
+.editor-pane-save-pill.is-idle {
+  border-color: rgba(147, 173, 255, 0.1);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-dim);
+}
+
+.editor-pane-contextmeta {
+  max-width: 260px;
+  color: var(--text-dim);
+  background: transparent;
+}
+
+.editor-pane-markdown-actions {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.editor-pane-markdown-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.editor-pane-ghost-action {
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.editor-pane-ghost-action:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--editor-accent) 28%, rgba(147, 173, 255, 0.18));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--editor-accent) 9%, rgba(255, 255, 255, 0.026));
+}
+
+.editor-pane-ghost-action.is-danger {
+  border-color: rgba(255, 113, 113, 0.2);
+  color: color-mix(in srgb, var(--text) 82%, #ff7171 18%);
+}
+
+.editor-pane-ghost-action.is-danger:hover {
+  border-color: rgba(255, 113, 113, 0.32);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    rgba(255, 113, 113, 0.075);
+}
+
+.editor-pane-markdown-status {
+  flex: 0 0 auto;
+  border-color: rgba(115, 247, 255, 0.18);
+  background: rgba(115, 247, 255, 0.07);
+  color: color-mix(in srgb, var(--text) 86%, #73f7ff 14%);
+}
+
+.editor-pane-markdown-status.is-error {
+  border-color: rgba(255, 113, 113, 0.26);
+  background: rgba(255, 113, 113, 0.08);
+  color: color-mix(in srgb, var(--text) 80%, #ff7171 20%);
+}
+
+.editor-pane-hidden-input {
+  display: none;
+}
+
+.editor-pane-shell {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.editor-stage-column {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-stage-frame {
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-stage-shell {
+  position: relative;
+  height: 100%;
+  min-height: 100%;
+  overflow: auto;
+  overflow-x: hidden;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgba(147, 173, 255, 0.1));
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--editor-accent) 12%, transparent), transparent 30%),
+    radial-gradient(circle at 100% 8%, rgba(115, 247, 255, 0.045), transparent 28%),
+    linear-gradient(180deg, rgba(10, 12, 28, 0.92), rgba(5, 7, 16, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 22px 58px rgba(0, 0, 0, 0.28);
+}
+
+.editor-pane.is-immersive .editor-stage-shell {
+  border-radius: 24px;
+}
+
+.editor-stage-shell .bn-container {
+  --bn-colors-editor-text: var(--text);
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--text);
+  --bn-colors-tooltip-text: var(--text);
+  --bn-colors-hovered-text: var(--text);
+  --bn-colors-side-menu: color-mix(in srgb, var(--editor-accent) 38%, rgba(147, 173, 255, 0.18));
+  height: auto;
+  min-height: 100%;
+  background: transparent;
+}
+
+.editor-stage-shell .bn-editor {
+  min-height: 100%;
+  height: auto;
+  padding:
+    var(--editor-content-padding-top)
+    var(--editor-content-padding-right)
+    var(--editor-content-padding-bottom)
+    var(--editor-content-padding-left);
+  background: transparent;
+  color: var(--bn-colors-editor-text);
+  font-family: var(--editor-copy-font);
+  font-size: var(--editor-copy-size);
+  letter-spacing: var(--editor-copy-tracking);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="heading"][data-text-color="default"],
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="heading"]:not([data-text-color]) {
+  color: color-mix(in srgb, var(--text) 92%, var(--editor-accent) 8%);
+  font-family: var(--editor-heading-font);
+  font-weight: var(--editor-heading-weight);
+  letter-spacing: var(--editor-heading-tracking);
+  text-transform: none;
+}
+
+.editor-stage-shell .bn-block-outer {
+  margin-block: 0.05rem;
+}
+
+.editor-pane.is-reading .editor-stage-shell .bn-block-outer {
+  margin-block: 0.08rem;
+}
+
+.editor-stage-shell .bn-block-content {
+  padding-block: 0.14rem;
+}
+
+.editor-pane.is-reading .editor-stage-shell .bn-block-content {
+  padding-block: 0.18rem;
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="heading"][data-level="1"] {
+  line-height: 1.12;
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
+  line-height: 1.18;
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="heading"][data-level="3"] {
+  line-height: 1.24;
+}
+
+.editor-stage-shell .bn-editor p,
+.editor-stage-shell .bn-editor li,
+.editor-stage-shell .bn-editor td,
+.editor-stage-shell .bn-editor th,
+.editor-stage-shell .bn-editor blockquote {
+  line-height: var(--editor-copy-leading);
+}
+
+.editor-stage-shell .bn-editor a,
+.editor-stage-shell .bn-editor .bn-inline-content a {
+  color: color-mix(in srgb, var(--text) 80%, var(--editor-accent) 20%);
+  text-decoration-color: color-mix(in srgb, var(--editor-accent) 58%, rgba(255, 255, 255, 0.12));
+  text-underline-offset: 0.16em;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
+}
+
+.editor-stage-shell .bn-editor a:hover,
+.editor-stage-shell .bn-editor .bn-inline-content a:hover {
+  color: color-mix(in srgb, var(--text) 72%, var(--editor-accent) 28%);
+  text-decoration-color: color-mix(in srgb, var(--editor-accent) 82%, rgba(255, 255, 255, 0.16));
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="checkListItem"] > div > input {
+  accent-color: color-mix(in srgb, var(--editor-accent) 82%, #ffffff 18%);
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="checkListItem"][data-checked="true"] .bn-inline-content {
+  color: color-mix(in srgb, var(--text) 72%, var(--editor-accent) 28%);
+  text-decoration-color: color-mix(in srgb, var(--editor-accent) 72%, rgba(255, 255, 255, 0.18));
+}
+
+.editor-stage-shell .bn-editor .bn-inline-content code {
+  padding: 0.12em 0.34em;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+  color: color-mix(in srgb, var(--text) 90%, rgba(141, 183, 255, 0.14));
+  font-family: var(--font-ui-mono);
+  font-size: 0.92em;
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="codeBlock"] {
+  border-radius: 18px;
+  border: 1px solid rgba(147, 173, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+    rgba(6, 8, 18, 0.88);
+  padding: 0.32rem 0.42rem;
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="codeBlock"] > pre {
+  font-family: var(--font-ui-mono);
+  font-size: 0.83rem;
+  line-height: 1.72;
+}
+
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="quote"] blockquote {
+  padding-left: 0.9rem;
+  border-left-color: color-mix(in srgb, var(--editor-accent) 38%, rgba(147, 173, 255, 0.2));
+  color: color-mix(in srgb, var(--text) 86%, rgba(255, 255, 255, 0.14));
+}
+
+.editor-stage-shell .bn-editor table,
+.editor-stage-shell .bn-editor td,
+.editor-stage-shell .bn-editor th {
+  border-color: rgba(147, 173, 255, 0.14);
+}
+
+.editor-stage-shell .bn-editor img,
+.editor-stage-shell .bn-editor video,
+.editor-stage-shell .bn-editor audio {
+  max-width: 100%;
+  border-radius: 16px;
+}
+
+.editor-stage-shell .bn-editor [data-file-block],
+.editor-stage-shell .bn-editor blockquote {
+  border-color: rgba(147, 173, 255, 0.14);
+}
+
+.editor-stage-shell .bn-side-menu {
+  margin-left: 10px;
+}
+
+.editor-stage-shell .bn-side-menu,
+.editor-stage-shell .bn-formatting-toolbar,
+.editor-stage-shell .bn-file-panel,
+.editor-stage-shell .bn-suggestion-menu,
+.editor-stage-shell .bn-link-toolbar,
+.editor-stage-shell .bn-table-handle-menu,
+.editor-stage-shell [data-floating-ui-portal] * {
+  color: var(--text);
+}
+
+.editor-stage-shell .bn-formatting-toolbar,
+.editor-stage-shell .bn-file-panel,
+.editor-stage-shell .bn-suggestion-menu,
+.editor-stage-shell .bn-link-toolbar,
+.editor-stage-shell .bn-table-handle-menu {
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgba(147, 173, 255, 0.12));
+  background: rgba(8, 10, 22, 0.9);
+  box-shadow:
+    0 14px 42px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+}
+
+.editor-sidepanel {
+  display: grid;
+  flex: 0 0 280px;
+  width: 280px;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+  align-content: start;
+}
+
+.editor-pane-detail-card {
+  display: grid;
+  gap: 11px;
+  padding: 11px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 15%, rgba(147, 173, 255, 0.1));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 7%, transparent), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.014)),
+    rgba(8, 10, 22, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.editor-pane-detail-card-actions {
+  padding-top: 10px;
+}
+
+.editor-pane-detail-field {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.editor-pane-detail-label {
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  line-height: 1.35;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.editor-pane-detail-select {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 15px;
+}
+
+.editor-pane-color-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.editor-pane-custom-color-picker {
+  gap: 6px;
+}
+
+.editor-pane-custom-color-picker .orbital-custom-color-control {
+  min-height: 38px;
+}
+
+.editor-pane-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.editor-pane-action-grid .micro-action {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 14px;
+  font-size: 0.68rem;
+}
+
+.orbital-editor-modal-window.is-note-mode .editor-pane {
+  padding: 12px 14px 14px;
+  padding-top: max(46px, calc(env(safe-area-inset-top) + 42px));
+}
+
+.orbital-editor-modal-window.is-note-mode .editor-pane .editor-pane-save-pill {
+  min-height: 22px;
+  padding: 2px 7px;
+  font-size: 0.6rem;
+}
+
+@media (max-width: 1180px) {
+  .editor-pane.is-reading {
+    --editor-content-padding-right: clamp(24px, 7vw, 96px);
+    --editor-content-padding-left: clamp(52px, 9vw, 132px);
+  }
+
+  .editor-sidepanel {
+    flex-basis: 264px;
+    width: 264px;
+  }
+
+  .editor-pane-toolbar-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editor-pane-markdown-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1080px) {
+  .editor-pane-shell {
+    flex-direction: column;
+  }
+
+  .editor-stage-frame,
+  .editor-pane.is-immersive .editor-stage-frame {
+    min-height: clamp(340px, 58vh, 720px);
+  }
+
+  .editor-sidepanel {
+    width: auto;
+    flex: 0 0 auto;
+    max-height: min(30vh, 320px);
+  }
+}
+
+@media (max-width: 860px) {
+  .editor-pane {
+    padding: 9px;
+    gap: 8px;
+  }
+
+  .editor-pane-toolbar {
+    border-radius: 20px;
+  }
+
+  .editor-pane-title-field {
+    min-height: 36px;
+    padding-inline: 11px;
+    border-radius: 14px;
+    font-size: 0.94rem;
+  }
+
+  .editor-pane.is-reading {
+    --editor-copy-size: 0.96rem;
+    --editor-content-padding-right: 20px;
+    --editor-content-padding-left: 48px;
+  }
+
+  .editor-pane-chip,
+  .editor-pane-markdown-status,
+  .editor-pane-contextmeta {
+    min-height: 21px;
+    padding: 3px 7px;
+    font-size: 0.58rem;
+  }
+
+  .editor-pane-ghost-action {
+    min-height: 28px;
+    padding-inline: 9px;
+    font-size: 0.64rem;
+  }
+
+  .editor-stage-frame,
+  .editor-pane.is-immersive .editor-stage-frame {
+    min-height: clamp(300px, 54vh, 620px);
+  }
+
+  .editor-stage-shell {
+    border-radius: 20px;
+  }
+
+  .editor-stage-shell .bn-editor {
+    padding: 22px 16px 44px 44px;
+    font-size: var(--editor-copy-size);
+  }
+
+  .editor-pane-detail-card {
+    padding: 10px;
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 720px) {
+  .editor-pane {
+    padding: 8px;
+  }
+
+  .editor-pane.is-immersive {
+    padding: 6px;
+  }
+
+  .editor-pane.is-reading {
+    --editor-copy-size: 0.93rem;
+    --editor-copy-leading: 1.84;
+    --editor-content-padding-right: 14px;
+    --editor-content-padding-left: 40px;
+  }
+
+  .editor-pane-toolbar {
+    padding: 7px;
+    border-radius: 18px;
+  }
+
+  .editor-pane-toolbar-meta {
+    gap: 4px;
+  }
+
+  .editor-pane-contextmeta {
+    max-width: 100%;
+  }
+
+  .editor-stage-frame,
+  .editor-pane.is-immersive .editor-stage-frame {
+    min-height: clamp(260px, 50vh, 540px);
+  }
+
+  .editor-stage-shell {
+    border-radius: 18px;
+  }
+
+  .editor-stage-shell .bn-editor {
+    padding: 18px 12px 38px 38px;
+  }
+
+  .editor-stage-shell .bn-side-menu {
+    margin-left: 6px;
+  }
+
+  .editor-sidepanel {
+    max-height: min(32vh, 300px);
+  }
+
+  .editor-pane-action-grid {
+    grid-template-columns: 1fr;
+  }
+}

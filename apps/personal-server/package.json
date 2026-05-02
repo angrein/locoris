@@ -1,0 +1,11 @@
+{
+  "name": "@locoris/personal-server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "description": "Minimal single-owner multi-vault self-hosted sync server for Locoris",
+  "scripts": {
+    "start": "node server.mjs",
+    "sync-server": "node server.mjs"
+  }
+}

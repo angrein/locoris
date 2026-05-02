@@ -1,0 +1,16 @@
+services:
+  locoris-personal-server:
+    build:
+      context: ../../..
+      dockerfile: infra/docker/personal-server/Dockerfile
+    environment:
+      PORT: "8787"
+      SYNC_TOKEN: "change-me"
+      SYNC_DATA_DIR: "/data"
+    ports:
+      - "8787:8787"
+    volumes:
+      - locoris-personal-data:/data
+
+volumes:
+  locoris-personal-data:

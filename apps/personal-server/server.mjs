@@ -1,0 +1,1173 @@
+import { createHash, randomUUID } from "node:crypto";
+import { createServer } from "node:http";
+import { rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  applyChangeSetToSnapshot,
+  buildChangeSetFromSnapshots,
+  collapseChangeSets,
+  collectBody,
+  createEmptyEnvelope,
+  createEmptyChangeSet,
+  ensureDir,
+  fileExists,
+  getBearerToken,
+  handleOptimisticSyncRoute,
+  isChangeSetEmpty,
+  isEncryptedEnvelope,
+  normalizeEncryptedPayload,
+  normalizeChangeSet,
+  normalizeStoredEnvelope,
+  now,
+  pruneChangeHistory,
+  readJsonFile,
+  sendCorsNoContent,
+  sendJson,
+  sendText,
+  serveStaticAsset,
+  writeJsonFile
+} from "../../packages/sync-core/common.mjs";
+
+const PORT = Number.parseInt(process.env.PORT ?? "8787", 10);
+const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+function resolveDefaultDataDir() {
+  const home = os.homedir();
+
+  if (process.platform === "darwin") {
+    return path.join(home, "Library", "Application Support", "Locoris", "Personal Server");
+  }
+
+  if (process.platform === "win32") {
+    const baseDir = process.env.LOCALAPPDATA || path.join(home, "AppData", "Local");
+    return path.join(baseDir, "Locoris", "Personal Server");
+  }
+
+  const baseDir = process.env.XDG_DATA_HOME || path.join(home, ".local", "share");
+  return path.join(baseDir, "locoris", "personal-server");
+}
+
+const DATA_DIR = process.env.SYNC_DATA_DIR
+  ? path.resolve(process.env.SYNC_DATA_DIR)
+  : resolveDefaultDataDir();
+const STATIC_DIR = path.join(SERVER_DIR, "public");
+const PERSONAL_CONFIG_FILE = path.join(DATA_DIR, "personal-config.json");
+const PERSONAL_REGISTRY_FILE = path.join(DATA_DIR, "registry.json");
+const VAULTS_DIR = path.join(DATA_DIR, "vaults");
+const LEGACY_SYNC_TOKEN = String(process.env.SYNC_TOKEN ?? "").trim();
+const ENV_MANAGEMENT_TOKEN = String(process.env.SYNC_MANAGEMENT_TOKEN ?? "").trim();
+
+function sanitizeVaultId(rawValue) {
+  const candidate = String(rawValue ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+
+  return candidate;
+}
+
+function sanitizeDisplayName(rawValue, fallbackValue) {
+  const candidate = String(rawValue ?? "").trim().slice(0, 120);
+  return candidate || fallbackValue;
+}
+
+function normalizeVaultKind(value) {
+  return value === "private" ? "private" : "regular";
+}
+
+function hashToken(token) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function createManagementToken() {
+  return `zpm_${randomUUID().replace(/-/g, "")}`;
+}
+
+function createVaultSyncToken(vaultId) {
+  return `zpt_${vaultId}_${randomUUID().replace(/-/g, "")}`;
+}
+
+function createEmptyRegistry() {
+  return {
+    schemaVersion: 1,
+    vaults: [],
+    tokens: []
+  };
+}
+
+function getVaultStateFile(vaultId) {
+  return path.join(VAULTS_DIR, `${vaultId}.json`);
+}
+
+function getVaultJournalFile(vaultId) {
+  return path.join(VAULTS_DIR, `${vaultId}.journal.json`);
+}
+
+async function readVaultJournal(vaultId) {
+  const parsed = await readJsonFile(getVaultJournalFile(vaultId), []);
+
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      return {
+        revision: typeof entry.revision === "string" ? entry.revision : null,
+        baseRevision:
+          typeof entry.baseRevision === "string" || entry.baseRevision === null
+            ? entry.baseRevision ?? null
+            : null,
+        createdAt: typeof entry.createdAt === "number" ? entry.createdAt : now(),
+        changes: entry.encryptedChanges ? null : normalizeChangeSet(entry.changes, "server"),
+        encryptedChanges: normalizeEncryptedPayload(entry.encryptedChanges)
+      };
+    })
+    .filter((entry) => entry && entry.revision && (entry.changes || entry.encryptedChanges));
+}
+
+async function writeVaultJournal(vaultId, journal) {
+  await writeJsonFile(getVaultJournalFile(vaultId), pruneChangeHistory(journal));
+}
+
+function buildVaultList(registry) {
+  return registry.vaults
+    .map((vault) => ({
+      ...vault,
+      tokenCount: registry.tokens.filter((token) => token.vaultId === vault.id).length
+    }))
+    .sort((left, right) => left.createdAt - right.createdAt);
+}
+
+function buildTokenMeta(token) {
+  return {
+    id: token.id,
+    vaultId: token.vaultId,
+    label: token.label,
+    createdAt: token.createdAt,
+    lastUsedAt: token.lastUsedAt ?? null
+  };
+}
+
+async function readConfig() {
+  const parsed = await readJsonFile(PERSONAL_CONFIG_FILE, null);
+
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+
+  return parsed;
+}
+
+async function writeConfig(config) {
+  await writeJsonFile(PERSONAL_CONFIG_FILE, config);
+}
+
+async function readRegistry() {
+  const parsed = await readJsonFile(PERSONAL_REGISTRY_FILE, createEmptyRegistry());
+  const timestamp = now();
+
+  return {
+    schemaVersion: 1,
+    vaults: Array.isArray(parsed.vaults)
+      ? parsed.vaults
+          .map((entry) => {
+            if (!entry || typeof entry !== "object") {
+              return null;
+            }
+
+            const vault = entry;
+            const id = sanitizeVaultId(vault.id);
+            const name = sanitizeDisplayName(vault.name, "");
+
+            if (!id || !name) {
+              return null;
+            }
+
+            return {
+              id,
+              name,
+              vaultKind: normalizeVaultKind(vault.vaultKind),
+              createdAt: typeof vault.createdAt === "number" ? vault.createdAt : timestamp,
+              updatedAt: typeof vault.updatedAt === "number" ? vault.updatedAt : timestamp,
+              lastRevision: typeof vault.lastRevision === "string" ? vault.lastRevision : null,
+              lastSyncAt: typeof vault.lastSyncAt === "number" ? vault.lastSyncAt : null
+            };
+          })
+          .filter(Boolean)
+      : [],
+    tokens: Array.isArray(parsed.tokens)
+      ? parsed.tokens
+          .map((entry) => {
+            if (!entry || typeof entry !== "object") {
+              return null;
+            }
+
+            const token = entry;
+            const id = typeof token.id === "string" ? token.id : "";
+            const vaultId = sanitizeVaultId(token.vaultId);
+            const tokenHash = typeof token.tokenHash === "string" ? token.tokenHash.trim() : "";
+
+            if (!id || !vaultId || !tokenHash) {
+              return null;
+            }
+
+            return {
+              id,
+              vaultId,
+              label: sanitizeDisplayName(token.label, "Client token"),
+              tokenHash,
+              createdAt: typeof token.createdAt === "number" ? token.createdAt : timestamp,
+              lastUsedAt: typeof token.lastUsedAt === "number" ? token.lastUsedAt : null
+            };
+          })
+          .filter(Boolean)
+      : []
+  };
+}
+
+async function writeRegistry(registry) {
+  await writeJsonFile(PERSONAL_REGISTRY_FILE, registry);
+}
+
+async function readVaultEnvelope(vaultId) {
+  const parsed = await readJsonFile(getVaultStateFile(vaultId), createEmptyEnvelope());
+  return normalizeStoredEnvelope(parsed);
+}
+
+async function writeVaultEnvelope(vaultId, envelope) {
+  await writeJsonFile(getVaultStateFile(vaultId), envelope);
+}
+
+async function syncVaultEnvelopeName(vaultId, vaultName) {
+  const envelope = await readVaultEnvelope(vaultId);
+
+  if (!envelope?.metadata) {
+    return;
+  }
+
+  const existingVaultDescriptor =
+    envelope.metadata.vault && typeof envelope.metadata.vault === "object"
+      ? envelope.metadata.vault
+      : null;
+
+  await writeVaultEnvelope(vaultId, {
+    ...envelope,
+    metadata: {
+      ...envelope.metadata,
+      vault: {
+        localVaultId:
+          typeof existingVaultDescriptor?.localVaultId === "string"
+            ? existingVaultDescriptor.localVaultId
+            : null,
+        vaultGuid:
+          typeof existingVaultDescriptor?.vaultGuid === "string"
+            ? existingVaultDescriptor.vaultGuid
+            : vaultId,
+        name: vaultName,
+        vaultKind:
+          existingVaultDescriptor?.vaultKind === "private" ||
+          envelope.metadata.payloadMode === "encrypted"
+            ? "private"
+            : "regular",
+        schemaVersion:
+          typeof existingVaultDescriptor?.schemaVersion === "number"
+            ? existingVaultDescriptor.schemaVersion
+            : 1
+      }
+    }
+  });
+}
+
+async function ensureDefaultVaultState(vaultId) {
+  if (!(await fileExists(getVaultStateFile(vaultId)))) {
+    await writeVaultEnvelope(vaultId, createEmptyEnvelope());
+  }
+
+  if (!(await fileExists(getVaultJournalFile(vaultId)))) {
+    await writeVaultJournal(vaultId, []);
+  }
+}
+
+async function ensureInitialized() {
+  await ensureDir(DATA_DIR);
+  await ensureDir(VAULTS_DIR);
+
+  const timestamp = now();
+  const storedConfig = await readConfig();
+  let registry = await readRegistry();
+  let changed = false;
+  const storedDefaultVaultId =
+    storedConfig && typeof storedConfig.defaultVaultId === "string"
+      ? sanitizeVaultId(storedConfig.defaultVaultId)
+      : "";
+  const legacyVaultId =
+    storedConfig && typeof storedConfig.vaultId === "string" ? sanitizeVaultId(storedConfig.vaultId) : "";
+  const managementToken =
+    ENV_MANAGEMENT_TOKEN ||
+    (storedConfig && typeof storedConfig.managementToken === "string"
+      ? String(storedConfig.managementToken).trim()
+      : "") ||
+    createManagementToken();
+  const legacyVaultToken =
+    LEGACY_SYNC_TOKEN ||
+    (storedConfig && typeof storedConfig.token === "string" ? String(storedConfig.token).trim() : "");
+  const requestedDefaultVaultId = storedDefaultVaultId || legacyVaultId;
+  const shouldBootstrapLegacyVault = Boolean(requestedDefaultVaultId) && registry.vaults.length === 0;
+  let defaultVaultId =
+    (storedDefaultVaultId && registry.vaults.some((vault) => vault.id === storedDefaultVaultId)
+      ? storedDefaultVaultId
+      : "") ||
+    (requestedDefaultVaultId && registry.vaults.some((vault) => vault.id === requestedDefaultVaultId)
+      ? requestedDefaultVaultId
+      : "") ||
+    (shouldBootstrapLegacyVault ? requestedDefaultVaultId : "") ||
+    (registry.vaults[0]?.id ?? "");
+
+  const storedDefaultVaultName =
+    storedConfig && typeof storedConfig.defaultVaultName === "string"
+      ? sanitizeDisplayName(storedConfig.defaultVaultName, "Default vault")
+      : "";
+  let defaultVaultName =
+    storedDefaultVaultName ||
+    (defaultVaultId ? registry.vaults.find((vault) => vault.id === defaultVaultId)?.name ?? "Default vault" : "");
+
+  if (shouldBootstrapLegacyVault && !registry.vaults.some((vault) => vault.id === defaultVaultId)) {
+    registry = {
+      ...registry,
+      vaults: [
+        ...registry.vaults,
+        {
+          id: defaultVaultId,
+          name: defaultVaultName,
+          vaultKind: "regular",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          lastRevision: null,
+          lastSyncAt: null
+        }
+      ]
+    };
+    changed = true;
+    defaultVaultName = defaultVaultName || "Default vault";
+  }
+
+  defaultVaultId =
+    (storedDefaultVaultId && registry.vaults.some((vault) => vault.id === storedDefaultVaultId)
+      ? storedDefaultVaultId
+      : "") ||
+    (requestedDefaultVaultId && registry.vaults.some((vault) => vault.id === requestedDefaultVaultId)
+      ? requestedDefaultVaultId
+      : "") ||
+    (registry.vaults[0]?.id ?? "");
+  defaultVaultName =
+    defaultVaultId ? registry.vaults.find((vault) => vault.id === defaultVaultId)?.name ?? defaultVaultName : "";
+
+  if (legacyVaultToken && defaultVaultId) {
+    const legacyHash = hashToken(legacyVaultToken);
+    const hasLegacyToken = registry.tokens.some(
+      (token) => token.vaultId === defaultVaultId && token.tokenHash === legacyHash
+    );
+
+    if (!hasLegacyToken) {
+      registry = {
+        ...registry,
+        tokens: [
+          ...registry.tokens,
+          {
+            id: `legacy-${defaultVaultId}`,
+            vaultId: defaultVaultId,
+            label: "Legacy default token",
+            tokenHash: legacyHash,
+            createdAt: timestamp,
+            lastUsedAt: null
+          }
+        ]
+      };
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await writeRegistry(registry);
+  }
+
+  if (defaultVaultId) {
+    await ensureDefaultVaultState(defaultVaultId);
+  }
+
+  const config = {
+    mode: "personal",
+    managementToken,
+    defaultVaultId,
+    defaultVaultName,
+    createdAt:
+      storedConfig && typeof storedConfig.createdAt === "number" ? storedConfig.createdAt : timestamp,
+    updatedAt: timestamp
+  };
+
+  if (legacyVaultId) {
+    config.vaultId = legacyVaultId;
+  }
+
+  if (legacyVaultToken) {
+    config.token = legacyVaultToken;
+  }
+
+  await writeConfig(config);
+
+  return {
+    config,
+    registry: changed ? await readRegistry() : registry
+  };
+}
+
+function getAuthorizedManagement(config, request) {
+  return getBearerToken(request) === config.managementToken;
+}
+
+function getAuthorizedTokenRecord(registry, vaultId, tokenValue) {
+  const tokenHash = hashToken(tokenValue);
+  return (
+    registry.tokens.find((token) => token.vaultId === vaultId && token.tokenHash === tokenHash) ?? null
+  );
+}
+
+function getVaultById(registry, vaultId) {
+  return registry.vaults.find((vault) => vault.id === vaultId) ?? null;
+}
+
+async function markTokenUsed(registry, tokenId) {
+  const token = registry.tokens.find((entry) => entry.id === tokenId);
+
+  if (token && (token.lastUsedAt ?? 0) > now() - 60_000) {
+    return registry;
+  }
+
+  const nextRegistry = {
+    ...registry,
+    tokens: registry.tokens.map((entry) =>
+      entry.id === tokenId
+        ? {
+            ...entry,
+            lastUsedAt: now()
+          }
+        : entry
+    )
+  };
+
+  await writeRegistry(nextRegistry);
+  return nextRegistry;
+}
+
+async function updateVaultMeta(registry, vaultId, patch) {
+  const nextRegistry = {
+    ...registry,
+    vaults: registry.vaults.map((vault) =>
+      vault.id === vaultId
+        ? {
+            ...vault,
+            ...patch,
+            updatedAt: now()
+          }
+        : vault
+    )
+  };
+
+  await writeRegistry(nextRegistry);
+  return nextRegistry;
+}
+
+function buildSnapshotFallbackFeed(envelope) {
+  return {
+    mode: "snapshot",
+    revision: envelope.revision,
+    baseRevision: null,
+    changes: null,
+    encryptedChanges: null,
+    snapshot: isEncryptedEnvelope(envelope) ? null : envelope.snapshot,
+    metadata: envelope.metadata ?? null
+  };
+}
+
+function resolveEnvelopeVaultKind(envelope) {
+  return envelope?.metadata?.payloadMode === "encrypted" ? "private" : "regular";
+}
+
+async function appendVaultJournalEntry(vaultId, entry) {
+  const journal = await readVaultJournal(vaultId);
+  await writeVaultJournal(vaultId, [...journal, entry]);
+}
+
+async function createVaultRecord(registry, payload) {
+  const name = sanitizeDisplayName(payload?.name, "New vault");
+  const requestedId = sanitizeVaultId(payload?.id ?? "");
+  const vaultId = requestedId || sanitizeVaultId(name) || `vault-${randomUUID().slice(0, 8)}`;
+
+  if (registry.vaults.some((vault) => vault.id === vaultId)) {
+    return {
+      statusCode: 409,
+      error: "VAULT_ALREADY_EXISTS"
+    };
+  }
+
+  const timestamp = now();
+  const nextRegistry = {
+    ...registry,
+    vaults: [
+      ...registry.vaults,
+      {
+        id: vaultId,
+        name,
+        vaultKind: "regular",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        lastRevision: null,
+        lastSyncAt: null
+      }
+    ]
+  };
+
+  await writeRegistry(nextRegistry);
+  await ensureDefaultVaultState(vaultId);
+
+  return {
+    statusCode: 201,
+    nextRegistry,
+    vault: buildVaultList(nextRegistry).find((vault) => vault.id === vaultId) ?? null
+  };
+}
+
+async function deleteVaultRecord(registry, config, vaultId) {
+  const vault = getVaultById(registry, vaultId);
+
+  if (!vault) {
+    return {
+      statusCode: 404,
+      error: "VAULT_NOT_FOUND"
+    };
+  }
+
+  if (registry.vaults.length <= 1) {
+    return {
+      statusCode: 409,
+      error: "LAST_VAULT_REQUIRED"
+    };
+  }
+
+  const nextRegistry = {
+    ...registry,
+    vaults: registry.vaults.filter((entry) => entry.id !== vaultId),
+    tokens: registry.tokens.filter((entry) => entry.vaultId !== vaultId)
+  };
+
+  await writeRegistry(nextRegistry);
+  await rm(getVaultStateFile(vaultId), {
+    force: true
+  });
+  await rm(getVaultJournalFile(vaultId), {
+    force: true
+  });
+
+  if (config.defaultVaultId === vaultId) {
+    const nextDefaultVault = buildVaultList(nextRegistry)[0] ?? null;
+
+    if (nextDefaultVault) {
+      await writeConfig({
+        ...config,
+        defaultVaultId: nextDefaultVault.id,
+        defaultVaultName: nextDefaultVault.name,
+        updatedAt: now()
+      });
+    }
+  }
+
+  return {
+    statusCode: 200,
+    nextRegistry,
+    vaultId
+  };
+}
+
+async function issueVaultToken(registry, vaultId, labelValue) {
+  if (!getVaultById(registry, vaultId)) {
+    return {
+      statusCode: 404,
+      error: "VAULT_NOT_FOUND"
+    };
+  }
+
+  const tokenValue = createVaultSyncToken(vaultId);
+  const nextToken = {
+    id: randomUUID(),
+    vaultId,
+    label: sanitizeDisplayName(labelValue, "Client token"),
+    tokenHash: hashToken(tokenValue),
+    createdAt: now(),
+    lastUsedAt: null
+  };
+  const nextRegistry = {
+    ...registry,
+    tokens: [...registry.tokens, nextToken]
+  };
+
+  await writeRegistry(nextRegistry);
+
+  return {
+    statusCode: 201,
+    nextRegistry,
+    token: tokenValue,
+    tokenMeta: buildTokenMeta(nextToken)
+  };
+}
+
+function renderSetupPage(config, registry) {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zen Sync Personal</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <span class="eyebrow">Zen Sync Personal</span>
+        <h1>Personal self-hosted sync for one owner with many vaults.</h1>
+        <p>
+          This runtime stays minimal and local-first, but it can now host multiple remote vaults on
+          one personal server. The app manages vault bindings through a single management token.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Server setup</h2>
+        <dl class="details">
+          <div>
+            <dt>Mode</dt>
+            <dd>Single-user multi-vault</dd>
+          </div>
+          <div>
+            <dt>Default vault</dt>
+            <dd><code>${config.defaultVaultId || "none"}</code></dd>
+          </div>
+          <div>
+            <dt>Management token</dt>
+            <dd>Stored in <code>${PERSONAL_CONFIG_FILE}</code> and used by the app to create/list remote vaults.</dd>
+          </div>
+          <div>
+            <dt>Vault count</dt>
+            <dd>${registry.vaults.length}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>What the app can do</h2>
+        <ul class="feature-list">
+          <li>List remote vaults on this personal server</li>
+          <li>Create separate remote vaults for local vaults</li>
+          <li>Issue per-vault sync tokens</li>
+          <li>Keep vault snapshots isolated instead of merging everything into one blob</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
+const bootstrap = await ensureInitialized();
+
+const server = createServer(async (request, response) => {
+  try {
+    if (!request.url) {
+      sendJson(response, 400, { error: "INVALID_REQUEST" });
+      return;
+    }
+
+    if (request.method === "OPTIONS") {
+      sendCorsNoContent(response);
+      return;
+    }
+
+    const { config } = await ensureInitialized();
+    const registry = await readRegistry();
+    const url = new URL(request.url, `http://${request.headers.host ?? "localhost"}`);
+    const pathname = url.pathname;
+
+    if (pathname === "/" && request.method === "GET") {
+      sendText(response, 200, "text/html; charset=utf-8", renderSetupPage(config, registry));
+      return;
+    }
+
+    if (pathname === "/styles.css" && request.method === "GET") {
+      await serveStaticAsset(response, STATIC_DIR, "styles.css", "text/css; charset=utf-8");
+      return;
+    }
+
+    if (pathname === "/health" && request.method === "GET") {
+      sendJson(response, 200, {
+        ok: true,
+        mode: "personal",
+        defaultVaultId: config.defaultVaultId || null,
+        vaultCount: registry.vaults.length
+      });
+      return;
+    }
+
+    if (pathname === "/v1/capabilities" && request.method === "GET") {
+      sendJson(response, 200, {
+        mode: "personal",
+        product: "Zen Sync Personal",
+        features: {
+          selfHosted: true,
+          hostedAccounts: false,
+          adminUi: false,
+          accountPortal: false,
+          multiUser: false,
+          multiVault: true,
+          standaloneRegistry: true,
+          managementApi: true,
+          deltaSync: true
+        },
+        defaultVaultId: config.defaultVaultId || null
+      });
+      return;
+    }
+
+    if (pathname === "/v1/personal/vaults" && request.method === "GET") {
+      if (!getAuthorizedManagement(config, request)) {
+        sendJson(response, 401, { error: "UNAUTHORIZED" });
+        return;
+      }
+
+      sendJson(response, 200, {
+        vaults: buildVaultList(registry)
+      });
+      return;
+    }
+
+    if (pathname === "/v1/personal/vaults" && request.method === "POST") {
+      if (!getAuthorizedManagement(config, request)) {
+        sendJson(response, 401, { error: "UNAUTHORIZED" });
+        return;
+      }
+
+      const payload = await collectBody(request);
+      const created = await createVaultRecord(registry, payload);
+
+      if (created.error) {
+        sendJson(response, created.statusCode, { error: created.error });
+        return;
+      }
+
+      sendJson(response, created.statusCode, {
+        vault: created.vault
+      });
+      return;
+    }
+
+    const personalVaultMatch = pathname.match(/^\/v1\/personal\/vaults\/([a-z0-9-_]{1,64})$/i);
+
+    if (personalVaultMatch && request.method === "PATCH") {
+      if (!getAuthorizedManagement(config, request)) {
+        sendJson(response, 401, { error: "UNAUTHORIZED" });
+        return;
+      }
+
+      const vaultId = sanitizeVaultId(personalVaultMatch[1]);
+      const vault = getVaultById(registry, vaultId);
+
+      if (!vault) {
+        sendJson(response, 404, { error: "VAULT_NOT_FOUND" });
+        return;
+      }
+
+      const payload = await collectBody(request);
+      const nextName = sanitizeDisplayName(payload?.name, "");
+
+      if (!nextName) {
+        sendJson(response, 400, { error: "VAULT_NAME_REQUIRED" });
+        return;
+      }
+
+      const nextRegistry = await updateVaultMeta(registry, vaultId, {
+        name: nextName
+      });
+      await syncVaultEnvelopeName(vaultId, nextName);
+
+      sendJson(response, 200, {
+        vault: buildVaultList(nextRegistry).find((entry) => entry.id === vaultId) ?? null
+      });
+      return;
+    }
+
+    if (personalVaultMatch && request.method === "DELETE") {
+      if (!getAuthorizedManagement(config, request)) {
+        sendJson(response, 401, { error: "UNAUTHORIZED" });
+        return;
+      }
+
+      const vaultId = sanitizeVaultId(personalVaultMatch[1]);
+      const removed = await deleteVaultRecord(registry, config, vaultId);
+
+      if (removed.error) {
+        sendJson(response, removed.statusCode, {
+          error: removed.error
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        ok: true,
+        vaultId: removed.vaultId
+      });
+      return;
+    }
+
+    const personalVaultTokenMatch = pathname.match(/^\/v1\/personal\/vaults\/([a-z0-9-_]{1,64})\/tokens$/i);
+
+    if (personalVaultTokenMatch && request.method === "GET") {
+      if (!getAuthorizedManagement(config, request)) {
+        sendJson(response, 401, { error: "UNAUTHORIZED" });
+        return;
+      }
+
+      const vaultId = sanitizeVaultId(personalVaultTokenMatch[1]);
+
+      if (!getVaultById(registry, vaultId)) {
+        sendJson(response, 404, { error: "VAULT_NOT_FOUND" });
+        return;
+      }
+
+      sendJson(response, 200, {
+        tokens: registry.tokens
+          .filter((token) => token.vaultId === vaultId)
+          .map(buildTokenMeta)
+          .sort((left, right) => left.createdAt - right.createdAt)
+      });
+      return;
+    }
+
+    if (personalVaultTokenMatch && request.method === "POST") {
+      if (!getAuthorizedManagement(config, request)) {
+        sendJson(response, 401, { error: "UNAUTHORIZED" });
+        return;
+      }
+
+      const vaultId = sanitizeVaultId(personalVaultTokenMatch[1]);
+      const payload = await collectBody(request);
+      const issued = await issueVaultToken(registry, vaultId, payload?.label);
+
+      if (issued.error) {
+        sendJson(response, issued.statusCode, { error: issued.error });
+        return;
+      }
+
+      sendJson(response, issued.statusCode, {
+        token: issued.token,
+        tokenMeta: issued.tokenMeta
+      });
+      return;
+    }
+
+    const changesMatch = pathname.match(/^\/v1\/vaults\/([a-z0-9-_]{1,64})\/changes$/i);
+    const legacyDefaultChangesRoute =
+      pathname === "/v1/changes" && config.defaultVaultId ? ["", config.defaultVaultId] : null;
+    const changesVaultId = sanitizeVaultId(changesMatch?.[1] ?? legacyDefaultChangesRoute?.[1] ?? "");
+
+    if (changesVaultId && (request.method === "GET" || request.method === "POST")) {
+      const vault = getVaultById(registry, changesVaultId);
+
+      if (!vault) {
+        sendJson(response, 404, { error: "VAULT_NOT_FOUND" });
+        return;
+      }
+
+      const tokenValue = getBearerToken(request);
+      const tokenRecord = tokenValue ? getAuthorizedTokenRecord(registry, changesVaultId, tokenValue) : null;
+
+      if (!tokenRecord) {
+        sendJson(response, 401, { error: "UNAUTHORIZED" });
+        return;
+      }
+
+      const registryWithUsage = await markTokenUsed(registry, tokenRecord.id);
+      const currentEnvelope = await readVaultEnvelope(changesVaultId);
+
+      if (request.method === "GET") {
+        const sinceRevision = url.searchParams.get("since")?.trim() ?? "";
+
+        if (!sinceRevision || !currentEnvelope.revision) {
+          sendJson(response, 200, buildSnapshotFallbackFeed(currentEnvelope));
+          return;
+        }
+
+        if (sinceRevision === currentEnvelope.revision) {
+          sendJson(response, 200, {
+            mode: "delta",
+            revision: currentEnvelope.revision,
+            baseRevision: sinceRevision,
+            changes:
+              currentEnvelope.metadata?.payloadMode === "encrypted"
+                ? null
+                : createEmptyChangeSet("server"),
+            encryptedChanges:
+              currentEnvelope.metadata?.payloadMode === "encrypted" ? [] : null,
+            snapshot: null,
+            metadata: currentEnvelope.metadata ?? null
+          });
+          return;
+        }
+
+        const journal = await readVaultJournal(changesVaultId);
+        const cursorIndex = journal.findIndex((entry) => entry.revision === sinceRevision);
+
+        if (cursorIndex === -1) {
+          sendJson(response, 200, buildSnapshotFallbackFeed(currentEnvelope));
+          return;
+        }
+
+        if (currentEnvelope.metadata?.payloadMode === "encrypted") {
+          const batches = journal.slice(cursorIndex + 1).map((entry) => entry.encryptedChanges).filter(Boolean);
+
+          if (batches.length !== journal.slice(cursorIndex + 1).length) {
+            sendJson(response, 200, buildSnapshotFallbackFeed(currentEnvelope));
+            return;
+          }
+
+          sendJson(response, 200, {
+            mode: "delta",
+            revision: currentEnvelope.revision,
+            baseRevision: sinceRevision,
+            changes: null,
+            encryptedChanges: batches,
+            snapshot: null,
+            metadata: currentEnvelope.metadata ?? null
+          });
+          return;
+        }
+
+        sendJson(response, 200, {
+          mode: "delta",
+          revision: currentEnvelope.revision,
+          baseRevision: sinceRevision,
+          changes: collapseChangeSets(journal.slice(cursorIndex + 1).map((entry) => entry.changes)),
+          encryptedChanges: null,
+          snapshot: null
+        });
+        return;
+      }
+
+      const payload = await collectBody(request);
+      const baseRevision =
+        payload && typeof payload === "object" && "baseRevision" in payload
+          ? payload.baseRevision ?? null
+          : null;
+      const rawChanges =
+        payload && typeof payload === "object" && "changes" in payload ? payload.changes : null;
+      const encryptedChanges =
+        payload && typeof payload === "object" && "encryptedChanges" in payload
+          ? normalizeEncryptedPayload(payload.encryptedChanges)
+          : null;
+      const encryptedSnapshot =
+        payload && typeof payload === "object" && "encryptedSnapshot" in payload
+          ? normalizeEncryptedPayload(payload.encryptedSnapshot)
+          : null;
+      const metadata =
+        payload && typeof payload === "object" && payload.metadata && typeof payload.metadata === "object"
+          ? {
+              schemaVersion:
+                typeof payload.metadata.schemaVersion === "number" ? payload.metadata.schemaVersion : 1,
+              payloadMode: payload.metadata.payloadMode === "encrypted" ? "encrypted" : "plain",
+              vault:
+                payload.metadata.vault && typeof payload.metadata.vault === "object"
+                  ? payload.metadata.vault
+                  : null,
+              encryption:
+                payload.metadata.encryption && typeof payload.metadata.encryption === "object"
+                  ? payload.metadata.encryption
+                  : null
+            }
+          : null;
+      const changes = normalizeChangeSet(rawChanges, "server");
+
+      if (currentEnvelope.metadata?.payloadMode === "encrypted") {
+        if (!encryptedChanges || !encryptedSnapshot || metadata?.payloadMode !== "encrypted") {
+          sendJson(response, 400, {
+            error: "ENCRYPTED_DELTA_PAYLOAD_REQUIRED"
+          });
+          return;
+        }
+
+        if (currentEnvelope.revision !== baseRevision) {
+          sendJson(response, 409, {
+            error: "SYNC_REVISION_CONFLICT",
+            revision: currentEnvelope.revision
+          });
+          return;
+        }
+
+        const nextEnvelope = {
+          revision: `rev-${Date.now()}-${randomUUID()}`,
+          encryptedSnapshot,
+          metadata
+        };
+
+        await writeVaultEnvelope(changesVaultId, nextEnvelope);
+        await appendVaultJournalEntry(changesVaultId, {
+          revision: nextEnvelope.revision,
+          baseRevision,
+          createdAt: now(),
+          encryptedChanges
+        });
+        await updateVaultMeta(registryWithUsage, changesVaultId, {
+          lastRevision: nextEnvelope.revision,
+          lastSyncAt: Date.now(),
+          vaultKind: "private"
+        });
+
+        sendJson(response, 200, {
+          revision: nextEnvelope.revision
+        });
+        return;
+      }
+
+      if (encryptedChanges || encryptedSnapshot || metadata?.payloadMode === "encrypted") {
+        sendJson(response, 409, {
+          error: "DELTA_SYNC_UNAVAILABLE",
+          revision: currentEnvelope.revision
+        });
+        return;
+      }
+
+      if (currentEnvelope.revision !== baseRevision) {
+        sendJson(response, 409, {
+          error: "SYNC_REVISION_CONFLICT",
+          revision: currentEnvelope.revision
+        });
+        return;
+      }
+
+      if (isChangeSetEmpty(changes)) {
+        sendJson(response, 200, {
+          revision: currentEnvelope.revision
+        });
+        return;
+      }
+
+      const nextSnapshot = applyChangeSetToSnapshot(currentEnvelope.snapshot, changes);
+      const nextEnvelope = {
+        ...currentEnvelope,
+        revision: `rev-${Date.now()}-${randomUUID()}`,
+        snapshot: {
+          ...nextSnapshot,
+          exportedAt: Date.now()
+        }
+      };
+
+      await writeVaultEnvelope(changesVaultId, nextEnvelope);
+      await appendVaultJournalEntry(changesVaultId, {
+        revision: nextEnvelope.revision,
+        baseRevision,
+        createdAt: now(),
+        changes: {
+          ...changes,
+          exportedAt: nextEnvelope.snapshot.exportedAt
+        }
+      });
+      await updateVaultMeta(registryWithUsage, changesVaultId, {
+        lastRevision: nextEnvelope.revision,
+        lastSyncAt: Date.now(),
+        vaultKind: "regular"
+      });
+
+      sendJson(response, 200, {
+        revision: nextEnvelope.revision
+      });
+      return;
+    }
+
+    const stateMatch = pathname.match(/^\/v1\/vaults\/([a-z0-9-_]{1,64})\/state$/i);
+    const legacyDefaultStateRoute =
+      pathname === "/v1/state" && config.defaultVaultId ? ["", config.defaultVaultId] : null;
+    const stateVaultId = sanitizeVaultId(stateMatch?.[1] ?? legacyDefaultStateRoute?.[1] ?? "");
+
+    if (stateVaultId && (request.method === "GET" || request.method === "PUT")) {
+      const vault = getVaultById(registry, stateVaultId);
+
+      if (!vault) {
+        sendJson(response, 404, { error: "VAULT_NOT_FOUND" });
+        return;
+      }
+
+      const tokenValue = getBearerToken(request);
+      const tokenRecord = tokenValue ? getAuthorizedTokenRecord(registry, stateVaultId, tokenValue) : null;
+
+      if (!tokenRecord) {
+        sendJson(response, 401, { error: "UNAUTHORIZED" });
+        return;
+      }
+
+      const registryWithUsage = await markTokenUsed(registry, tokenRecord.id);
+
+      await handleOptimisticSyncRoute({
+        request,
+        response,
+        readEnvelope: () => readVaultEnvelope(stateVaultId),
+        writeEnvelope: (envelope) => writeVaultEnvelope(stateVaultId, envelope),
+        onAfterWrite: async (envelope, previousEnvelope) => {
+          if (isEncryptedEnvelope(envelope) || isEncryptedEnvelope(previousEnvelope)) {
+            await writeVaultJournal(stateVaultId, []);
+            await updateVaultMeta(registryWithUsage, stateVaultId, {
+              lastRevision: envelope.revision,
+              lastSyncAt: Date.now(),
+              vaultKind: resolveEnvelopeVaultKind(envelope)
+            });
+            return;
+          }
+
+          const changeSet = buildChangeSetFromSnapshots(previousEnvelope?.snapshot, envelope.snapshot);
+
+          if (!isChangeSetEmpty(changeSet)) {
+            await appendVaultJournalEntry(stateVaultId, {
+              revision: envelope.revision,
+              baseRevision: previousEnvelope?.revision ?? null,
+              createdAt: now(),
+              changes: changeSet
+            });
+          }
+
+          await updateVaultMeta(registryWithUsage, stateVaultId, {
+            lastRevision: envelope.revision,
+            lastSyncAt: Date.now(),
+            vaultKind: resolveEnvelopeVaultKind(envelope)
+          });
+        }
+      });
+      return;
+    }
+
+    sendJson(response, 404, { error: "NOT_FOUND" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "SERVER_ERROR";
+    sendJson(response, 500, { error: message });
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`Zen Sync Personal listening on http://localhost:${PORT}`);
+  console.log(`Data dir: ${DATA_DIR}`);
+  console.log(`Default vault: ${bootstrap.config.defaultVaultId || "none"}`);
+  console.log(`Management token: ${bootstrap.config.managementToken}`);
+});
