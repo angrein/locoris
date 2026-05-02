@@ -1,0 +1,39 @@
+name: Tauri desktop (Windows)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build Windows installer
+        run: npm run desktop:build --workspace @locoris/app
+
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: locoris-windows-bundle
+          path: apps/app/src-tauri/target/release/bundle/
