@@ -53,6 +53,6 @@ jobs:
           tagName: app-v__VERSION__
           releaseName: Locoris App __VERSION__
           releaseBody: Desktop release for Locoris __VERSION__.
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

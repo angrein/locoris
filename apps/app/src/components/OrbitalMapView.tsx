@@ -73,6 +73,10 @@ interface OrbitalMapViewProps {
     text: string;
     title?: string;
   } | null;
+  updateChip?: {
+    text: string;
+    title?: string;
+  } | null;
   editorOpen: boolean;
   editorMode?: Note["contentType"] | null;
   editorSlot: ReactNode;
@@ -1959,6 +1963,7 @@ export default function OrbitalMapView({
   localVaultOptions,
   syncStatusChip,
   syncTransportChip,
+  updateChip,
   editorOpen,
   editorMode = null,
   editorSlot,
@@ -7171,6 +7176,20 @@ export default function OrbitalMapView({
                 >
                   {syncTransportChip.text}
                 </span>
+              ) : null}
+              {updateChip ? (
+                <button
+                  type="button"
+                  className="orbital-context-pill orbital-update-chip"
+                  title={updateChip.title ?? updateChip.text}
+                  onClick={() => {
+                    if (settingsModalSlot) {
+                      setActiveModal("settings");
+                    }
+                  }}
+                >
+                  {updateChip.text}
+                </button>
               ) : null}
             </div>
           </div>

@@ -375,8 +375,7 @@ const en = {
   settings: {
     kicker: "Preferences",
     title: "Settings",
-    caption:
-      "Language and synchronization live here. This screen lets you route local vaults into cloud and self-hosted backends without leaving Locoris.",
+    caption: "Interface language, app updates, and vault synchronization.",
     networkOnline: "NET",
     networkOffline: "OFF",
     general: "General",
@@ -400,6 +399,8 @@ const en = {
     desktopUpdateInstall: "Install update",
     desktopUpdateInstalling: "Installing…",
     desktopUpdateCheck: "Check for updates",
+    desktopUpdateChip: "Update {{version}}",
+    desktopUpdateChipTitle: "Version {{version}} is available. Open settings to install the update.",
     desktopUpdateHint:
       "The app will restart automatically after installation. Updates are available only in the desktop edition of Locoris.",
     desktopUpdateError: "Could not check or install the update.",
@@ -408,8 +409,7 @@ const en = {
     syncManagerIntro:
       "Connect each local vault to one remote method. A single sync method can hold many vaults, and every link is visualized directly in this layout.",
     back: "Back",
-    footnote:
-      "This screen follows the same minimal visual language as the inspector hierarchy, so the app keeps one coherent rhythm end to end.",
+    footnote: "",
     vaultsTitle: "Local vaults",
     vaultsDescription:
       "Create vaults here, rename them, remove them, and connect each one to a single sync method.",
@@ -504,7 +504,7 @@ const en = {
       "Preparing the browser Google OAuth SDK. As soon as it is ready, the connect button becomes available.",
     googleDriveSdkReady: "Google OAuth SDK is ready. You can open the authorization window now.",
     selfHostedModalDescription:
-      "Enter the personal server endpoint and management token. After that you can connect vaults directly from this screen.",
+      "Enter the personal server endpoint and management token. After that the server will be ready for vault connections.",
     hostedModalDescription:
       "Sign in or create a cloud account, and the new sync method will appear in the right column ready for bindings.",
     connectionLabelOptional: "Optional label",

@@ -79,6 +79,7 @@ import {
   getDisplayVaultName,
   hasExplicitDisplayName
 } from "./lib/displayNames";
+import { checkForDesktopUpdate, supportsDesktopUpdates } from "./lib/desktopUpdates";
 import {
   connectGoogleDriveAccount,
   deleteHostedVault,
@@ -198,6 +199,9 @@ export default function App() {
     title: string;
   } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [desktopUpdateChip, setDesktopUpdateChip] = useState<{
+    version: string;
+  } | null>(null);
   const [isDocumentVisible, setIsDocumentVisible] = useState(
     typeof document === "undefined" ? true : document.visibilityState !== "hidden"
   );
@@ -213,6 +217,7 @@ export default function App() {
   const previousVisibilityRef = useRef(isDocumentVisible);
   const previousOrbitalEditorNoteIdRef = useRef<string | null>(null);
   const newDocumentDraftIdsRef = useRef<Set<string>>(new Set());
+  const desktopUpdateCheckStartedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -402,6 +407,39 @@ export default function App() {
       document.documentElement.lang = settings.language;
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (!online || !supportsDesktopUpdates() || desktopUpdateCheckStartedRef.current) {
+      return;
+    }
+
+    desktopUpdateCheckStartedRef.current = true;
+    let cancelled = false;
+
+    void checkForDesktopUpdate()
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (result.status === "available") {
+          setDesktopUpdateChip({
+            version: result.nextVersion
+          });
+        } else {
+          setDesktopUpdateChip(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDesktopUpdateChip(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [online]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -2973,6 +3011,14 @@ export default function App() {
         onCloseEditor={handleCloseOrbitalEditor}
         syncStatusChip={activeVaultSyncChip}
         syncTransportChip={activeSyncTransportChip}
+        updateChip={
+          desktopUpdateChip
+            ? {
+                text: t("settings.desktopUpdateChip", { version: desktopUpdateChip.version }),
+                title: t("settings.desktopUpdateChipTitle", { version: desktopUpdateChip.version })
+              }
+            : null
+        }
         activeLocalVaultId={activeLocalVaultId}
         localVaultOptions={localVaultSwitcherItems}
         onSelectLocalVault={(localVaultId) => activateLocalVault(localVaultId)}

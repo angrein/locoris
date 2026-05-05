@@ -105,15 +105,6 @@ interface SettingsPanelProps {
   onLockVaultEncryption: (localVaultId: string) => void | Promise<void>;
 }
 
-function SettingsGlyph() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      <path d="M8.2 2.5h3.6l.4 1.8a5.8 5.8 0 0 1 1.3.6l1.7-.8 2.6 2.6-.8 1.7c.24.42.45.86.6 1.33l1.8.4v3.6l-1.8.4a5.9 5.9 0 0 1-.6 1.3l.8 1.7-2.6 2.6-1.7-.8a5.8 5.8 0 0 1-1.33.6l-.4 1.8H8.2l-.4-1.8a5.8 5.8 0 0 1-1.3-.6l-1.7.8-2.6-2.6.8-1.7a5.8 5.8 0 0 1-.6-1.3l-1.8-.4v-3.6l1.8-.4a6.2 6.2 0 0 1 .6-1.33l-.8-1.7 2.6-2.6 1.7.8c.42-.24.86-.45 1.3-.6l.4-1.8Z" />
-      <circle cx="10" cy="10" r="2.6" className="settings-row-icon-core" />
-    </svg>
-  );
-}
-
 function LanguageGlyph() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -246,6 +237,14 @@ export default function SettingsPanel({
       cancelled = true;
     };
   }, [desktopUpdatesEnabled]);
+
+  useEffect(() => {
+    if (!desktopUpdatesEnabled || desktopUpdateState.phase !== "idle") {
+      return;
+    }
+
+    void handleCheckDesktopUpdates();
+  }, [desktopUpdatesEnabled, desktopUpdateState.phase]);
 
   const handleCheckDesktopUpdates = async () => {
     setDesktopUpdateState((current) => ({
@@ -559,12 +558,6 @@ export default function SettingsPanel({
         </div>
       ) : null}
 
-      <div className="settings-panel-footnote">
-        <span className="settings-panel-footnote-icon" aria-hidden="true">
-          <SettingsGlyph />
-        </span>
-        <p>{t("settings.footnote")}</p>
-      </div>
     </section>
   );
 }
