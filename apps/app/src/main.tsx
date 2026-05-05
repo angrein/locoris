@@ -61,7 +61,54 @@ import "./styles.css";
 import "./i18n";
 import { initializePersistentClientStorage } from "./lib/persistentClientStorage";
 
+function isDesktopRuntime() {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+async function resetDesktopServiceWorkerState() {
+  if (!isDesktopRuntime()) {
+    return;
+  }
+
+  let foundDesktopPwaState = false;
+
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);
+
+    if (registrations.length > 0) {
+      foundDesktopPwaState = true;
+    }
+
+    await Promise.all(registrations.map((registration) => registration.unregister().catch(() => false)));
+  }
+
+  if ("caches" in window) {
+    const cacheKeys = await caches.keys().catch(() => []);
+
+    if (cacheKeys.length > 0) {
+      foundDesktopPwaState = true;
+    }
+
+    await Promise.all(cacheKeys.map((cacheKey) => caches.delete(cacheKey).catch(() => false)));
+  }
+
+  if (!foundDesktopPwaState) {
+    sessionStorage.removeItem("locoris:desktop-pwa-reset");
+    return;
+  }
+
+  if (sessionStorage.getItem("locoris:desktop-pwa-reset") === "1") {
+    sessionStorage.removeItem("locoris:desktop-pwa-reset");
+    return;
+  }
+
+  sessionStorage.setItem("locoris:desktop-pwa-reset", "1");
+  window.location.reload();
+  await new Promise(() => undefined);
+}
+
 async function bootstrap() {
+  await resetDesktopServiceWorkerState();
   await initializePersistentClientStorage();
 
   ReactDOM.createRoot(document.getElementById("root")!).render(

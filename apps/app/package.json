@@ -9,9 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "tauri": "tauri",
-    "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build",
-    "desktop:build:debug": "tauri build --debug",
+    "desktop:dev": "node ./scripts/run-tauri.mjs dev",
+    "desktop:build": "node ./scripts/run-tauri.mjs build",
+    "desktop:build:debug": "node ./scripts/run-tauri.mjs build --debug",
     "desktop:info": "tauri info"
   },
   "dependencies": {

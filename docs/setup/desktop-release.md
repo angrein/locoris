@@ -52,6 +52,20 @@ This keeps the release pipeline simple while no Apple Developer account or Windo
 
 These warnings are normal for the current distribution strategy.
 
+### macOS note about "damaged" apps
+
+On modern macOS versions an unsigned app downloaded from the internet can be shown as "damaged" even when the bundle itself is valid.
+
+This usually means Gatekeeper blocked the app because it is unsigned and unnotarized, not that the `.dmg` is actually corrupted.
+
+Typical local workaround after moving the app to `/Applications`:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Locoris.app
+```
+
+Then open the app again.
+
 ### Important distinction
 
 Tauri updater signing is still enabled.
