@@ -101,6 +101,11 @@
   box-shadow: none;
 }
 
+.settings-row-action:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
 .settings-row-icon,
 .settings-row-action-icon {
   width: 18px;
@@ -299,6 +304,40 @@
   color: rgba(189, 196, 228, 0.76);
 }
 
+.settings-update-row {
+  align-items: flex-start;
+}
+
+.settings-update-copy span {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: initial;
+}
+
+.settings-update-side {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.settings-update-note,
+.settings-update-hint {
+  margin: 2px 0 0;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: rgba(187, 194, 226, 0.72);
+}
+
+.settings-update-note {
+  color: rgba(226, 231, 255, 0.78);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 @media (max-width: 720px) {
   .settings-panel-header {
     flex-direction: column;
@@ -312,6 +351,15 @@
 
   .settings-row-side {
     margin-left: auto;
+  }
+
+  .settings-update-side {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .settings-update-side .settings-row-count {
+    justify-self: flex-start;
   }
 
   .settings-language-menu {

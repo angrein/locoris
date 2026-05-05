@@ -49,6 +49,9 @@ type InspectorCompactIconKind =
 type InspectorDocumentKindFilter = "note" | "canvas";
 
 const PROJECT_DRAG_THRESHOLD_PX = 5;
+const ORBITAL_NODE_POSITION_EASE_MS = 180;
+const ORBITAL_NODE_POSITION_SNAP_DISTANCE = 0.18;
+const LOW_DENSITY_DPR_THRESHOLD = 1.5;
 
 interface OrbitalMapViewProps {
   projects: Project[];
@@ -290,6 +293,11 @@ interface OrbitalScene {
   links: OrbitalSceneLink[];
   entityMap: Map<string, OrbitalSceneNode>;
 }
+
+type OrbitalScenePosition = {
+  x: number;
+  y: number;
+};
 
 type OrbitalVisualTone = "primary" | "direct" | "secondary" | "muted";
 
@@ -1663,34 +1671,58 @@ function materializeOrbitalScene(
 
     if (parent && layoutNode.orbit) {
       const tone = toneByEntityId?.get(layoutNode.entityId) ?? "muted";
-      const motionFactor =
+      const presentationMotionAmplitude =
         tone === "primary"
-          ? 1.06
+          ? 3.4
           : tone === "direct"
-            ? 0.82
+            ? 1.8
             : tone === "secondary"
-              ? 0.34
+              ? 0.82
               : 0.12;
+      const orbitExpansion =
+        tone === "primary" ? 16 : tone === "direct" ? 9 : tone === "secondary" ? 4 : 0;
       const angle =
         layoutNode.orbit.baseAngle +
-        timeMs * layoutNode.orbit.speed * layoutNode.orbit.direction * motionFactor * motionCalmFactor +
+        timeMs * layoutNode.orbit.speed * layoutNode.orbit.direction * motionCalmFactor +
         layoutNode.orbit.wobble;
       const localX = Math.cos(angle) * layoutNode.orbit.rx;
       const localY = Math.sin(angle) * layoutNode.orbit.ry;
 
-      x =
+      const orbitalX =
         parent.x +
         localX * layoutNode.orbit.rotationCos -
         localY * layoutNode.orbit.rotationSin;
-      y =
+      const orbitalY =
         parent.y +
         localX * layoutNode.orbit.rotationSin +
         localY * layoutNode.orbit.rotationCos;
+      const orbitVectorX = orbitalX - parent.x;
+      const orbitVectorY = orbitalY - parent.y;
+      const orbitVectorLength = Math.hypot(orbitVectorX, orbitVectorY) || 1;
+      const radialUnitX = orbitVectorX / orbitVectorLength;
+      const radialUnitY = orbitVectorY / orbitVectorLength;
+      const tangentUnitX = -radialUnitY;
+      const tangentUnitY = radialUnitX;
+      const motionPhase =
+        timeMs * (layoutNode.orbit.speed * 26 + 0.00042) +
+        layoutNode.orbit.baseAngle * 1.85 +
+        layoutNode.depth * 0.38;
+      const radialLift = orbitExpansion * 0.56 * motionCalmFactor;
+      const radialOffset =
+        radialLift + Math.sin(motionPhase) * presentationMotionAmplitude * motionCalmFactor;
+      const tangentOffset =
+        Math.cos(motionPhase * 0.72) *
+        presentationMotionAmplitude *
+        0.16 *
+        motionCalmFactor;
+
+      x = orbitalX + radialUnitX * radialOffset + tangentUnitX * tangentOffset;
+      y = orbitalY + radialUnitY * radialOffset + tangentUnitY * tangentOffset;
       orbit = {
         x: parent.x,
         y: parent.y,
-        rx: layoutNode.orbit.rx,
-        ry: layoutNode.orbit.ry,
+        rx: layoutNode.orbit.rx + orbitExpansion,
+        ry: layoutNode.orbit.ry + orbitExpansion * 0.68,
         rotation: layoutNode.orbit.rotation,
         color: layoutNode.orbit.color
       };
@@ -1754,6 +1786,76 @@ function materializeOrbitalScene(
 
   layout.roots.forEach((root) => {
     visit(root, null);
+  });
+
+  return {
+    nodes,
+    orbits,
+    links,
+    entityMap
+  };
+}
+
+function buildRenderedOrbitalScene(
+  scene: OrbitalScene,
+  positionByEntityId: Map<string, OrbitalScenePosition>
+): OrbitalScene {
+  if (positionByEntityId.size === 0) {
+    return scene;
+  }
+
+  const nodes = scene.nodes.map((node) => {
+    const animatedPosition = positionByEntityId.get(node.entityId);
+
+    if (!animatedPosition) {
+      return node;
+    }
+
+    const orbit = node.orbit
+      ? {
+          ...node.orbit,
+          x: positionByEntityId.get(node.parentEntityId ?? "")?.x ?? node.orbit.x,
+          y: positionByEntityId.get(node.parentEntityId ?? "")?.y ?? node.orbit.y
+        }
+      : undefined;
+
+    return {
+      ...node,
+      x: animatedPosition.x,
+      y: animatedPosition.y,
+      orbit
+    };
+  });
+
+  const entityMap = new Map(nodes.map((node) => [node.entityId, node]));
+  const orbits = scene.orbits.map((orbit) => {
+    const parentPosition = entityMap.get(orbit.parentEntityId);
+
+    if (!parentPosition) {
+      return orbit;
+    }
+
+    return {
+      ...orbit,
+      x: parentPosition.x,
+      y: parentPosition.y
+    };
+  });
+  const links = scene.links.map((link) => {
+    const parentPosition = entityMap.get(link.parentEntityId);
+    const nodePosition = entityMap.get(link.entityId);
+
+    if (!parentPosition || !nodePosition) {
+      return link;
+    }
+
+    return {
+      ...link,
+      x1: parentPosition.x,
+      y1: parentPosition.y,
+      x2: nodePosition.x,
+      y2: nodePosition.y
+    };
   });
 
   return {
@@ -1915,6 +2017,9 @@ export default function OrbitalMapView({
       ? false
       : window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
+  const [devicePixelRatio, setDevicePixelRatio] = useState(
+    typeof window === "undefined" ? 1 : window.devicePixelRatio || 1
+  );
   const [isMobilePreviewMode, setIsMobilePreviewMode] = useState(
     typeof window === "undefined"
       ? false
@@ -1982,9 +2087,14 @@ export default function OrbitalMapView({
   const [hoverPreviewFallbackRect, setHoverPreviewFallbackRect] =
     useState<HoverPreviewAnchorRect | null>(null);
   const [hoverPreviewCursor, setHoverPreviewCursor] = useState({ x: 0, y: 0 });
+  const [animatedSceneVersion, setAnimatedSceneVersion] = useState(0);
   const timeRef = useRef(0);
   const cameraRef = useRef({ x: 0, y: 0, scale: 1 });
   const cameraAnimationFrameRef = useRef<number | null>(null);
+  const sceneAnimationFrameRef = useRef<number | null>(null);
+  const sceneAnimationLastTimeRef = useRef<number | null>(null);
+  const animatedNodePositionsRef = useRef(new Map<string, OrbitalScenePosition>());
+  const targetNodePositionsRef = useRef(new Map<string, OrbitalScenePosition>());
   const projectPositionDraftsRef = useRef<Record<string, { x: number; y: number }>>({});
   const noteHoverPreviewScrollRef = useRef<HTMLDivElement | null>(null);
   const hoverPreviewCloseTimeoutRef = useRef<number | null>(null);
@@ -2034,6 +2144,76 @@ export default function OrbitalMapView({
     | null
   >(null);
 
+  const stopScenePositionAnimation = () => {
+    if (sceneAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(sceneAnimationFrameRef.current);
+      sceneAnimationFrameRef.current = null;
+    }
+
+    sceneAnimationLastTimeRef.current = null;
+  };
+
+  const startScenePositionAnimation = () => {
+    if (typeof window === "undefined" || sceneAnimationFrameRef.current !== null) {
+      return;
+    }
+
+    const step = (now: number) => {
+      const lastTime = sceneAnimationLastTimeRef.current ?? now;
+      const deltaMs = Math.min(48, Math.max(0, now - lastTime));
+      const interpolation = 1 - Math.exp(-deltaMs / ORBITAL_NODE_POSITION_EASE_MS);
+      sceneAnimationLastTimeRef.current = now;
+
+      const currentPositions = animatedNodePositionsRef.current;
+      const targetPositions = targetNodePositionsRef.current;
+      let hasAnimatedChange = false;
+      let needsAnotherFrame = false;
+
+      targetPositions.forEach((targetPosition, entityId) => {
+        const currentPosition = currentPositions.get(entityId) ?? {
+          x: targetPosition.x,
+          y: targetPosition.y
+        };
+        const deltaX = targetPosition.x - currentPosition.x;
+        const deltaY = targetPosition.y - currentPosition.y;
+
+        if (
+          Math.abs(deltaX) <= ORBITAL_NODE_POSITION_SNAP_DISTANCE &&
+          Math.abs(deltaY) <= ORBITAL_NODE_POSITION_SNAP_DISTANCE
+        ) {
+          if (currentPosition.x !== targetPosition.x || currentPosition.y !== targetPosition.y) {
+            currentPositions.set(entityId, {
+              x: targetPosition.x,
+              y: targetPosition.y
+            });
+            hasAnimatedChange = true;
+          }
+          return;
+        }
+
+        currentPositions.set(entityId, {
+          x: currentPosition.x + deltaX * interpolation,
+          y: currentPosition.y + deltaY * interpolation
+        });
+        hasAnimatedChange = true;
+        needsAnotherFrame = true;
+      });
+
+      if (hasAnimatedChange) {
+        setAnimatedSceneVersion((current) => current + 1);
+      }
+
+      if (needsAnotherFrame) {
+        sceneAnimationFrameRef.current = window.requestAnimationFrame(step);
+        return;
+      }
+
+      stopScenePositionAnimation();
+    };
+
+    sceneAnimationFrameRef.current = window.requestAnimationFrame(step);
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return undefined;
@@ -2067,6 +2247,25 @@ export default function OrbitalMapView({
 
     return () => {
       mediaQuery.removeEventListener("change", syncReducedMotion);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const syncDevicePixelRatio = () => {
+      setDevicePixelRatio(window.devicePixelRatio || 1);
+    };
+
+    syncDevicePixelRatio();
+    window.addEventListener("resize", syncDevicePixelRatio);
+    window.visualViewport?.addEventListener("resize", syncDevicePixelRatio);
+
+    return () => {
+      window.removeEventListener("resize", syncDevicePixelRatio);
+      window.visualViewport?.removeEventListener("resize", syncDevicePixelRatio);
     };
   }, []);
   const folderPathMap = useMemo(() => buildFolderPathMap(folders), [folders]);
@@ -2583,8 +2782,14 @@ export default function OrbitalMapView({
       ),
     [isMobilePreviewMode, sceneLayout, sceneToneByEntityId, timeMs]
   );
+  const isLowDensityDisplay = devicePixelRatio < LOW_DENSITY_DPR_THRESHOLD;
+
+  const renderedScene = useMemo(
+    () => buildRenderedOrbitalScene(scene, animatedNodePositionsRef.current),
+    [animatedSceneVersion, scene]
+  );
   const getSceneTone = (entityId: string): OrbitalVisualTone => sceneToneByEntityId.get(entityId) ?? "muted";
-  const selectedNode = selectedEntityId ? scene.entityMap.get(selectedEntityId) ?? null : null;
+  const selectedNode = selectedEntityId ? renderedScene.entityMap.get(selectedEntityId) ?? null : null;
   const shouldShowHierarchyInspector =
     selectedNode?.kind === "folder" || selectedNode?.kind === "note";
   const effectiveInspectorMenu = shouldShowHierarchyInspector ? "folders" : inspectorMenu;
@@ -2640,7 +2845,7 @@ export default function OrbitalMapView({
     inspectorHierarchyItemRefs.current.delete(entityId);
   };
   const currentProjectNode = currentProjectEntityId
-    ? scene.entityMap.get(currentProjectEntityId)
+    ? renderedScene.entityMap.get(currentProjectEntityId)
     : undefined;
   const hoverPreviewNote = hoveredSelectionNoteId
     ? orbitalData.noteById.get(hoveredSelectionNoteId) ?? null
@@ -3006,9 +3211,10 @@ export default function OrbitalMapView({
     setIsOverviewColorPanelOpen(false);
   }, [contextMenuState, currentProjectId]);
 
-  const anchorNode = selectedNode || currentProjectNode || scene.nodes.find((node) => node.kind === "core");
-  const visibleBodies = Math.max(scene.nodes.filter((node) => node.kind !== "core").length, 0);
-  const hiddenBodies = Math.max(orbitalData.totalEntities - scene.nodes.length, 0);
+  const anchorNode =
+    selectedNode || currentProjectNode || renderedScene.nodes.find((node) => node.kind === "core");
+  const visibleBodies = Math.max(renderedScene.nodes.filter((node) => node.kind !== "core").length, 0);
+  const hiddenBodies = Math.max(orbitalData.totalEntities - renderedScene.nodes.length, 0);
   const topFolders = useMemo(
     () => (currentProjectId ? (orbitalData.rootFoldersByProject.get(currentProjectId) ?? []).slice(0, 5).map((branch) => branch.folder) : []),
     [currentProjectId, orbitalData.rootFoldersByProject]
@@ -3062,6 +3268,50 @@ export default function OrbitalMapView({
       : ORBIT_IDLE_FRAME_MS;
   const isOrbitAnimationSuspended =
     isPaused || editorOpen || activeModal !== null || !isDocumentVisible || prefersReducedMotion;
+  useEffect(() => {
+    const shouldSnapImmediately =
+      prefersReducedMotion ||
+      isOrbitAnimationSuspended ||
+      dragRef.current?.mode === "project";
+    const nextTargetPositions = new Map<string, OrbitalScenePosition>(
+      scene.nodes.map((node) => [node.entityId, { x: node.x, y: node.y }])
+    );
+
+    targetNodePositionsRef.current = nextTargetPositions;
+
+    if (shouldSnapImmediately) {
+      animatedNodePositionsRef.current = new Map(nextTargetPositions);
+      stopScenePositionAnimation();
+      setAnimatedSceneVersion((current) => current + 1);
+      return;
+    }
+
+    const currentPositions = animatedNodePositionsRef.current;
+    let changed = false;
+
+    nextTargetPositions.forEach((targetPosition, entityId) => {
+      if (!currentPositions.has(entityId)) {
+        currentPositions.set(entityId, {
+          x: targetPosition.x,
+          y: targetPosition.y
+        });
+        changed = true;
+      }
+    });
+
+    Array.from(currentPositions.keys()).forEach((entityId) => {
+      if (!nextTargetPositions.has(entityId)) {
+        currentPositions.delete(entityId);
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      setAnimatedSceneVersion((current) => current + 1);
+    }
+
+    startScenePositionAnimation();
+  }, [isOrbitAnimationSuspended, prefersReducedMotion, scene.nodes]);
   const focusSystemLabel =
     !anchorNode
       ? labels.core
@@ -3216,6 +3466,8 @@ export default function OrbitalMapView({
 
   useEffect(
     () => () => {
+      stopScenePositionAnimation();
+
       if (cameraAnimationFrameRef.current !== null) {
         window.cancelAnimationFrame(cameraAnimationFrameRef.current);
       }
@@ -7359,7 +7611,7 @@ export default function OrbitalMapView({
 
           <svg
             viewBox={`${VIEWBOX.minX} ${VIEWBOX.minY} ${VIEWBOX.width} ${VIEWBOX.height}`}
-            className="orbital-scene"
+            className={`orbital-scene ${isLowDensityDisplay ? "is-low-density" : ""}`}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={(event) => releaseDrag(event.pointerId)}
@@ -7380,7 +7632,7 @@ export default function OrbitalMapView({
             </g>
 
             <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
-              {scene.links.map((link) => {
+              {renderedScene.links.map((link) => {
                 const linkTone = getSceneTone(link.entityId);
 
                 return (
@@ -7399,7 +7651,7 @@ export default function OrbitalMapView({
                 );
               })}
 
-              {scene.orbits.map((orbit) => {
+              {renderedScene.orbits.map((orbit) => {
                 const orbitTone = getSceneTone(orbit.entityId);
 
                 return (
@@ -7419,7 +7671,7 @@ export default function OrbitalMapView({
                 );
               })}
 
-              {scene.nodes.map((node) => {
+              {renderedScene.nodes.map((node) => {
                 const nodeTone = getSceneTone(node.entityId);
                 const isPrimaryTone = nodeTone === "primary";
                 const isSelected = node.entityId === selectedEntityId;
@@ -7679,60 +7931,61 @@ export default function OrbitalMapView({
                     {isSelected ? <circle r={node.radius * 1.82} className="orbital-selection-ring" /> : null}
 
                     {showLabel ? (
-                      <g
-                        className={`orbital-label-group orbital-label-group-${node.kind} ${
-                          isRootFolder ? "is-root-folder" : ""
-                        } ${isSubfolder ? "is-subfolder" : ""} ${isRootEntry ? "is-root-entry" : ""} ${
-                          isSelected ? "is-selected" : ""
-                        } is-${nodeTone}`}
-                        transform={`translate(0 ${node.radius + 24})`}
-                      >
-                        <rect
-                          x={-labelWidth / 2}
-                          y={-14}
-                          width={labelWidth}
-                          height={24}
-                          rx={12}
-                          className="orbital-label-badge"
-                        />
-                        {node.kind !== "core" ? (
-                          <g className="orbital-label-glyph" transform={`translate(${-labelWidth / 2 + 12} 0)`}>
-                            {node.kind === "folder" ? (
-                              isRootFolder ? (
+                      <g transform={`translate(0 ${node.radius + 24})`}>
+                        <g
+                          className={`orbital-label-group orbital-label-group-${node.kind} ${
+                            isRootFolder ? "is-root-folder" : ""
+                          } ${isSubfolder ? "is-subfolder" : ""} ${isRootEntry ? "is-root-entry" : ""} ${
+                            isSelected ? "is-selected" : ""
+                          } is-${nodeTone}`}
+                        >
+                          <rect
+                            x={-labelWidth / 2}
+                            y={-14}
+                            width={labelWidth}
+                            height={24}
+                            rx={12}
+                            className="orbital-label-badge"
+                          />
+                          {node.kind !== "core" ? (
+                            <g className="orbital-label-glyph" transform={`translate(${-labelWidth / 2 + 12} 0)`}>
+                              {node.kind === "folder" ? (
+                                isRootFolder ? (
+                                  <>
+                                    <circle r="4.1" className="orbital-label-glyph-orb" />
+                                    <ellipse rx="5.6" ry="2.45" className="orbital-label-glyph-ring" transform="rotate(-14)" />
+                                  </>
+                                ) : (
+                                  <>
+                                    <circle r="3.4" className="orbital-label-glyph-orb" />
+                                    <circle r="4.8" className="orbital-label-glyph-ring orbital-label-glyph-ring-dashed" />
+                                    <circle cx="4.7" cy="-3.9" r="1.2" className="orbital-label-glyph-dot" />
+                                  </>
+                                )
+                              ) : node.note?.contentType === "canvas" ? (
                                 <>
-                                  <circle r="4.1" className="orbital-label-glyph-orb" />
-                                  <ellipse rx="5.6" ry="2.45" className="orbital-label-glyph-ring" transform="rotate(-14)" />
+                                  <rect x="-4.7" y="-3.9" width="9.4" height="7.8" rx="2" className="orbital-label-glyph-rect" />
+                                  <path d="M -2.7 -0.9 H 2.7 M -2.7 1.3 H 2.7" className="orbital-label-glyph-line" />
                                 </>
                               ) : (
                                 <>
-                                  <circle r="3.4" className="orbital-label-glyph-orb" />
-                                  <circle r="4.8" className="orbital-label-glyph-ring orbital-label-glyph-ring-dashed" />
-                                  <circle cx="4.7" cy="-3.9" r="1.2" className="orbital-label-glyph-dot" />
+                                  <rect
+                                    x="-3.7"
+                                    y="-3.7"
+                                    width="7.4"
+                                    height="7.4"
+                                    rx="1.25"
+                                    transform="rotate(45)"
+                                    className="orbital-label-glyph-rect"
+                                  />
                                 </>
-                              )
-                            ) : node.note?.contentType === "canvas" ? (
-                              <>
-                                <rect x="-4.7" y="-3.9" width="9.4" height="7.8" rx="2" className="orbital-label-glyph-rect" />
-                                <path d="M -2.7 -0.9 H 2.7 M -2.7 1.3 H 2.7" className="orbital-label-glyph-line" />
-                              </>
-                            ) : (
-                              <>
-                                <rect
-                                  x="-3.7"
-                                  y="-3.7"
-                                  width="7.4"
-                                  height="7.4"
-                                  rx="1.25"
-                                  transform="rotate(45)"
-                                  className="orbital-label-glyph-rect"
-                                />
-                              </>
-                            )}
-                          </g>
-                        ) : null}
-                        <text y={2} textAnchor="middle" className="orbital-label-text" dx={node.kind === "core" ? 0 : 8}>
-                          {labelText}
-                        </text>
+                              )}
+                            </g>
+                          ) : null}
+                          <text y={2} textAnchor="middle" className="orbital-label-text" dx={node.kind === "core" ? 0 : 8}>
+                            {labelText}
+                          </text>
+                        </g>
                       </g>
                     ) : null}
                   </g>

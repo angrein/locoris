@@ -59,11 +59,18 @@ import App from "./App";
 import "./styles/scrollbars.css";
 import "./styles.css";
 import "./i18n";
+import { initializePersistentClientStorage } from "./lib/persistentClientStorage";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <MantineProvider>
-      <App />
-    </MantineProvider>
-  </React.StrictMode>
-);
+async function bootstrap() {
+  await initializePersistentClientStorage();
+
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <MantineProvider>
+        <App />
+      </MantineProvider>
+    </React.StrictMode>
+  );
+}
+
+void bootstrap();

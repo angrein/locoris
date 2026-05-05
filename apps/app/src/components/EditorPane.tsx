@@ -17,6 +17,10 @@ import { getDisplayNoteTitle } from "../lib/displayNames";
 import { COLOR_PALETTE, DEFAULT_NOTE_COLOR } from "../lib/palette";
 import { editorBlockNoteSchema } from "../lib/blocknoteSchema";
 import {
+  readPersistentString,
+  writePersistentString
+} from "../lib/persistentClientStorage";
+import {
   flattenFolderOptions,
   formatTimestamp,
   normalizeChecklistOrdering,
@@ -76,11 +80,7 @@ export default function EditorPane({
   const { t } = useTranslation();
   const [titleDraft, setTitleDraft] = useState(note.title);
   const [typographyMode, setTypographyMode] = useState<EditorTypographyMode>(() => {
-    if (typeof window === "undefined") {
-      return "focus";
-    }
-
-    const storedMode = window.localStorage.getItem(EDITOR_TYPOGRAPHY_MODE_STORAGE_KEY);
+    const storedMode = readPersistentString(EDITOR_TYPOGRAPHY_MODE_STORAGE_KEY);
 
     return storedMode === "reading" ? "reading" : "focus";
   });
@@ -118,7 +118,7 @@ export default function EditorPane({
   }, [note.id]);
 
   useEffect(() => {
-    window.localStorage.setItem(EDITOR_TYPOGRAPHY_MODE_STORAGE_KEY, typographyMode);
+    writePersistentString(EDITOR_TYPOGRAPHY_MODE_STORAGE_KEY, typographyMode);
   }, [typographyMode]);
 
   const editorDictionary = language === "ru" ? ru : en;

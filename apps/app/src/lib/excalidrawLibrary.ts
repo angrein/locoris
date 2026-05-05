@@ -1,5 +1,10 @@
 import { restoreLibraryItems } from "@excalidraw/excalidraw";
 import type { LibraryItems } from "@excalidraw/excalidraw/types";
+import {
+  readPersistentString,
+  removePersistentString,
+  writePersistentString
+} from "./persistentClientStorage";
 
 const EXCALIDRAW_LIBRARY_STORAGE_PREFIX = "zen:excalidraw-library:";
 
@@ -8,12 +13,12 @@ function getExcalidrawLibraryStorageKey(scopeId: string) {
 }
 
 export function readPersistedExcalidrawLibrary(scopeId: string): LibraryItems {
-  if (typeof window === "undefined" || !scopeId) {
+  if (!scopeId) {
     return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(getExcalidrawLibraryStorageKey(scopeId));
+    const raw = readPersistentString(getExcalidrawLibraryStorageKey(scopeId));
 
     if (!raw) {
       return [];
@@ -28,7 +33,7 @@ export function readPersistedExcalidrawLibrary(scopeId: string): LibraryItems {
 }
 
 export function persistExcalidrawLibrary(scopeId: string, libraryItems: LibraryItems) {
-  if (typeof window === "undefined" || !scopeId) {
+  if (!scopeId) {
     return;
   }
 
@@ -36,11 +41,11 @@ export function persistExcalidrawLibrary(scopeId: string, libraryItems: LibraryI
 
   try {
     if (!libraryItems.length) {
-      window.localStorage.removeItem(storageKey);
+      removePersistentString(storageKey);
       return;
     }
 
-    window.localStorage.setItem(storageKey, JSON.stringify(libraryItems));
+    writePersistentString(storageKey, JSON.stringify(libraryItems));
   } catch {
     // Ignore storage quota / privacy mode failures and let the editor continue working.
   }

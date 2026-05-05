@@ -1,4 +1,4 @@
-name: Tauri desktop (Windows)
+name: Tauri desktop (macOS)
 
 on:
   workflow_dispatch:
@@ -7,8 +7,9 @@ permissions:
   contents: read
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build-macos:
+    runs-on: macos-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,11 +31,11 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Build Windows installer
+      - name: Build macOS bundle
         run: npm run desktop:build --workspace @locoris/app
 
       - name: Upload bundles
         uses: actions/upload-artifact@v4
         with:
-          name: locoris-windows-bundle
+          name: locoris-macos-bundle
           path: apps/app/src-tauri/target/release/bundle/

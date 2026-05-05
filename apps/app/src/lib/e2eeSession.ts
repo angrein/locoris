@@ -1,12 +1,15 @@
+import {
+  listPersistentKeys,
+  readPersistentString,
+  removePersistentString,
+  writePersistentString
+} from "./persistentClientStorage";
+
 const vaultPassphraseCache = new Map<string, string>();
 const VAULT_PERSISTENT_STORAGE_PREFIX = "zen-notes.vault-passphrase:";
 
 function normalizeLocalVaultId(localVaultId: string) {
   return localVaultId.trim();
-}
-
-function canUseLocalStorage() {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
 function canUseSessionStorage() {
@@ -18,36 +21,24 @@ function buildPersistentStorageKey(localVaultId: string) {
 }
 
 function readPersistedPassphrase(localVaultId: string) {
-  if (!canUseLocalStorage()) {
-    return null;
-  }
-
   try {
-    return window.localStorage.getItem(buildPersistentStorageKey(localVaultId));
+    return readPersistentString(buildPersistentStorageKey(localVaultId));
   } catch {
     return null;
   }
 }
 
 function persistPassphrase(localVaultId: string, passphrase: string) {
-  if (!canUseLocalStorage()) {
-    return;
-  }
-
   try {
-    window.localStorage.setItem(buildPersistentStorageKey(localVaultId), passphrase);
+    writePersistentString(buildPersistentStorageKey(localVaultId), passphrase);
   } catch {
     // If the browser blocks localStorage, we keep the in-memory session only.
   }
 }
 
 function removePersistedPassphrase(localVaultId: string) {
-  if (!canUseLocalStorage()) {
-    return;
-  }
-
   try {
-    window.localStorage.removeItem(buildPersistentStorageKey(localVaultId));
+    removePersistentString(buildPersistentStorageKey(localVaultId));
   } catch {
     // Ignore storage cleanup failures and keep the app usable.
   }
@@ -135,24 +126,12 @@ export function getVaultEncryptionSessionPassphrase(localVaultId: string) {
 export function clearVaultEncryptionSessions() {
   vaultPassphraseCache.clear();
 
-  if (canUseLocalStorage()) {
-    try {
-      const keysToRemove: string[] = [];
-
-      for (let index = 0; index < window.localStorage.length; index += 1) {
-        const key = window.localStorage.key(index);
-
-        if (key?.startsWith(VAULT_PERSISTENT_STORAGE_PREFIX)) {
-          keysToRemove.push(key);
-        }
-      }
-
-      keysToRemove.forEach((key) => {
-        window.localStorage.removeItem(key);
-      });
-    } catch {
-      // Ignore storage cleanup failures and keep the app usable.
-    }
+  try {
+    listPersistentKeys(VAULT_PERSISTENT_STORAGE_PREFIX).forEach((key) => {
+      removePersistentString(key);
+    });
+  } catch {
+    // Ignore storage cleanup failures and keep the app usable.
   }
 
   if (canUseSessionStorage()) {

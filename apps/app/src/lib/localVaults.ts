@@ -1,5 +1,9 @@
 import Dexie from "dexie";
 import type { SyncVaultBinding } from "../types";
+import {
+  readPersistentString,
+  writePersistentString
+} from "./persistentClientStorage";
 
 export type LocalVaultKind = "regular" | "private";
 
@@ -22,10 +26,6 @@ const DEFAULT_LOCAL_VAULT_ID = "local-default";
 
 function now() {
   return Date.now();
-}
-
-function canUseStorage() {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
 function sanitizeLocalVaultName(value: string) {
@@ -117,36 +117,28 @@ function normalizeRegistryState(value: unknown): LocalVaultRegistryState {
 }
 
 function readRegistryFromStorage() {
-  if (!canUseStorage()) {
-    return getFallbackRegistry();
-  }
-
-  const raw = window.localStorage.getItem(REGISTRY_STORAGE_KEY);
+  const raw = readPersistentString(REGISTRY_STORAGE_KEY);
 
   if (!raw) {
     const fallback = getFallbackRegistry();
-    window.localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(fallback));
+    writePersistentString(REGISTRY_STORAGE_KEY, JSON.stringify(fallback));
     return fallback;
   }
 
   try {
     const parsed = JSON.parse(raw);
     const normalized = normalizeRegistryState(parsed);
-    window.localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(normalized));
+    writePersistentString(REGISTRY_STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
   } catch {
     const fallback = getFallbackRegistry();
-    window.localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(fallback));
+    writePersistentString(REGISTRY_STORAGE_KEY, JSON.stringify(fallback));
     return fallback;
   }
 }
 
 function writeRegistryToStorage(state: LocalVaultRegistryState) {
-  if (!canUseStorage()) {
-    return state;
-  }
-
-  window.localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(state));
+  writePersistentString(REGISTRY_STORAGE_KEY, JSON.stringify(state));
   return state;
 }
 

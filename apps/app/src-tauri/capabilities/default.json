@@ -6,6 +6,9 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "process:default",
+    "store:default",
+    "updater:default"
   ]
 }

@@ -4,6 +4,10 @@ import type {
   SyncConnectionProvider,
   SyncVaultBinding
 } from "../types";
+import {
+  readPersistentString,
+  writePersistentString
+} from "./persistentClientStorage";
 
 const SYNC_REGISTRY_STORAGE_KEY = "zen-notes.sync-registry";
 const SYNC_REGISTRY_VERSION = 1;
@@ -16,10 +20,6 @@ interface SyncRegistryState {
 
 function now() {
   return Date.now();
-}
-
-function canUseStorage() {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
 function sanitizeProvider(value: unknown): SyncConnectionProvider | null {
@@ -135,36 +135,28 @@ function normalizeRegistryState(value: unknown): SyncRegistryState {
 }
 
 function readRegistryFromStorage() {
-  if (!canUseStorage()) {
-    return createEmptyRegistry();
-  }
-
-  const raw = window.localStorage.getItem(SYNC_REGISTRY_STORAGE_KEY);
+  const raw = readPersistentString(SYNC_REGISTRY_STORAGE_KEY);
 
   if (!raw) {
     const fallback = createEmptyRegistry();
-    window.localStorage.setItem(SYNC_REGISTRY_STORAGE_KEY, JSON.stringify(fallback));
+    writePersistentString(SYNC_REGISTRY_STORAGE_KEY, JSON.stringify(fallback));
     return fallback;
   }
 
   try {
     const parsed = JSON.parse(raw);
     const normalized = normalizeRegistryState(parsed);
-    window.localStorage.setItem(SYNC_REGISTRY_STORAGE_KEY, JSON.stringify(normalized));
+    writePersistentString(SYNC_REGISTRY_STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
   } catch {
     const fallback = createEmptyRegistry();
-    window.localStorage.setItem(SYNC_REGISTRY_STORAGE_KEY, JSON.stringify(fallback));
+    writePersistentString(SYNC_REGISTRY_STORAGE_KEY, JSON.stringify(fallback));
     return fallback;
   }
 }
 
 function writeRegistryToStorage(state: SyncRegistryState) {
-  if (!canUseStorage()) {
-    return state;
-  }
-
-  window.localStorage.setItem(SYNC_REGISTRY_STORAGE_KEY, JSON.stringify(state));
+  writePersistentString(SYNC_REGISTRY_STORAGE_KEY, JSON.stringify(state));
   return state;
 }
 
