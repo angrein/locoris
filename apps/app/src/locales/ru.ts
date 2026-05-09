@@ -313,15 +313,21 @@ const ru = {
     hostedVaultRequired: "Сначала выбери облачное хранилище.",
     hostedTokenRequired: "Сначала привяжи это локальное хранилище к облачному хранилищу.",
     googleDriveClientIdRequired:
-      "Для Google Drive в этой сборке сначала задай VITE_GOOGLE_DRIVE_CLIENT_ID.",
+      "Для Google Drive сначала задай VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID для desktop-сборок или VITE_GOOGLE_DRIVE_CLIENT_ID для web-сборки.",
     googleDriveAuthRequired:
       "Сессия Google Drive истекла. Обнови авторизацию, чтобы снова загружать удаленные хранилища.",
     googleDriveConnected: "Google Drive подключен.",
-    googleDrivePopupClosed: "Окно входа Google было закрыто до завершения авторизации.",
-    googleDrivePopupFailed: "Не удалось открыть окно входа Google.",
-    googleDrivePreparing: "Подготавливаем Google OAuth. Подожди секунду и попробуй снова.",
+    googleDrivePopupClosed: "Авторизация Google была отменена до выдачи доступа.",
+    googleDrivePopupFailed: "Не удалось открыть системный браузер для авторизации Google.",
+    googleDrivePreparing: "Подготавливаем авторизацию Google. Подожди секунду и попробуй снова.",
     googleDriveSdkFailed:
-      "Не удалось подготовить Google OAuth в браузере. Проверь сеть, блокировщики контента и попробуй снова.",
+      "Не удалось подготовить авторизацию Google на этом устройстве. Проверь сеть и попробуй снова.",
+    googleDriveRedirectTimeout:
+      "Google слишком долго возвращал авторизацию в Locoris. Попробуй снова и заверши шаг в браузере чуть быстрее.",
+    googleDriveRedirectFailed:
+      "Locoris получил некорректный ответ авторизации Google. Запусти подключение ещё раз.",
+    googleDriveAuthInProgress:
+      "Авторизация Google уже идёт. Сначала заверши или закрой текущий шаг в браузере.",
     googleDriveEncryptedPending:
       "Это хранилище в Google Drive зашифровано, но импорт зашифрованной оболочки синхронизации пока не включен в приложении.",
     unauthorized: "Сервер отклонил токен.",
@@ -495,17 +501,18 @@ const ru = {
     googleDriveConnectionDescription: "Синхронизация через скрытую appDataFolder внутри твоего Google-аккаунта.",
     googleDriveReconnect: "Обновить Google Drive auth",
     googleDriveClientMissing:
-      "Сначала задай Google OAuth client ID, и после этого этот способ можно будет подключить.",
+      "Сначала задай desktop Google OAuth client ID для нативной сборки или web client ID для браузерной версии.",
     googleDriveModalDescription:
-      "Авторизуй Locoris в браузере, и мы будем хранить каждое удаленное хранилище внутри Google Drive appDataFolder.",
+      "Locoris откроет системный браузер, завершит авторизацию Google через защищённый локальный callback и будет хранить каждое удалённое хранилище внутри Google Drive appDataFolder.",
     googleDriveConnect: "Подключить Google Drive",
     googleDriveAppFolder: "appDataFolder",
     googleDriveAppFolderDescription:
       "Файлы там скрыты от обычного интерфейса Drive и доступны только этому приложению.",
     googleDriveSessionReady: "OAuth-сессия готова для доступа к Drive appDataFolder.",
     googleDriveSdkLoading:
-      "Подготавливаем браузерный Google OAuth SDK. Как только он будет готов, кнопку подключения можно нажать.",
-    googleDriveSdkReady: "Google OAuth SDK готов. Можно открывать окно авторизации.",
+      "Подготавливаем нативную авторизацию Google. Как только она будет готова, кнопку подключения можно нажать.",
+    googleDriveSdkReady:
+      "Авторизация Google готова. Locoris откроет системный браузер и сам вернётся в приложение.",
     selfHostedModalDescription:
       "Укажи адрес персонального сервера и management token. После этого можно сразу подключать хранилища прямо на этом экране.",
     hostedModalDescription:

@@ -232,7 +232,8 @@ export async function initializeSecureSyncRegistryState() {
   await preloadSecureSecrets([
     ...registry.connections.flatMap((connection) => [
       buildSyncConnectionSecretKey(connection.id, "managementToken"),
-      buildSyncConnectionSecretKey(connection.id, "sessionToken")
+      buildSyncConnectionSecretKey(connection.id, "sessionToken"),
+      buildSyncConnectionSecretKey(connection.id, "refreshToken")
     ]),
     ...registry.bindings.map((binding) =>
       buildSyncBindingSecretKey(binding.id, "syncToken")
@@ -260,6 +261,7 @@ export async function createSyncConnection(input: {
   label?: string;
   managementToken?: string;
   sessionToken?: string;
+  refreshToken?: string | null;
   tokenExpiresAt?: number | null;
   userId?: string | null;
   userName?: string;
@@ -296,6 +298,10 @@ export async function createSyncConnection(input: {
     writeSecureSecret(
       buildSyncConnectionSecretKey(connection.id, "sessionToken"),
       connection.sessionToken
+    ),
+    writeSecureSecret(
+      buildSyncConnectionSecretKey(connection.id, "refreshToken"),
+      sanitizeText(input.refreshToken, 2048)
     )
   ]);
 
@@ -309,7 +315,9 @@ export async function createSyncConnection(input: {
 
 export async function updateSyncConnection(
   connectionId: string,
-  patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">>
+  patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">> & {
+    refreshToken?: string | null;
+  }
 ) {
   const registry = getSyncRegistry();
   const currentConnection = registry.connections.find((connection) => connection.id === connectionId) ?? null;
@@ -366,6 +374,12 @@ export async function updateSyncConnection(
       ? writeSecureSecret(
           buildSyncConnectionSecretKey(connectionId, "sessionToken"),
           nextConnection.sessionToken
+        )
+      : Promise.resolve(),
+    typeof patch.refreshToken === "string" || patch.refreshToken === null
+      ? writeSecureSecret(
+          buildSyncConnectionSecretKey(connectionId, "refreshToken"),
+          sanitizeText(patch.refreshToken, 2048)
         )
       : Promise.resolve()
   ]);

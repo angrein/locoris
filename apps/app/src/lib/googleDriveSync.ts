@@ -1,4 +1,11 @@
 import { createPlainSyncDescriptor } from "./e2ee";
+import {
+  connectGoogleDriveDesktopAccount,
+  desktopGoogleDriveOAuthReady,
+  isDesktopGoogleDriveOauthRuntime,
+  prepareGoogleDriveDesktopOAuth,
+  refreshGoogleDriveDesktopAccountSession
+} from "./googleDriveDesktopOAuth";
 import type {
   SyncChangeFeed,
   SyncChangeSet,
@@ -148,6 +155,7 @@ interface GoogleDriveVaultJournalBlob {
 export interface GoogleDriveAccountSession {
   accessToken: string;
   expiresAt: number | null;
+  refreshToken?: string | null;
   userId: string | null;
   userName: string;
   userEmail: string;
@@ -160,7 +168,14 @@ function now() {
 }
 
 function getClientIdFromEnv() {
-  return import.meta.env.VITE_GOOGLE_DRIVE_CLIENT_ID?.trim() ?? "";
+  const webClientId = import.meta.env.VITE_GOOGLE_DRIVE_CLIENT_ID?.trim() ?? "";
+  const desktopClientId = import.meta.env.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID?.trim() ?? "";
+
+  if (isDesktopGoogleDriveOauthRuntime()) {
+    return desktopClientId || webClientId;
+  }
+
+  return webClientId || desktopClientId;
 }
 
 export function getGoogleDriveClientId() {
@@ -438,10 +453,18 @@ export function googleDriveOAuthReady() {
     return false;
   }
 
+  if (isDesktopGoogleDriveOauthRuntime()) {
+    return desktopGoogleDriveOAuthReady(getClientIdFromEnv());
+  }
+
   return Boolean(getGoogleIdentityApi());
 }
 
 export async function prepareGoogleDriveOAuth() {
+  if (isDesktopGoogleDriveOauthRuntime()) {
+    return prepareGoogleDriveDesktopOAuth();
+  }
+
   if (typeof window === "undefined" || typeof document === "undefined") {
     throw new Error("GOOGLE_OAUTH_UNAVAILABLE");
   }
@@ -1135,6 +1158,18 @@ export async function connectGoogleDriveAccount(options?: {
   prompt?: string;
   silent?: boolean;
 }) {
+  if (isDesktopGoogleDriveOauthRuntime()) {
+    if (options?.silent) {
+      throw new Error("GOOGLE_DRIVE_AUTH_REQUIRED");
+    }
+
+    return connectGoogleDriveDesktopAccount({
+      clientId: ensureClientId(options?.clientId),
+      loginHint: options?.loginHint,
+      prompt: options?.prompt
+    });
+  }
+
   if (!googleDriveOAuthReady()) {
     await prepareGoogleDriveOAuth();
   }
@@ -1162,6 +1197,59 @@ export async function connectGoogleDriveAccount(options?: {
     accessToken: token.access_token,
     expiresAt:
       typeof token.expires_in === "number" ? now() + Math.max(30, token.expires_in) * 1000 : null,
+    refreshToken: null,
+    userId: sanitizeText(about.user?.permissionId) || null,
+    userName: sanitizeText(about.user?.displayName),
+    userEmail: sanitizeText(about.user?.emailAddress)
+  } satisfies GoogleDriveAccountSession;
+}
+
+export async function refreshGoogleDriveAccountSession(options: {
+  connectionId?: string;
+  clientId?: string;
+  loginHint?: string;
+}) {
+  if (isDesktopGoogleDriveOauthRuntime()) {
+    const connectionId = sanitizeText(options.connectionId);
+
+    if (!connectionId) {
+      throw new Error("GOOGLE_DRIVE_AUTH_REQUIRED");
+    }
+
+    return refreshGoogleDriveDesktopAccountSession({
+      clientId: ensureClientId(options.clientId),
+      connectionId
+    });
+  }
+
+  if (!googleDriveOAuthReady()) {
+    await prepareGoogleDriveOAuth();
+  }
+
+  const token = await requestGoogleDriveAccessToken({
+    clientId: options.clientId,
+    loginHint: options.loginHint,
+    silent: true,
+    prompt: "none"
+  });
+
+  if (!token.access_token) {
+    throw new Error("GOOGLE_DRIVE_AUTH_REQUIRED");
+  }
+
+  const about = await googleDriveJsonRequest<GoogleDriveAboutResponse>(
+    `${GOOGLE_DRIVE_ABOUT_URL}?fields=user(displayName,emailAddress,permissionId)`,
+    token.access_token,
+    {
+      method: "GET"
+    }
+  );
+
+  return {
+    accessToken: token.access_token,
+    expiresAt:
+      typeof token.expires_in === "number" ? now() + Math.max(30, token.expires_in) * 1000 : null,
+    refreshToken: null,
     userId: sanitizeText(about.user?.permissionId) || null,
     userName: sanitizeText(about.user?.displayName),
     userEmail: sanitizeText(about.user?.emailAddress)
@@ -1546,12 +1634,8 @@ export function buildGoogleDriveBindingToken() {
   return GOOGLE_DRIVE_BINDING_TOKEN;
 }
 
-export async function probeGoogleDriveConnection(connection: Pick<SyncConnection, "sessionToken" | "tokenExpiresAt">) {
+export async function probeGoogleDriveConnection(connection: Pick<SyncConnection, "sessionToken">) {
   if (!connection.sessionToken.trim()) {
-    return "authError" as const;
-  }
-
-  if (connection.tokenExpiresAt && connection.tokenExpiresAt <= now() + 15_000) {
     return "authError" as const;
   }
 

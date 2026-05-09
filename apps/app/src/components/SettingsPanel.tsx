@@ -55,6 +55,7 @@ interface SettingsPanelProps {
     label?: string;
     managementToken?: string;
     sessionToken?: string;
+    refreshToken?: string | null;
     tokenExpiresAt?: number | null;
     userId?: string | null;
     userName?: string;
@@ -63,7 +64,9 @@ interface SettingsPanelProps {
   onDeleteConnection: (connectionId: string) => void | Promise<void>;
   onUpdateConnection: (
     connectionId: string,
-    patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">>
+    patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">> & {
+      refreshToken?: string | null;
+    }
   ) => void | Promise<void>;
   onBindVault: (input: {
     localVaultId: string;

@@ -33,6 +33,7 @@ import {
   loadGoogleDriveRemoteChangeFeed,
   loadGoogleDriveRemoteEnvelope,
   prepareGoogleDriveOAuth as prepareGoogleDriveOAuthViaApi,
+  refreshGoogleDriveAccountSession as refreshGoogleDriveAccountSessionViaApi,
   probeGoogleDriveConnection,
   pushGoogleDriveRemoteChanges,
   renameGoogleDriveRemoteVault,
@@ -1306,13 +1307,45 @@ async function requestJson<T>(url: string, init: RequestInit = {}) {
 }
 
 export async function probeSyncConnectionAvailability(
-  connection: Pick<SyncConnection, "provider" | "serverUrl" | "managementToken" | "sessionToken" | "tokenExpiresAt">
+  connection: Pick<
+    SyncConnection,
+    "id" | "provider" | "serverUrl" | "managementToken" | "sessionToken" | "tokenExpiresAt"
+  >
 ): Promise<"available" | "unavailable" | "authError"> {
   if (connection.provider === "googleDrive") {
-    return probeGoogleDriveConnection({
-      sessionToken: connection.sessionToken,
-      tokenExpiresAt: "tokenExpiresAt" in connection ? connection.tokenExpiresAt ?? null : null
+    let sessionToken = connection.sessionToken;
+
+    if (connection.tokenExpiresAt && connection.tokenExpiresAt <= Date.now() + 15_000) {
+      try {
+        const refreshed = await refreshGoogleDriveAccountSessionViaApi({
+          connectionId: connection.id
+        });
+
+        sessionToken = refreshed.accessToken;
+      } catch {
+        return "authError";
+      }
+    }
+
+    const status = await probeGoogleDriveConnection({
+      sessionToken
     });
+
+    if (status === "authError") {
+      try {
+        const refreshed = await refreshGoogleDriveAccountSessionViaApi({
+          connectionId: connection.id
+        });
+
+        return probeGoogleDriveConnection({
+          sessionToken: refreshed.accessToken
+        });
+      } catch {
+        return "authError";
+      }
+    }
+
+    return status;
   }
 
   const controller = new AbortController();
@@ -1376,6 +1409,14 @@ export async function connectGoogleDriveAccount(options?: {
   silent?: boolean;
 }) {
   return connectGoogleDriveAccountViaOAuth(options);
+}
+
+export async function refreshGoogleDriveAccountSession(options: {
+  connectionId?: string;
+  clientId?: string;
+  loginHint?: string;
+}) {
+  return refreshGoogleDriveAccountSessionViaApi(options);
 }
 
 export async function registerHostedAccount(

@@ -18,8 +18,9 @@ export const APP_SETTINGS_SECRET_FIELDS = [
 
 export const SYNC_CONNECTION_SECRET_FIELDS = [
   "managementToken",
-  "sessionToken"
-] as const satisfies readonly (keyof SyncConnection)[];
+  "sessionToken",
+  "refreshToken"
+] as const;
 
 export const SYNC_BINDING_SECRET_FIELDS = [
   "syncToken"

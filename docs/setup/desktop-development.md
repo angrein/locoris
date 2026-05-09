@@ -62,6 +62,6 @@ npm run desktop:build:debug
 ## Next integration steps
 
 1. Replace browser-only storage for vault/sync registries with a native desktop-backed store.
-2. Add deep-link handling for Google OAuth callback flows.
+2. Add a native Google OAuth callback flow through the system browser and local loopback listener.
 3. Move sensitive secrets to a native secure storage strategy.
 4. Add updater, signing and notarization for release builds.

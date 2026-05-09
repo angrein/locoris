@@ -1,17 +1,43 @@
 use keyring::{Entry, Error as KeyringError};
 use rusqlite::{params, Connection, OptionalExtension};
+use serde::Serialize;
 use serde_json::{Map, Value};
 use std::{
   fs,
+  io::{Read, Write},
+  net::TcpListener,
   path::{Path, PathBuf},
+  sync::{mpsc, Mutex},
+  thread,
+  time::{Duration, Instant},
 };
-use tauri::{AppHandle, Manager, Runtime, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, Runtime, State, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
 
 const DESKTOP_DATA_DIRECTORY: &str = "data";
 const DESKTOP_SETTINGS_DIRECTORY: &str = "settings";
 const DESKTOP_WEBVIEW_DIRECTORY: &str = "webview";
 const DESKTOP_CACHE_DIRECTORY: &str = "cache";
+const GOOGLE_DESKTOP_LOOPBACK_PATH: &str = "/oauth/google-drive";
+const GOOGLE_DESKTOP_LOOPBACK_HOST: &str = "127.0.0.1";
+const GOOGLE_DESKTOP_LOOPBACK_LISTENER_TIMEOUT_SECS: u64 = 190;
+
+#[derive(Default)]
+struct DesktopGoogleOauthState {
+  callback_receiver: Mutex<Option<mpsc::Receiver<DesktopGoogleOauthCallbackPayload>>>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopGoogleOauthLoopbackSession {
+  redirect_uri: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopGoogleOauthCallbackPayload {
+  url: String,
+}
 
 fn secure_secret_service_name(identifier: &str) -> String {
   let normalized_identifier = if identifier.trim().is_empty() {
@@ -303,6 +329,200 @@ fn build_windows_webview_directory(label: &str, identifier: &str, version: &str)
   )
 }
 
+fn desktop_google_oauth_success_html() -> &'static str {
+  r#"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Locoris connected</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f6f4ee;
+        color: #161311;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      main {
+        width: min(480px, 100%);
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(22, 19, 17, 0.08);
+        border-radius: 24px;
+        padding: 28px 24px;
+        box-shadow: 0 24px 80px rgba(22, 19, 17, 0.12);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 28px;
+        line-height: 1.1;
+      }
+      p {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.55;
+        color: rgba(22, 19, 17, 0.74);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Locoris is connected</h1>
+      <p>You can close this browser tab and return to the app.</p>
+    </main>
+  </body>
+</html>"#
+}
+
+fn desktop_google_oauth_not_found_html() -> &'static str {
+  r#"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Locoris redirect not found</title>
+  </head>
+  <body>
+    <p>This redirect is not handled by Locoris.</p>
+  </body>
+</html>"#
+}
+
+fn desktop_google_oauth_write_http_response(
+  stream: &mut std::net::TcpStream,
+  status_line: &str,
+  body: &str,
+) {
+  let response = format!(
+    "HTTP/1.1 {status_line}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{body}",
+    body.as_bytes().len()
+  );
+
+  let _ = stream.write_all(response.as_bytes());
+  let _ = stream.flush();
+}
+
+fn desktop_google_oauth_extract_request_target(request: &str) -> Option<&str> {
+  let request_line = request.lines().next()?.trim();
+  let mut parts = request_line.split_whitespace();
+  let method = parts.next()?;
+  let target = parts.next()?;
+
+  if method != "GET" {
+    return None;
+  }
+
+  Some(target)
+}
+
+fn spawn_desktop_google_oauth_listener(
+  listener: TcpListener,
+  sender: mpsc::Sender<DesktopGoogleOauthCallbackPayload>,
+) {
+  let _ = listener.set_nonblocking(true);
+  let local_port = listener.local_addr().map(|address| address.port()).unwrap_or_default();
+
+  thread::spawn(move || {
+    let deadline = Instant::now() + Duration::from_secs(GOOGLE_DESKTOP_LOOPBACK_LISTENER_TIMEOUT_SECS);
+
+    loop {
+      match listener.accept() {
+        Ok((mut stream, _address)) => {
+          let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+          let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+
+          let mut buffer = [0u8; 8192];
+          let bytes_read = stream.read(&mut buffer).unwrap_or_default();
+          let request = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
+
+          if let Some(target) = desktop_google_oauth_extract_request_target(&request) {
+            let url = format!("http://{GOOGLE_DESKTOP_LOOPBACK_HOST}:{local_port}{target}");
+
+            if target.starts_with(GOOGLE_DESKTOP_LOOPBACK_PATH) {
+              desktop_google_oauth_write_http_response(
+                &mut stream,
+                "200 OK",
+                desktop_google_oauth_success_html(),
+              );
+              let _ = sender.send(DesktopGoogleOauthCallbackPayload { url });
+              break;
+            }
+          }
+
+          desktop_google_oauth_write_http_response(
+            &mut stream,
+            "404 Not Found",
+            desktop_google_oauth_not_found_html(),
+          );
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+          if Instant::now() >= deadline {
+            break;
+          }
+
+          thread::sleep(Duration::from_millis(50));
+        }
+        Err(_) => break,
+      }
+    }
+  });
+}
+
+#[tauri::command]
+fn desktop_google_oauth_prepare_loopback(
+  state: State<'_, DesktopGoogleOauthState>,
+) -> Result<DesktopGoogleOauthLoopbackSession, String> {
+  let listener = TcpListener::bind((GOOGLE_DESKTOP_LOOPBACK_HOST, 0))
+    .map_err(|error| format!("failed to start local Google OAuth callback listener: {error}"))?;
+  let local_port = listener
+    .local_addr()
+    .map_err(|error| format!("failed to inspect local Google OAuth callback listener: {error}"))?
+    .port();
+  let (sender, receiver) = mpsc::channel();
+  let mut callback_receiver = state
+    .callback_receiver
+    .lock()
+    .map_err(|_| "failed to acquire desktop OAuth callback state".to_string())?;
+
+  if callback_receiver.is_some() {
+    return Err("GOOGLE_OAUTH_IN_PROGRESS".into());
+  }
+
+  *callback_receiver = Some(receiver);
+  spawn_desktop_google_oauth_listener(listener, sender);
+
+  Ok(DesktopGoogleOauthLoopbackSession {
+    redirect_uri: format!(
+      "http://{GOOGLE_DESKTOP_LOOPBACK_HOST}:{local_port}{GOOGLE_DESKTOP_LOOPBACK_PATH}"
+    ),
+  })
+}
+
+#[tauri::command]
+fn desktop_google_oauth_wait_for_callback(
+  state: State<'_, DesktopGoogleOauthState>,
+  timeout_ms: Option<u64>,
+) -> Result<DesktopGoogleOauthCallbackPayload, String> {
+  let timeout = Duration::from_millis(timeout_ms.unwrap_or(180_000));
+  let receiver = state
+    .callback_receiver
+    .lock()
+    .map_err(|_| "failed to acquire desktop OAuth callback state".to_string())?
+    .take()
+    .ok_or_else(|| "GOOGLE_OAUTH_NOT_READY".to_string())?;
+
+  match receiver.recv_timeout(timeout) {
+    Ok(payload) => Ok(payload),
+    Err(mpsc::RecvTimeoutError::Timeout) => Err("GOOGLE_OAUTH_REDIRECT_TIMEOUT".into()),
+    Err(mpsc::RecvTimeoutError::Disconnected) => Err("GOOGLE_OAUTH_CALLBACK_FAILED".into()),
+  }
+}
+
 #[tauri::command]
 fn native_vault_store_read<R: Runtime>(
   app: AppHandle<R>,
@@ -549,8 +769,12 @@ pub fn run() {
     log_targets.push(Target::new(TargetKind::Stdout));
   }
 
-  tauri::Builder::default()
+  let builder = tauri::Builder::default().manage(DesktopGoogleOauthState::default());
+
+  builder
     .invoke_handler(tauri::generate_handler![
+      desktop_google_oauth_prepare_loopback,
+      desktop_google_oauth_wait_for_callback,
       native_vault_store_read,
       native_vault_store_write,
       native_vault_store_delete,
@@ -566,11 +790,13 @@ pub fn run() {
         .level(log_level)
         .build(),
     )
+    .plugin(tauri_plugin_opener::init())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_store::Builder::new().build())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .setup(|app| {
       ensure_runtime_layout(app)?;
+
       create_main_window(app)?;
       Ok(())
     })

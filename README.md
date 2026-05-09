@@ -55,7 +55,7 @@ Override it with `SYNC_DATA_DIR=/absolute/path`.
 
 ## Google Drive Setup
 
-Google Drive sync uses OAuth in the browser and stores remote vaults in the hidden `appDataFolder`.
+Google Drive sync stores remote vaults in the hidden `appDataFolder`.
 
 1. Copy the env template:
 
@@ -63,7 +63,14 @@ Google Drive sync uses OAuth in the browser and stores remote vaults in the hidd
 cp apps/app/.env.example apps/app/.env
 ```
 
-2. Set your Google OAuth web client id in `apps/app/.env`.
+2. Set your Google OAuth client ids in `apps/app/.env`:
+
+```env
+VITE_GOOGLE_DRIVE_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
+VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID=your-desktop-client-id.apps.googleusercontent.com
+```
+
+Desktop builds prefer `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID` and fall back to `VITE_GOOGLE_DRIVE_CLIENT_ID` if needed.
 
 3. Start the app and connect Google Drive from `Settings → Synchronization → Add connection → Google Drive`.
 

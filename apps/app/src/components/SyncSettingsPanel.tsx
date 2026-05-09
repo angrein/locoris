@@ -29,6 +29,7 @@ import {
   loginHostedAccount,
   prepareGoogleDriveOAuth,
   probeSyncConnectionAvailability,
+  refreshGoogleDriveAccountSession,
   registerHostedAccount
 } from "../lib/sync";
 import type {
@@ -76,6 +77,7 @@ interface SyncSettingsPanelProps {
     label?: string;
     managementToken?: string;
     sessionToken?: string;
+    refreshToken?: string | null;
     tokenExpiresAt?: number | null;
     userId?: string | null;
     userName?: string;
@@ -84,7 +86,9 @@ interface SyncSettingsPanelProps {
   onDeleteConnection: (connectionId: string) => void | Promise<void>;
   onUpdateConnection: (
     connectionId: string,
-    patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">>
+    patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">> & {
+      refreshToken?: string | null;
+    }
   ) => void | Promise<void>;
   onBindVault: (input: {
     localVaultId: string;
@@ -376,9 +380,19 @@ function translateSyncManagerError(message: string, t: ReturnType<typeof useTran
     case "GOOGLE_OAUTH_NOT_READY":
       return t("sync.googleDrivePreparing");
     case "GOOGLE_OAUTH_POPUP_CLOSED":
+    case "GOOGLE_OAUTH_ACCESS_DENIED":
       return t("sync.googleDrivePopupClosed");
     case "GOOGLE_OAUTH_POPUP_FAILED":
+    case "GOOGLE_OAUTH_BROWSER_OPEN_FAILED":
       return t("sync.googleDrivePopupFailed");
+    case "GOOGLE_OAUTH_REDIRECT_TIMEOUT":
+      return t("sync.googleDriveRedirectTimeout");
+    case "GOOGLE_OAUTH_CALLBACK_FAILED":
+      return t("sync.googleDriveRedirectFailed");
+    case "GOOGLE_OAUTH_DESKTOP_INSTALL_REQUIRED":
+      return t("sync.googleDriveDesktopInstallRequired");
+    case "GOOGLE_OAUTH_IN_PROGRESS":
+      return t("sync.googleDriveAuthInProgress");
     case "GOOGLE_OAUTH_SCRIPT_FAILED":
     case "GOOGLE_OAUTH_UNAVAILABLE":
       return t("sync.googleDriveSdkFailed");
@@ -1253,6 +1267,7 @@ export default function SyncSettingsPanel({
         provider: "googleDrive",
         serverUrl: "https://www.googleapis.com",
         sessionToken: result.accessToken,
+        refreshToken: result.refreshToken ?? null,
         tokenExpiresAt: result.expiresAt,
         userId: result.userId,
         userName: result.userName,
@@ -1282,16 +1297,21 @@ export default function SyncSettingsPanel({
       return connection;
     }
 
-    const result = await connectGoogleDriveAccount({
-      clientId: googleDriveClientId,
-      loginHint: connection.userEmail || undefined,
-      silent: options?.silent,
-      prompt: options?.silent ? "none" : undefined
-    });
+    const result = options?.silent
+      ? await refreshGoogleDriveAccountSession({
+          connectionId: connection.id,
+          clientId: googleDriveClientId,
+          loginHint: connection.userEmail || undefined
+        })
+      : await connectGoogleDriveAccount({
+          clientId: googleDriveClientId,
+          loginHint: connection.userEmail || undefined
+        });
 
     await Promise.resolve(
       onUpdateConnection(connection.id, {
       sessionToken: result.accessToken,
+      refreshToken: result.refreshToken ?? undefined,
       tokenExpiresAt: result.expiresAt,
       userId: result.userId,
       userName: result.userName,

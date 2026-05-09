@@ -88,6 +88,7 @@ import {
   importRemoteVaultIntoLocalVault,
   migrateRemoteVaultEncryption,
   primeRemoteVaultEncryptionMetadata,
+  refreshGoogleDriveAccountSession,
   issueGoogleDriveVaultToken,
   issueHostedVaultToken,
   issuePersonalServerVaultToken,
@@ -617,9 +618,22 @@ export default function App() {
         case "GOOGLE_DRIVE_CLIENT_ID_REQUIRED":
           return t("sync.googleDriveClientIdRequired");
         case "GOOGLE_OAUTH_POPUP_CLOSED":
+        case "GOOGLE_OAUTH_ACCESS_DENIED":
           return t("sync.googleDrivePopupClosed");
         case "GOOGLE_OAUTH_POPUP_FAILED":
+        case "GOOGLE_OAUTH_BROWSER_OPEN_FAILED":
           return t("sync.googleDrivePopupFailed");
+        case "GOOGLE_OAUTH_REDIRECT_TIMEOUT":
+          return t("sync.googleDriveRedirectTimeout");
+        case "GOOGLE_OAUTH_CALLBACK_FAILED":
+          return t("sync.googleDriveRedirectFailed");
+        case "GOOGLE_OAUTH_DESKTOP_INSTALL_REQUIRED":
+          return t("sync.googleDriveDesktopInstallRequired");
+        case "GOOGLE_OAUTH_IN_PROGRESS":
+          return t("sync.googleDriveAuthInProgress");
+        case "GOOGLE_OAUTH_SCRIPT_FAILED":
+        case "GOOGLE_OAUTH_UNAVAILABLE":
+          return t("sync.googleDriveSdkFailed");
         case "ENCRYPTED_SYNC_NOT_IMPLEMENTED":
           return t("sync.googleDriveEncryptedPending");
         case "VAULT_ENCRYPTION_LOCKED":
@@ -932,14 +946,14 @@ export default function App() {
       }
 
       try {
-        const result = await connectGoogleDriveAccount({
-          loginHint: connection.userEmail || undefined,
-          silent: true,
-          prompt: "none"
+        const result = await refreshGoogleDriveAccountSession({
+          connectionId: connection.id,
+          loginHint: connection.userEmail || undefined
         });
 
         const nextConnection = await updateSyncConnection(connection.id, {
           sessionToken: result.accessToken,
+          refreshToken: result.refreshToken ?? undefined,
           tokenExpiresAt: result.expiresAt,
           userId: result.userId,
           userName: result.userName,

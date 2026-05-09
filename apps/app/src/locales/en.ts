@@ -311,15 +311,21 @@ const en = {
     hostedVaultRequired: "Choose a hosted vault first.",
     hostedTokenRequired: "Bind this local vault to a hosted vault first.",
     googleDriveClientIdRequired:
-      "Set VITE_GOOGLE_DRIVE_CLIENT_ID before connecting Google Drive in this build.",
+      "Set VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID for desktop builds or VITE_GOOGLE_DRIVE_CLIENT_ID for web before connecting Google Drive.",
     googleDriveAuthRequired:
       "Google Drive session expired. Refresh the authorization to continue loading remote vaults.",
     googleDriveConnected: "Google Drive connected.",
-    googleDrivePopupClosed: "Google sign-in was closed before access was granted.",
-    googleDrivePopupFailed: "The Google sign-in window could not be opened.",
-    googleDrivePreparing: "Preparing Google OAuth. Give it a moment and try again.",
+    googleDrivePopupClosed: "Google authorization was canceled before access was granted.",
+    googleDrivePopupFailed: "The system browser could not be opened for Google authorization.",
+    googleDrivePreparing: "Preparing Google authorization. Give it a moment and try again.",
     googleDriveSdkFailed:
-      "Google OAuth could not be prepared in the browser. Check your network and content blockers, then try again.",
+      "Google authorization could not be prepared on this device. Check your network and try again.",
+    googleDriveRedirectTimeout:
+      "Google authorization took too long to return to Locoris. Try again and complete the browser step sooner.",
+    googleDriveRedirectFailed:
+      "Locoris received an invalid Google authorization response. Try the connection flow again.",
+    googleDriveAuthInProgress:
+      "Google authorization is already in progress. Finish the browser step or cancel it before starting again.",
     googleDriveEncryptedPending:
       "This Google Drive vault is encrypted, but encrypted sync import is not enabled in the app yet.",
     unauthorized: "The server rejected the token.",
@@ -492,17 +498,19 @@ const en = {
     googleDriveConnectionTitle: "Connect Google Drive",
     googleDriveConnectionDescription: "Hidden appDataFolder sync inside your Google account.",
     googleDriveReconnect: "Refresh Google Drive auth",
-    googleDriveClientMissing: "Set the Google OAuth client ID first to enable this method.",
+    googleDriveClientMissing:
+      "Set the desktop Google OAuth client ID first for native builds, or the web client ID for browser builds.",
     googleDriveModalDescription:
-      "Authorize Locoris in your browser and we will store each remote vault inside Google Drive appDataFolder.",
+      "Locoris opens your system browser, completes Google authorization with a secure local callback, and stores each remote vault inside Google Drive appDataFolder.",
     googleDriveConnect: "Connect Google Drive",
     googleDriveAppFolder: "appDataFolder",
     googleDriveAppFolderDescription:
       "Files stored there stay hidden from the regular Drive UI and are scoped to this app.",
     googleDriveSessionReady: "OAuth session ready for Drive appDataFolder access.",
     googleDriveSdkLoading:
-      "Preparing the browser Google OAuth SDK. As soon as it is ready, the connect button becomes available.",
-    googleDriveSdkReady: "Google OAuth SDK is ready. You can open the authorization window now.",
+      "Preparing native Google authorization. As soon as it is ready, the connect button becomes available.",
+    googleDriveSdkReady:
+      "Google authorization is ready. Locoris will open your system browser and return to the app automatically.",
     selfHostedModalDescription:
       "Enter the personal server endpoint and management token. After that the server will be ready for vault connections.",
     hostedModalDescription:
