@@ -124,7 +124,41 @@
   color: color-mix(in srgb, var(--text) 88%, var(--canvas-accent) 12%);
 }
 
+.canvas-pane-file-status {
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  color: color-mix(in srgb, var(--text) 82%, var(--text-dim) 18%);
+  font-size: 0.64rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.canvas-pane-file-status.is-png,
+.canvas-pane-file-status.is-svg,
+.canvas-pane-file-status.is-json,
+.canvas-pane-file-status.is-imported {
+  border-color: color-mix(in srgb, var(--canvas-accent) 30%, rgba(255, 224, 138, 0.14));
+  background: color-mix(in srgb, var(--canvas-accent) 13%, rgba(255, 255, 255, 0.03));
+  color: color-mix(in srgb, var(--text) 88%, var(--canvas-accent) 12%);
+}
+
+.canvas-pane-file-status.is-error {
+  border-color: rgba(255, 120, 120, 0.24);
+  background: rgba(255, 120, 120, 0.08);
+  color: color-mix(in srgb, var(--danger) 62%, var(--text) 38%);
+}
+
 .canvas-pane.is-immersive .canvas-pane-toolbar .editor-save-pill {
+  min-height: 22px;
+  padding: 2px 7px;
+  font-size: 0.6rem;
+}
+
+.canvas-pane.is-immersive .canvas-pane-file-status {
   min-height: 22px;
   padding: 2px 7px;
   font-size: 0.6rem;

@@ -2,8 +2,12 @@ import {
   bumpVersion,
   CaptureUpdateAction,
   Excalidraw,
+  exportToBlob,
+  exportToSvg,
+  loadFromBlob,
   MainMenu
 } from "@excalidraw/excalidraw";
+import { serializeAsJSON } from "@excalidraw/excalidraw";
 import type {
   AppState as ExcalidrawAppState,
   BinaryFiles,
@@ -38,6 +42,11 @@ import {
   persistExcalidrawLibrary,
   readPersistedExcalidrawLibrary
 } from "../lib/excalidrawLibrary";
+import {
+  openBlobFileWithDialog,
+  saveBlobFileWithDialog,
+  saveTextFileWithDialog
+} from "../lib/nativeFileIntegration";
 import { COLOR_PALETTE, DEFAULT_NOTE_COLOR } from "../lib/palette";
 import { flattenFolderOptions, formatTimestamp } from "../lib/notes";
 import type {
@@ -73,6 +82,16 @@ interface CanvasPaneProps {
   libraryStorageScopeId: string;
   immersive?: boolean;
 }
+
+type CanvasTransferStatus = "png" | "svg" | "json" | "imported" | "error" | null;
+type PendingCanvasImport = {
+  fileName: string;
+  restored: {
+    elements: readonly ExcalidrawElement[];
+    appState: ExcalidrawAppState;
+    files: BinaryFiles;
+  };
+};
 
 const EXCALIDRAW_UI_OPTIONS: Partial<UIOptions> = {
   canvasActions: {
@@ -144,6 +163,26 @@ function markCanvasElementUpdated<T extends ExcalidrawElement>(element: T) {
   const nextElement = { ...element } as T;
   bumpVersion(nextElement);
   return nextElement;
+}
+
+function getCanvasDocumentBaseName(note: Note, language: AppLanguage) {
+  const safeTitle = getDisplayNoteTitle(note, language)
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+
+  return safeTitle || "canvas";
+}
+
+function createImportedCanvasFileNames(files: BinaryFiles) {
+  return Object.fromEntries(
+    Object.entries(files).map(([fileId, file]) => {
+      const subtype = file.mimeType.split("/")[1] ?? "bin";
+      const sanitizedSubtype = subtype.replace(/[^a-z0-9]/gi, "") || "bin";
+      return [fileId, `canvas-${fileId.slice(0, 8)}.${sanitizedSubtype}`];
+    })
+  );
 }
 
 const DEFAULT_CANVAS_BACKGROUND_ALIASES = new Set([
@@ -355,9 +394,12 @@ export default function CanvasPane({
     (getInitialCanvasAppState(note.canvasContent).viewBackgroundColor ?? DEFAULT_CANVAS_BACKGROUND).toUpperCase()
   );
   const [isClearCanvasDialogOpen, setIsClearCanvasDialogOpen] = useState(false);
+  const [canvasTransferStatus, setCanvasTransferStatus] = useState<CanvasTransferStatus>(null);
+  const [pendingCanvasImport, setPendingCanvasImport] = useState<PendingCanvasImport | null>(null);
   const canvasStageShellRef = useRef<HTMLDivElement | null>(null);
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
+  const canvasTransferStatusTimeoutRef = useRef<number | null>(null);
   const excalidrawApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const latestSceneRef = useRef<CanvasContent>(note.canvasContent ?? { elements: [], appState: null });
   const latestFilesRef = useRef<BinaryFiles>({});
@@ -383,6 +425,8 @@ export default function CanvasPane({
     setCurrentCanvasBackground(initialCanvasBackground);
     setBackgroundHexDraft(initialCanvasBackground.toUpperCase());
     setIsClearCanvasDialogOpen(false);
+    setCanvasTransferStatus(null);
+    setPendingCanvasImport(null);
     latestFilesRef.current = {};
     latestFileNamesRef.current = {};
     generatedFileNamesRef.current = {};
@@ -739,6 +783,198 @@ export default function CanvasPane({
     }, 220);
   };
 
+  const showCanvasTransferStatus = (status: Exclude<CanvasTransferStatus, null>) => {
+    setCanvasTransferStatus(status);
+
+    if (canvasTransferStatusTimeoutRef.current) {
+      window.clearTimeout(canvasTransferStatusTimeoutRef.current);
+    }
+
+    canvasTransferStatusTimeoutRef.current = window.setTimeout(() => {
+      setCanvasTransferStatus(null);
+      canvasTransferStatusTimeoutRef.current = null;
+    }, 2400);
+  };
+
+  const buildCanvasExportState = () => {
+    const api = excalidrawApiRef.current;
+
+    if (!api) {
+      throw new Error("Canvas API is not ready");
+    }
+
+    return {
+      elements: api.getSceneElements().filter((element) => !element.isDeleted),
+      appState: api.getAppState(),
+      files: latestFilesRef.current
+    };
+  };
+
+  const handleExportCanvasPng = async () => {
+    try {
+      const { elements, appState, files } = buildCanvasExportState();
+      const blob = await exportToBlob({
+        elements,
+        appState,
+        files,
+        mimeType: "image/png"
+      });
+      const didSave = await saveBlobFileWithDialog({
+        defaultPath: `${getCanvasDocumentBaseName(note, language)}.png`,
+        filters: [
+          {
+            name: "PNG image",
+            extensions: ["png"]
+          }
+        ],
+        blob,
+        preferredExtension: "png"
+      });
+
+      if (!didSave) {
+        return;
+      }
+
+      showCanvasTransferStatus("png");
+    } catch {
+      showCanvasTransferStatus("error");
+    }
+  };
+
+  const handleExportCanvasSvg = async () => {
+    try {
+      const { elements, appState, files } = buildCanvasExportState();
+      const svg = await exportToSvg({
+        elements,
+        appState,
+        files
+      });
+      const serializedSvg = new XMLSerializer().serializeToString(svg);
+      const didSave = await saveTextFileWithDialog({
+        defaultPath: `${getCanvasDocumentBaseName(note, language)}.svg`,
+        filters: [
+          {
+            name: "SVG image",
+            extensions: ["svg"]
+          }
+        ],
+        content: serializedSvg,
+        preferredExtension: "svg"
+      });
+
+      if (!didSave) {
+        return;
+      }
+
+      showCanvasTransferStatus("svg");
+    } catch {
+      showCanvasTransferStatus("error");
+    }
+  };
+
+  const handleExportCanvasJson = async () => {
+    try {
+      const { elements, appState, files } = buildCanvasExportState();
+      const didSave = await saveTextFileWithDialog({
+        defaultPath: `${getCanvasDocumentBaseName(note, language)}.excalidraw`,
+        filters: [
+          {
+            name: "Excalidraw scene",
+            extensions: ["excalidraw", "json"]
+          }
+        ],
+        content: serializeAsJSON(elements, appState, files, "local"),
+        preferredExtension: "excalidraw"
+      });
+
+      if (!didSave) {
+        return;
+      }
+
+      showCanvasTransferStatus("json");
+    } catch {
+      showCanvasTransferStatus("error");
+    }
+  };
+
+  const applyCanvasImport = (
+    restored: PendingCanvasImport["restored"],
+    status: Exclude<CanvasTransferStatus, null> = "imported"
+  ) => {
+    const api = excalidrawApiRef.current;
+
+    if (!api) {
+      showCanvasTransferStatus("error");
+      return;
+    }
+
+    const importedFileNames = createImportedCanvasFileNames(restored.files);
+    generatedFileNamesRef.current = importedFileNames;
+    latestFileNamesRef.current = importedFileNames;
+    latestFilesRef.current = restored.files;
+
+    const importedBackground =
+      restored.appState?.viewBackgroundColor ?? DEFAULT_CANVAS_BACKGROUND;
+
+    setCurrentCanvasBackground(importedBackground);
+    setBackgroundHexDraft(importedBackground.toUpperCase());
+    setPendingCanvasImport(null);
+
+    api.updateScene({
+      elements: restored.elements,
+      appState: {
+        ...restored.appState,
+        theme: DEFAULT_CANVAS_THEME,
+        exportWithDarkMode: false
+      },
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY
+    });
+
+    window.requestAnimationFrame(syncCanvasUiChrome);
+    showCanvasTransferStatus(status);
+  };
+
+  const handleImportCanvasJson = async () => {
+    const selectedFile = await openBlobFileWithDialog({
+      filters: [
+        {
+          name: "Excalidraw scene",
+          extensions: ["excalidraw", "json"]
+        }
+      ]
+    });
+
+    if (!selectedFile) {
+      return;
+    }
+
+    try {
+      const restored = await loadFromBlob(
+        selectedFile.blob,
+        getInitialCanvasAppState(note.canvasContent) as unknown as ExcalidrawAppState,
+        (note.canvasContent?.elements ?? []) as unknown as readonly ExcalidrawElement[]
+      );
+
+      const normalizedRestored: PendingCanvasImport["restored"] = {
+        elements: restored.elements as unknown as readonly ExcalidrawElement[],
+        appState: restored.appState as unknown as ExcalidrawAppState,
+        files: restored.files
+      };
+
+      if (hasMeaningfulCanvasContent(latestSceneRef.current)) {
+        setPendingCanvasImport({
+          fileName: selectedFile.fileName,
+          restored: normalizedRestored
+        });
+        return;
+      }
+
+      applyCanvasImport(normalizedRestored);
+    } catch {
+      showCanvasTransferStatus("error");
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (titleTimeoutRef.current) {
@@ -753,6 +989,10 @@ export default function CanvasPane({
           latestFileNamesRef.current,
           "saved"
         );
+      }
+
+      if (canvasTransferStatusTimeoutRef.current) {
+        window.clearTimeout(canvasTransferStatusTimeoutRef.current);
       }
 
       if (latestTitleDraftRef.current !== latestStoredTitleRef.current) {
@@ -835,6 +1075,11 @@ export default function CanvasPane({
 
           <div className="canvas-pane-toolbar-meta">
             <span className={`editor-save-pill is-${saveState}`}>{t(`saveState.${saveState}`)}</span>
+            {canvasTransferStatus ? (
+              <span className={`canvas-pane-file-status is-${canvasTransferStatus}`}>
+                {t(`canvas.fileStatus.${canvasTransferStatus}`)}
+              </span>
+            ) : null}
             <span className="canvas-pane-contextmeta">
               {t("note.updated")}: {formatTimestamp(note.updatedAt, language)}
             </span>
@@ -912,7 +1157,23 @@ export default function CanvasPane({
                 viewModeEnabled={false}
               >
                 <MainMenu>
-                  <MainMenu.DefaultItems.SaveAsImage />
+                  <MainMenu.Group title={t("canvas.exportActions")}>
+                    <MainMenu.Item onSelect={() => void handleExportCanvasPng()}>
+                      {t("canvas.exportPng")}
+                    </MainMenu.Item>
+                    <MainMenu.Item onSelect={() => void handleExportCanvasSvg()}>
+                      {t("canvas.exportSvg")}
+                    </MainMenu.Item>
+                    <MainMenu.Item onSelect={() => void handleExportCanvasJson()}>
+                      {t("canvas.exportJson")}
+                    </MainMenu.Item>
+                  </MainMenu.Group>
+                  <MainMenu.Separator />
+                  <MainMenu.Group title={t("canvas.importActions")}>
+                    <MainMenu.Item onSelect={() => void handleImportCanvasJson()}>
+                      {t("canvas.importJson")}
+                    </MainMenu.Item>
+                  </MainMenu.Group>
                   <MainMenu.Separator />
                   <CanvasBackgroundMenuSection
                     label={t("canvas.backgroundLabel")}
@@ -943,6 +1204,28 @@ export default function CanvasPane({
               cancelLabel={t("canvas.clearCanvasCancel")}
               onConfirm={handleClearCanvasConfirm}
               onCancel={() => setIsClearCanvasDialogOpen(false)}
+            />
+            <ConfirmDialog
+              open={Boolean(pendingCanvasImport)}
+              kicker={t("canvas.importJson")}
+              title={t("canvas.importJsonTitle")}
+              message={
+                pendingCanvasImport
+                  ? t("canvas.importJsonMessage", {
+                      fileName: pendingCanvasImport.fileName
+                    })
+                  : ""
+              }
+              confirmLabel={t("canvas.replaceWithImport")}
+              cancelLabel={t("dialog.cancel")}
+              onConfirm={() => {
+                if (!pendingCanvasImport) {
+                  return;
+                }
+
+                applyCanvasImport(pendingCanvasImport.restored);
+              }}
+              onCancel={() => setPendingCanvasImport(null)}
             />
           </div>
         </div>

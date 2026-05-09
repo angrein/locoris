@@ -27,6 +27,10 @@ import {
   normalizeNoteContent,
   seedChecklistStableOrderMap
 } from "../lib/notes";
+import {
+  openTextFileWithDialog,
+  saveTextFileWithDialog
+} from "../lib/nativeFileIntegration";
 import type { AppLanguage, Folder, Note, NoteContent, SaveState, Tag } from "../types";
 
 type MarkdownStatus = "copied" | "exported" | "imported" | "error" | null;
@@ -90,7 +94,6 @@ export default function EditorPane({
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
   const markdownStatusTimeoutRef = useRef<number | null>(null);
-  const markdownFileInputRef = useRef<HTMLInputElement | null>(null);
   const isApplyingChecklistTransformRef = useRef(false);
   const checklistStableOrderRef = useRef(new Map<string, number>());
   const latestTitleDraftRef = useRef(titleDraft);
@@ -272,18 +275,24 @@ export default function EditorPane({
     }
   };
 
-  const handleExportMarkdown = () => {
+  const handleExportMarkdown = async () => {
     try {
-      const blob = new Blob([getMarkdown()], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const didSave = await saveTextFileWithDialog({
+        defaultPath: getMarkdownFilename(),
+        filters: [
+          {
+            name: "Markdown",
+            extensions: ["md", "markdown"]
+          }
+        ],
+        content: getMarkdown(),
+        preferredExtension: "md"
+      });
 
-      link.href = url;
-      link.download = getMarkdownFilename();
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      if (!didSave) {
+        return;
+      }
+
       showMarkdownStatus("exported");
     } catch {
       showMarkdownStatus("error");
@@ -303,26 +312,31 @@ export default function EditorPane({
     }
   };
 
-  const handleImportMarkdownFile = async (file: File | null | undefined) => {
-    if (!file) {
+  const handleImportMarkdown = async () => {
+    const importedFile = await openTextFileWithDialog({
+      filters: [
+        {
+          name: "Markdown",
+          extensions: ["md", "markdown", "txt"]
+        }
+      ]
+    });
+
+    if (!importedFile) {
       return;
     }
 
     try {
-      const markdown = await file.text();
+      const { fileName, text } = importedFile;
 
       if (getMarkdown().trim().length > 0) {
-        setPendingMarkdownImport({ fileName: file.name, markdown });
+        setPendingMarkdownImport({ fileName, markdown: text });
         return;
       }
 
-      await applyMarkdownImport(markdown);
+      await applyMarkdownImport(text);
     } catch {
       showMarkdownStatus("error");
-    } finally {
-      if (markdownFileInputRef.current) {
-        markdownFileInputRef.current.value = "";
-      }
     }
   };
 
@@ -420,23 +434,20 @@ export default function EditorPane({
             <button type="button" className="editor-pane-ghost-action" onClick={handleCopyMarkdown}>
               {t("note.copyMarkdown")}
             </button>
-            <button type="button" className="editor-pane-ghost-action" onClick={handleExportMarkdown}>
+            <button
+              type="button"
+              className="editor-pane-ghost-action"
+              onClick={() => void handleExportMarkdown()}
+            >
               {t("note.exportMarkdown")}
             </button>
             <button
               type="button"
               className="editor-pane-ghost-action"
-              onClick={() => markdownFileInputRef.current?.click()}
+              onClick={() => void handleImportMarkdown()}
             >
               {t("note.importMarkdown")}
             </button>
-            <input
-              ref={markdownFileInputRef}
-              className="editor-pane-hidden-input"
-              type="file"
-              accept=".md,.markdown,text/markdown,text/plain"
-              onChange={(event) => void handleImportMarkdownFile(event.target.files?.[0])}
-            />
             {markdownStatus ? (
               <span className={`editor-pane-markdown-status is-${markdownStatus}`}>
                 {t(`note.markdownStatus.${markdownStatus}`)}

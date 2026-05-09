@@ -166,11 +166,18 @@ const en = {
     exportPng: "PNG",
     exportSvg: "SVG",
     exportJson: "JSON",
-    exportStatus: {
+    importActions: "Canvas import",
+    importJson: "Import JSON",
+    importJsonTitle: "Replace current canvas?",
+    importJsonMessage:
+      "Importing {{fileName}} will replace every element on this canvas. Export the current scene first if you want to keep it.",
+    replaceWithImport: "Replace",
+    fileStatus: {
       png: "PNG ready",
       svg: "SVG ready",
       json: "JSON ready",
-      error: "Export failed"
+      imported: "Canvas imported",
+      error: "File action failed"
     },
     emptyState: "Visual canvas with no text yet."
   },

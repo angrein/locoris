@@ -11,8 +11,9 @@ use std::{
   thread,
   time::{Duration, Instant},
 };
-use tauri::{AppHandle, Manager, Runtime, State, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
+use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 const DESKTOP_DATA_DIRECTORY: &str = "data";
 const DESKTOP_SETTINGS_DIRECTORY: &str = "settings";
@@ -283,7 +284,30 @@ fn ensure_runtime_layout<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<
   Ok(())
 }
 
-fn create_main_window<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::Error>> {
+fn desktop_window_state_flags() -> StateFlags {
+  StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED | StateFlags::FULLSCREEN
+}
+
+fn show_and_focus_window<R: Runtime>(
+  window: &WebviewWindow<R>,
+) -> Result<(), Box<dyn std::error::Error>> {
+  let _ = window.unminimize();
+  window.show()?;
+  let _ = window.set_focus();
+  Ok(())
+}
+
+fn restore_and_present_main_window<R: Runtime>(
+  window: &WebviewWindow<R>,
+) -> Result<(), Box<dyn std::error::Error>> {
+  if let Err(error) = window.restore_state(desktop_window_state_flags()) {
+    log::debug!("No saved main window state restored: {error}");
+  }
+
+  show_and_focus_window(window)
+}
+
+fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
   let window_config = app
     .config()
     .app
@@ -296,8 +320,7 @@ fn create_main_window<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn
 
   let identifier = app.config().identifier.clone();
   let version = app.package_info().version.to_string();
-  let app_handle = app.handle().clone();
-  let mut builder = WebviewWindowBuilder::from_config(&app_handle, &window_config)?;
+  let mut builder = WebviewWindowBuilder::from_config(app, &window_config)?;
 
   #[cfg(target_os = "windows")]
   {
@@ -315,8 +338,19 @@ fn create_main_window<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn
     builder = builder.data_store_identifier(build_macos_data_store_identifier(&identifier, &version));
   }
 
-  builder.build()?;
+  let window = builder.build()?;
+  restore_and_present_main_window(&window)?;
   Ok(())
+}
+
+fn focus_existing_main_window<R: Runtime>(
+  app: &AppHandle<R>,
+) -> Result<(), Box<dyn std::error::Error>> {
+  if let Some(window) = app.get_webview_window("main") {
+    return show_and_focus_window(&window);
+  }
+
+  create_main_window(app)
 }
 
 #[cfg(target_os = "windows")]
@@ -769,7 +803,18 @@ pub fn run() {
     log_targets.push(Target::new(TargetKind::Stdout));
   }
 
-  let builder = tauri::Builder::default().manage(DesktopGoogleOauthState::default());
+  let mut builder = tauri::Builder::default();
+
+  #[cfg(desktop)]
+  {
+    builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+      if let Err(error) = focus_existing_main_window(app) {
+        log::warn!("Failed to focus existing Locoris window: {error}");
+      }
+    }));
+  }
+
+  let builder = builder.manage(DesktopGoogleOauthState::default());
 
   builder
     .invoke_handler(tauri::generate_handler![
@@ -782,6 +827,7 @@ pub fn run() {
       secure_secret_set,
       secure_secret_delete
     ])
+    .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
     .plugin(
       tauri_plugin_log::Builder::new()
@@ -794,10 +840,16 @@ pub fn run() {
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_store::Builder::new().build())
     .plugin(tauri_plugin_updater::Builder::new().build())
+    .plugin(
+      tauri_plugin_window_state::Builder::default()
+        .with_state_flags(desktop_window_state_flags())
+        .skip_initial_state("main")
+        .build(),
+    )
     .setup(|app| {
       ensure_runtime_layout(app)?;
 
-      create_main_window(app)?;
+      create_main_window(&app.handle())?;
       Ok(())
     })
     .run(tauri::generate_context!())

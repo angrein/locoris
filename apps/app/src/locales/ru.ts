@@ -166,11 +166,18 @@ const ru = {
     exportPng: "PNG",
     exportSvg: "SVG",
     exportJson: "JSON",
-    exportStatus: {
+    importActions: "Импорт холста",
+    importJson: "Импорт JSON",
+    importJsonTitle: "Заменить текущий холст?",
+    importJsonMessage:
+      "Импорт файла {{fileName}} заменит все элементы на этом холсте. Сначала экспортируй текущую сцену, если хочешь сохранить её.",
+    replaceWithImport: "Заменить",
+    fileStatus: {
       png: "PNG готов",
       svg: "SVG готов",
       json: "JSON готов",
-      error: "Экспорт не удался"
+      imported: "Холст импортирован",
+      error: "Не удалось выполнить файловое действие"
     },
     emptyState: "На холсте пока нет текстовых элементов."
   },

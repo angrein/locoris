@@ -1,6 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
+import { saveDesktopWindowState } from "./desktopWindowState";
 
 export type DesktopUpdateCheckResult =
   | {
@@ -67,6 +68,8 @@ export async function installDesktopUpdate(
   update: Update,
   onProgress?: (event: DownloadEvent) => void
 ) {
+  await saveDesktopWindowState().catch(() => {});
+
   const [{ relaunch }] = await Promise.all([
     import("@tauri-apps/plugin-process"),
     update.downloadAndInstall(onProgress)

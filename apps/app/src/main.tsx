@@ -64,6 +64,7 @@ import {
   sanitizePersistedLocalVaultSecrets
 } from "./data/db";
 import { bootstrapDesktopRuntimeState } from "./lib/desktopRuntimeBootstrap";
+import { initializeDesktopWindowStatePersistence } from "./lib/desktopWindowState";
 import { initializeVaultEncryptionSessions } from "./lib/e2eeSession";
 import { listLocalVaultProfiles } from "./lib/localVaults";
 import { initializePersistentClientStorage } from "./lib/persistentClientStorage";
@@ -128,6 +129,7 @@ async function bootstrap() {
   await preloadSecureSecrets(localVaultIds.flatMap((localVaultId) => listAppSettingsSecretKeys(localVaultId)));
   await initializeVaultEncryptionSessions(localVaultIds);
   await resetDesktopServiceWorkerState();
+  await initializeDesktopWindowStatePersistence();
 
   let desktopPersistenceFlush: Promise<void> | null = null;
 
