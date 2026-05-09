@@ -7,6 +7,16 @@
   ],
   "permissions": [
     "core:default",
+    "fs:default",
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
+    "fs:allow-applocaldata-write-recursive",
+    "fs:allow-appcache-write-recursive",
+    "fs:allow-applog-write-recursive",
+    "fs:scope-appdata-recursive",
+    "fs:scope-appcache-recursive",
+    "fs:scope-applocaldata-recursive",
+    "fs:scope-applog-recursive",
     "process:default",
     "store:default",
     "updater:default"

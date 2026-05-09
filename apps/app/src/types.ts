@@ -258,6 +258,34 @@ export interface SyncTombstone {
   deletedAt: number;
 }
 
+export interface DesktopLocalVaultBackupAsset {
+  id: string;
+  noteId: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  kind: AssetKind;
+  data: string;
+  version?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface DesktopLocalVaultBackup {
+  schemaVersion: 1;
+  localVaultId: string;
+  savedAt: number;
+  projects: Project[];
+  folders: Folder[];
+  tags: Tag[];
+  notes: Note[];
+  assets: DesktopLocalVaultBackupAsset[];
+  settings: AppSettings | null;
+  syncDirtyEntries: SyncDirtyEntry[];
+  syncShadows: SyncShadow[];
+  syncTombstones: SyncTombstone[];
+}
+
 export interface SyncedNoteRecord {
   id: string;
   title: string;

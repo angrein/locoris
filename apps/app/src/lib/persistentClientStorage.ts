@@ -1,6 +1,6 @@
 import { isTauri } from "@tauri-apps/api/core";
 
-const STORE_FILE_NAME = "locoris-client.store.json";
+const STORE_FILE_NAME = "settings/locoris-client.store.json";
 const MIGRATION_PREFIXES = ["zen-notes.", "zen:"];
 
 const memoryStorage = new Map<string, string>();

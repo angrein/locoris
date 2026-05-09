@@ -1,7 +1,7 @@
 {
   "name": "locoris",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -21,6 +21,8 @@
     "desktop:build": "npm run desktop:build --workspace @locoris/app",
     "desktop:build:debug": "npm run desktop:build:debug --workspace @locoris/app",
     "desktop:info": "npm run desktop:info --workspace @locoris/app",
+    "desktop:uninstall:macos": "bash ./scripts/macos/uninstall-locoris.sh /Applications/Locoris.app",
+    "desktop:uninstall:macos:wipe": "LOCORIS_WIPE_DATA=1 bash ./scripts/macos/uninstall-locoris.sh /Applications/Locoris.app",
     "sync-server": "npm run start --workspace @locoris/personal-server",
     "sync-server:personal": "npm run start --workspace @locoris/personal-server"
   }

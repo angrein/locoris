@@ -4,6 +4,8 @@ import {
   readPersistentString,
   writePersistentString
 } from "./persistentClientStorage";
+import { deleteDesktopVaultBackup } from "./desktopVaultBackups";
+import { deleteNativeVaultSnapshot } from "./nativeVaultStore";
 
 export type LocalVaultKind = "regular" | "private";
 
@@ -384,4 +386,6 @@ export function removeLocalVaultProfile(localVaultId: string) {
 
 export async function deleteLocalVaultDatabase(localVaultId: string) {
   await Dexie.delete(buildLocalVaultDatabaseName(localVaultId));
+  await deleteNativeVaultSnapshot(localVaultId);
+  await deleteDesktopVaultBackup(localVaultId);
 }

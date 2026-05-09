@@ -23,12 +23,23 @@ import {
 } from "../lib/canvas";
 import { normalizeTagLookup, normalizeTagName } from "../lib/tags";
 import { buildLocalVaultDatabaseName, getStoredActiveLocalVaultId } from "../lib/localVaults";
+import {
+  deleteDesktopVaultBackup,
+  writeDesktopVaultBackup
+} from "../lib/desktopVaultBackups";
+import {
+  deleteNativeVaultSnapshot,
+  readNativeVaultSnapshot,
+  writeNativeVaultSnapshot
+} from "../lib/nativeVaultStore";
 import type {
   AppLanguage,
   AppSettings,
   Asset,
   AssetKind,
   CanvasContent,
+  DesktopLocalVaultBackup,
+  DesktopLocalVaultBackupAsset,
   Folder,
   Note,
   NoteContent,
@@ -247,6 +258,81 @@ function hydrateImportedNote(record: SyncedNoteRecord): Note {
     excerpt,
     plainText,
     syncState: record.conflictOriginId ? "conflict" : "synced"
+  };
+}
+
+function sortById<T extends { id: string }>(records: readonly T[]) {
+  return [...records].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function sortByKey<T extends { key: string }>(records: readonly T[]) {
+  return [...records].sort((left, right) => left.key.localeCompare(right.key));
+}
+
+async function blobToBase64(blob: Blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+}
+
+async function serializeDesktopBackupAsset(asset: Asset): Promise<DesktopLocalVaultBackupAsset> {
+  return {
+    id: asset.id,
+    noteId: asset.noteId,
+    name: asset.name,
+    mimeType: asset.mimeType,
+    size: asset.size,
+    kind: asset.kind,
+    data: await blobToBase64(asset.blob),
+    version: asset.version,
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt
+  };
+}
+
+function hydrateDesktopBackupAsset(record: DesktopLocalVaultBackupAsset): Asset {
+  return {
+    id: record.id,
+    noteId: record.noteId,
+    name: record.name,
+    mimeType: record.mimeType,
+    size: record.size,
+    kind: record.kind,
+    blob: base64ToBlob(record.data, record.mimeType),
+    version: record.version,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt
+  };
+}
+
+function hydrateDesktopBackupNote(record: Note): Note {
+  const normalizedContent = normalizeNoteContent(record.content);
+  const normalizedCanvas = record.canvasContent ? normalizeCanvasContent(record.canvasContent) : null;
+  const excerpt =
+    record.contentType === "canvas"
+      ? buildCanvasExcerpt(normalizedCanvas)
+      : buildExcerpt(normalizedContent);
+  const plainText =
+    record.contentType === "canvas"
+      ? extractCanvasPlainText(normalizedCanvas)
+      : extractPlainText(normalizedContent);
+
+  return {
+    ...record,
+    color: record.color || DEFAULT_NOTE_COLOR,
+    content: normalizedContent,
+    canvasContent: normalizedCanvas,
+    excerpt,
+    plainText,
+    syncState: record.syncState ?? (record.conflictOriginId ? "conflict" : "local"),
+    conflictOriginId: record.conflictOriginId ?? null
   };
 }
 
@@ -769,6 +855,264 @@ export async function withLocalVaultDatabase<T>(
   }
 }
 
+const desktopVaultPersistenceTimers = new Map<string, number>();
+const desktopVaultPersistenceTasks = new Map<string, Promise<void>>();
+
+function clearScheduledLocalVaultPersistence(localVaultId: string) {
+  const timerId = desktopVaultPersistenceTimers.get(localVaultId);
+
+  if (timerId !== undefined && typeof window !== "undefined") {
+    window.clearTimeout(timerId);
+  }
+
+  desktopVaultPersistenceTimers.delete(localVaultId);
+}
+
+function scheduleLocalVaultPersistence(localVaultId: string, delayMs = 400) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  clearScheduledLocalVaultPersistence(localVaultId);
+
+  const timerId = window.setTimeout(() => {
+    desktopVaultPersistenceTimers.delete(localVaultId);
+    void persistLocalVaultStorage(localVaultId);
+  }, delayMs);
+
+  desktopVaultPersistenceTimers.set(localVaultId, timerId);
+}
+
+function scheduleActiveLocalVaultPersistence() {
+  scheduleLocalVaultPersistence(getStoredActiveLocalVaultId());
+}
+
+function scheduleLocalVaultDesktopBackup(localVaultId: string) {
+  scheduleLocalVaultPersistence(localVaultId);
+}
+
+function scheduleActiveLocalVaultDesktopBackup() {
+  scheduleActiveLocalVaultPersistence();
+}
+
+function cloneSettingsForBackup(settings: AppSettings | null) {
+  return settings ? { ...settings } : null;
+}
+
+export async function hasLocalVaultPersistedState(localVaultId: string) {
+  return withLocalVaultDatabase(localVaultId, async (database) => {
+    return Boolean(await database.settings.get("app"));
+  });
+}
+
+export async function exportLocalVaultDesktopBackup(
+  localVaultId: string
+): Promise<DesktopLocalVaultBackup | null> {
+  return withLocalVaultDatabase(localVaultId, async (database) => {
+    const [projects, folders, tags, notes, assets, settings, syncDirtyEntries, syncShadows, syncTombstones] =
+      await Promise.all([
+        database.projects.toArray(),
+        database.folders.toArray(),
+        database.tags.toArray(),
+        database.notes.toArray(),
+        database.assets.toArray(),
+        database.settings.get("app"),
+        database.syncDirtyEntries.toArray(),
+        database.syncShadows.toArray(),
+        database.syncTombstones.toArray()
+      ]);
+
+    if (!settings) {
+      return null;
+    }
+
+    return {
+      schemaVersion: 1,
+      localVaultId,
+      savedAt: now(),
+      projects: sortById(projects),
+      folders: sortById(folders),
+      tags: sortById(tags),
+      notes: sortById(notes).map((note) => ({ ...note, tagIds: [...note.tagIds] })),
+      assets: sortById(await Promise.all(assets.map((asset) => serializeDesktopBackupAsset(asset)))),
+      settings: cloneSettingsForBackup(settings),
+      syncDirtyEntries: sortByKey(syncDirtyEntries),
+      syncShadows: sortByKey(syncShadows),
+      syncTombstones: sortByKey(syncTombstones)
+    } satisfies DesktopLocalVaultBackup;
+  });
+}
+
+export async function restoreLocalVaultDesktopBackup(
+  localVaultId: string,
+  backup: DesktopLocalVaultBackup
+) {
+  return withLocalVaultDatabase(localVaultId, async (database) => {
+    const notes = sortById(backup.notes).map((note) => hydrateDesktopBackupNote(note));
+    const assets = sortById(backup.assets).map((asset) => hydrateDesktopBackupAsset(asset));
+    const backupSettings = backup.settings;
+    const settings =
+      backupSettings
+        ? {
+            ...backupSettings,
+            lastOpenedNoteId:
+              backupSettings.lastOpenedNoteId && notes.some((note) => note.id === backupSettings.lastOpenedNoteId)
+                ? backupSettings.lastOpenedNoteId
+                : notes[0]?.id ?? null
+          }
+        : buildDefaultAppSettings(detectLanguage(), notes[0]?.id ?? null);
+
+    resetResolvedAssetCache();
+
+    await database.transaction(
+      "rw",
+      [
+        database.projects,
+        database.folders,
+        database.tags,
+        database.notes,
+        database.assets,
+        database.settings,
+        database.syncDirtyEntries,
+        database.syncShadows,
+        database.syncTombstones
+      ],
+      async () => {
+        await database.projects.clear();
+        await database.folders.clear();
+        await database.tags.clear();
+        await database.notes.clear();
+        await database.assets.clear();
+        await database.settings.clear();
+        await database.syncDirtyEntries.clear();
+        await database.syncShadows.clear();
+        await database.syncTombstones.clear();
+
+        if (backup.projects.length > 0) {
+          await database.projects.bulkAdd(sortById(backup.projects));
+        }
+
+        if (backup.folders.length > 0) {
+          await database.folders.bulkAdd(sortById(backup.folders));
+        }
+
+        if (backup.tags.length > 0) {
+          await database.tags.bulkAdd(sortById(backup.tags));
+        }
+
+        if (notes.length > 0) {
+          await database.notes.bulkAdd(notes);
+        }
+
+        if (assets.length > 0) {
+          await database.assets.bulkAdd(assets);
+        }
+
+        await database.settings.add(settings);
+
+        if (backup.syncDirtyEntries.length > 0) {
+          await database.syncDirtyEntries.bulkAdd(sortByKey(backup.syncDirtyEntries));
+        }
+
+        if (backup.syncShadows.length > 0) {
+          await database.syncShadows.bulkAdd(sortByKey(backup.syncShadows));
+        }
+
+        if (backup.syncTombstones.length > 0) {
+          await database.syncTombstones.bulkAdd(sortByKey(backup.syncTombstones));
+        }
+      }
+    );
+  });
+}
+
+export async function persistLocalVaultDesktopBackup(localVaultId: string) {
+  const backup = await exportLocalVaultDesktopBackup(localVaultId);
+
+  if (!backup) {
+    await deleteDesktopVaultBackup(localVaultId);
+    return;
+  }
+
+  await writeDesktopVaultBackup(localVaultId, backup);
+}
+
+export async function persistAllLocalVaultDesktopBackups(localVaultIds: readonly string[]) {
+  for (const localVaultId of localVaultIds) {
+    await persistLocalVaultDesktopBackup(localVaultId);
+  }
+}
+
+export async function readLocalVaultNativeSnapshot(localVaultId: string) {
+  return readNativeVaultSnapshot(localVaultId);
+}
+
+export async function restoreLocalVaultNativeSnapshot(localVaultId: string) {
+  const snapshot = await readNativeVaultSnapshot(localVaultId);
+
+  if (!snapshot) {
+    return false;
+  }
+
+  await restoreLocalVaultDesktopBackup(localVaultId, snapshot);
+  return true;
+}
+
+export async function persistLocalVaultNativeSnapshot(localVaultId: string) {
+  const backup = await exportLocalVaultDesktopBackup(localVaultId);
+
+  if (!backup) {
+    await deleteNativeVaultSnapshot(localVaultId);
+    return;
+  }
+
+  await writeNativeVaultSnapshot(localVaultId, backup);
+}
+
+export async function persistAllLocalVaultNativeSnapshots(localVaultIds: readonly string[]) {
+  for (const localVaultId of localVaultIds) {
+    await persistLocalVaultNativeSnapshot(localVaultId);
+  }
+}
+
+export async function persistLocalVaultStorage(localVaultId: string) {
+  const previousTask = desktopVaultPersistenceTasks.get(localVaultId) ?? Promise.resolve();
+  const nextTask = previousTask
+    .catch(() => undefined)
+    .then(async () => {
+      await Promise.all([
+        persistLocalVaultNativeSnapshot(localVaultId),
+        persistLocalVaultDesktopBackup(localVaultId)
+      ]);
+    });
+
+  desktopVaultPersistenceTasks.set(localVaultId, nextTask);
+
+  try {
+    await nextTask;
+  } finally {
+    if (desktopVaultPersistenceTasks.get(localVaultId) === nextTask) {
+      desktopVaultPersistenceTasks.delete(localVaultId);
+    }
+  }
+}
+
+export async function persistAllLocalVaultStorage(localVaultIds: readonly string[]) {
+  for (const localVaultId of localVaultIds) {
+    await persistLocalVaultStorage(localVaultId);
+  }
+}
+
+export async function flushPendingLocalVaultStorage(localVaultIds: readonly string[]) {
+  const uniqueLocalVaultIds = [...new Set(localVaultIds)];
+
+  for (const localVaultId of uniqueLocalVaultIds) {
+    clearScheduledLocalVaultPersistence(localVaultId);
+  }
+
+  await Promise.all(uniqueLocalVaultIds.map((localVaultId) => persistLocalVaultStorage(localVaultId)));
+}
+
 export async function ensureSeedData() {
   const existingSettings = await db.settings.get("app");
 
@@ -885,10 +1229,13 @@ export async function ensureSeedData() {
     });
     }
   );
+
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 export async function patchSettings(patch: Partial<Omit<AppSettings, "id">>) {
   await db.settings.update("app", patch);
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 export async function resetSyncBinding() {
@@ -906,6 +1253,8 @@ export async function resetSyncBinding() {
       }
     });
   });
+
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 export async function readLocalVaultSettings(localVaultId: string) {
@@ -934,6 +1283,7 @@ export async function ensureLocalVaultSettingsRecord(
     };
 
     await database.settings.add(nextSettings);
+    scheduleLocalVaultDesktopBackup(localVaultId);
     return nextSettings;
   });
 }
@@ -942,9 +1292,11 @@ export async function patchLocalVaultSettings(
   localVaultId: string,
   patch: Partial<Omit<AppSettings, "id">>
 ) {
-  return withLocalVaultDatabase(localVaultId, async (database) => {
+  await withLocalVaultDatabase(localVaultId, async (database) => {
     await database.settings.update("app", patch);
   });
+
+  scheduleLocalVaultDesktopBackup(localVaultId);
 }
 
 export async function writeImportedVaultSnapshot(
@@ -955,7 +1307,7 @@ export async function writeImportedVaultSnapshot(
     language?: AppLanguage;
   }
 ) {
-  return withLocalVaultDatabase(localVaultId, async (database) => {
+  await withLocalVaultDatabase(localVaultId, async (database) => {
     const existingSettings = await database.settings.get("app");
     const language = input.language ?? existingSettings?.language ?? detectLanguage();
     const notes = input.snapshot.notes.map((note) => hydrateImportedNote(note));
@@ -1034,10 +1386,12 @@ export async function writeImportedVaultSnapshot(
       }
     );
   });
+
+  scheduleLocalVaultDesktopBackup(localVaultId);
 }
 
 export async function resetLocalVaultSyncBinding(localVaultId: string) {
-  return withLocalVaultDatabase(localVaultId, async (database) => {
+  await withLocalVaultDatabase(localVaultId, async (database) => {
     await database.transaction("rw", [database.syncShadows, database.settings, database.notes], async () => {
       await database.syncShadows.clear();
       await database.settings.update("app", {
@@ -1060,6 +1414,8 @@ export async function resetLocalVaultSyncBinding(localVaultId: string) {
       });
     });
   });
+
+  scheduleLocalVaultDesktopBackup(localVaultId);
 }
 
 export async function createProject(name: string, x: number, y: number, color?: string) {
@@ -1079,6 +1435,7 @@ export async function createProject(name: string, x: number, y: number, color?: 
     await db.projects.add(project);
     await putSyncDirtyEntry("project", project.id, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return project;
 }
 
@@ -1098,6 +1455,7 @@ export async function updateProjectPosition(projectId: string, x: number, y: num
     });
     await putSyncDirtyEntry("project", projectId, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return true;
 }
 
@@ -1116,6 +1474,7 @@ export async function updateProjectColor(projectId: string, color: string) {
     });
     await putSyncDirtyEntry("project", projectId, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return true;
 }
 
@@ -1134,6 +1493,7 @@ export async function renameProject(projectId: string, name: string) {
     });
     await putSyncDirtyEntry("project", projectId, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return true;
 }
 
@@ -1189,6 +1549,8 @@ export async function removeProject(projectId: string) {
     }
     }
   );
+
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 export async function createFolder(
@@ -1229,6 +1591,7 @@ export async function createFolder(
     await db.folders.add(folder);
     await putSyncDirtyEntry("folder", folder.id, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return folder;
 }
 
@@ -1247,6 +1610,7 @@ export async function renameFolder(folderId: string, name: string) {
     });
     await putSyncDirtyEntry("folder", folderId, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return true;
 }
 
@@ -1265,6 +1629,7 @@ export async function updateFolderColor(folderId: string, color: string) {
     });
     await putSyncDirtyEntry("folder", folderId, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return true;
 }
 
@@ -1294,6 +1659,8 @@ export async function removeFolder(folderId: string) {
       cascade.noteIds.map((noteId) => createSyncDirtyEntry("note", noteId, timestamp))
     );
   });
+
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 export async function inspectFolderRemoval(folderId: string) {
@@ -1333,6 +1700,7 @@ export async function createTag(name: string) {
     await db.tags.add(tag);
     await putSyncDirtyEntry("tag", tag.id, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return tag;
 }
 
@@ -1405,6 +1773,8 @@ export async function renameTag(tagId: string, name: string) {
     });
     await putSyncDirtyEntry("tag", tagId, timestamp);
   });
+
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 export async function removeTag(tagId: string) {
@@ -1429,6 +1799,8 @@ export async function removeTag(tagId: string) {
       impactedNotes.map((note) => createSyncDirtyEntry("note", note.id, timestamp))
     );
   });
+
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 export async function createNote(
@@ -1476,6 +1848,7 @@ export async function createNote(
     });
   });
 
+  scheduleActiveLocalVaultDesktopBackup();
   return note;
 }
 
@@ -1524,6 +1897,7 @@ export async function createCanvas(
     });
   });
 
+  scheduleActiveLocalVaultDesktopBackup();
   return note;
 }
 
@@ -1591,6 +1965,7 @@ export async function updateNoteMeta(
     });
     await putSyncDirtyEntry("note", noteId, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return true;
 }
 
@@ -1646,6 +2021,9 @@ export async function saveNoteContent(noteId: string, content: NoteContent) {
     await putSyncDirtyEntry("note", noteId, timestamp);
     didChange = true;
   });
+  if (didChange) {
+    scheduleActiveLocalVaultDesktopBackup();
+  }
   return didChange;
 }
 
@@ -1787,6 +2165,9 @@ export async function saveCanvasContent(
     await putSyncDirtyEntry("note", noteId, timestamp);
     didChange = true;
   });
+  if (didChange) {
+    scheduleActiveLocalVaultDesktopBackup();
+  }
   return didChange;
 }
 
@@ -1822,6 +2203,8 @@ export async function removeNote(noteId: string) {
     await db.assets.bulkDelete(normalizedIds);
     await Promise.all(normalizedIds.map((assetId) => putSyncTombstone("asset", assetId)));
   });
+
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 export async function clearTrash() {
@@ -1855,6 +2238,7 @@ export async function clearTrash() {
     }
   });
 
+  scheduleActiveLocalVaultDesktopBackup();
   return trashedNoteIds.length;
 }
 
@@ -1893,6 +2277,7 @@ export async function storeAsset(noteId: string, file: File) {
     await db.assets.add(asset);
     await putSyncDirtyEntry("asset", asset.id, timestamp);
   });
+  scheduleActiveLocalVaultDesktopBackup();
   return `asset://${asset.id}`;
 }
 
@@ -1933,4 +2318,5 @@ export function isSyncProvider(value: string): value is SyncProvider {
 
 export async function clearSyncTombstone(entityType: SyncEntityKind, entityId: string) {
   await deleteSyncTombstone(entityType, entityId);
+  scheduleActiveLocalVaultDesktopBackup();
 }

@@ -41,6 +41,7 @@ import {
 import { getLocalVaultProfile, type LocalVaultProfile, updateLocalVaultProfile } from "./localVaults";
 import {
   db,
+  persistLocalVaultStorage,
   resetResolvedAssetCache,
   withLocalVaultDatabase,
   writeImportedVaultSnapshot,
@@ -1683,6 +1684,7 @@ export async function importRemoteVaultIntoLocalVault(input: {
     revision: envelope.revision,
     language: input.language
   });
+  await persistLocalVaultStorage(input.localVaultId);
 
   return {
     revision: envelope.revision,
@@ -2093,6 +2095,10 @@ export async function migrateRemoteVaultEncryption(
       lastSyncAt: Date.now(),
       syncCursor: pushed.envelope.revision
     });
+
+    if (remote.localVaultId) {
+      await persistLocalVaultStorage(remote.localVaultId);
+    }
 
     return {
       revision: pushed.envelope.revision ?? "",
@@ -3603,7 +3609,7 @@ export async function runConfiguredSync(
   }
 ): Promise<SyncExecutionResult> {
   if (options?.localVaultId) {
-    return withLocalVaultDatabase(options.localVaultId, async (database) =>
+    const result = await withLocalVaultDatabase(options.localVaultId, async (database) =>
       runConfiguredSyncInternal(
         {
           ...remote,
@@ -3613,9 +3619,12 @@ export async function runConfiguredSync(
         database
       )
     );
+
+    await persistLocalVaultStorage(options.localVaultId);
+    return result;
   }
 
-  return runConfiguredSyncInternal(
+  const result = await runConfiguredSyncInternal(
     {
       ...remote,
       localVaultId: remote.localVaultId ?? null
@@ -3623,4 +3632,10 @@ export async function runConfiguredSync(
     options,
     db
   );
+
+  if (remote.localVaultId) {
+    await persistLocalVaultStorage(remote.localVaultId);
+  }
+
+  return result;
 }

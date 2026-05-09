@@ -59,6 +59,9 @@ import App from "./App";
 import "./styles/scrollbars.css";
 import "./styles.css";
 import "./i18n";
+import { flushPendingLocalVaultStorage } from "./data/db";
+import { bootstrapDesktopRuntimeState } from "./lib/desktopRuntimeBootstrap";
+import { listLocalVaultProfiles } from "./lib/localVaults";
 import { initializePersistentClientStorage } from "./lib/persistentClientStorage";
 
 function isDesktopRuntime() {
@@ -108,8 +111,37 @@ async function resetDesktopServiceWorkerState() {
 }
 
 async function bootstrap() {
-  await resetDesktopServiceWorkerState();
   await initializePersistentClientStorage();
+  await bootstrapDesktopRuntimeState();
+  await resetDesktopServiceWorkerState();
+
+  let desktopPersistenceFlush: Promise<void> | null = null;
+
+  const flushDesktopRuntimeState = () => {
+    if (!isDesktopRuntime() || desktopPersistenceFlush) {
+      return desktopPersistenceFlush;
+    }
+
+    const localVaultIds = listLocalVaultProfiles().map((vault) => vault.id);
+    desktopPersistenceFlush = flushPendingLocalVaultStorage(localVaultIds).finally(() => {
+      desktopPersistenceFlush = null;
+    });
+    return desktopPersistenceFlush;
+  };
+
+  if (isDesktopRuntime()) {
+    const scheduleFlush = () => {
+      void flushDesktopRuntimeState();
+    };
+
+    window.addEventListener("pagehide", scheduleFlush);
+    window.addEventListener("beforeunload", scheduleFlush);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        scheduleFlush();
+      }
+    });
+  }
 
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
