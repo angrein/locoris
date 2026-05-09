@@ -5,6 +5,17 @@ import type {
   SyncVaultBinding
 } from "../types";
 import {
+  clearSyncBindingSecrets,
+  clearSyncConnectionSecrets,
+  buildSyncBindingSecretKey,
+  buildSyncConnectionSecretKey,
+  hydrateCachedSyncBinding,
+  hydrateCachedSyncConnection,
+  preloadSecureSecrets,
+  readCachedSecureSecret,
+  writeSecureSecret
+} from "./secureSecretStore";
+import {
   readPersistentString,
   writePersistentString
 } from "./persistentClientStorage";
@@ -12,10 +23,13 @@ import {
 const SYNC_REGISTRY_STORAGE_KEY = "zen-notes.sync-registry";
 const SYNC_REGISTRY_VERSION = 1;
 
+type PersistedSyncConnection = Omit<SyncConnection, "managementToken" | "sessionToken">;
+type PersistedSyncVaultBinding = Omit<SyncVaultBinding, "syncToken">;
+
 interface SyncRegistryState {
   version: number;
-  connections: SyncConnection[];
-  bindings: SyncVaultBinding[];
+  connections: PersistedSyncConnection[];
+  bindings: PersistedSyncVaultBinding[];
 }
 
 function now() {
@@ -30,7 +44,15 @@ function sanitizeText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
-function normalizeConnection(entry: unknown): SyncConnection | null {
+function createEmptyRegistry(): SyncRegistryState {
+  return {
+    version: SYNC_REGISTRY_VERSION,
+    connections: [],
+    bindings: []
+  };
+}
+
+function normalizeConnection(entry: unknown): PersistedSyncConnection | null {
   if (!entry || typeof entry !== "object") {
     return null;
   }
@@ -52,8 +74,6 @@ function normalizeConnection(entry: unknown): SyncConnection | null {
     provider,
     label,
     serverUrl,
-    managementToken: sanitizeText(record.managementToken, 512),
-    sessionToken: sanitizeText(record.sessionToken, 1024),
     tokenExpiresAt: typeof record.tokenExpiresAt === "number" ? record.tokenExpiresAt : null,
     userId: sanitizeText(record.userId, 120) || null,
     userName: sanitizeText(record.userName, 160),
@@ -63,7 +83,7 @@ function normalizeConnection(entry: unknown): SyncConnection | null {
   };
 }
 
-function normalizeBinding(entry: unknown, connectionIds: Set<string>): SyncVaultBinding | null {
+function normalizeBinding(entry: unknown, connectionIds: Set<string>): PersistedSyncVaultBinding | null {
   if (!entry || typeof entry !== "object") {
     return null;
   }
@@ -93,21 +113,12 @@ function normalizeBinding(entry: unknown, connectionIds: Set<string>): SyncVault
     connectionId,
     remoteVaultId,
     remoteVaultName: sanitizeText(record.remoteVaultName, 160) || remoteVaultId,
-    syncToken: sanitizeText(record.syncToken, 1024),
     syncStatus: status,
     lastSyncAt: typeof record.lastSyncAt === "number" ? record.lastSyncAt : null,
     syncCursor: sanitizeText(record.syncCursor, 160) || null,
     lastError: sanitizeText(record.lastError, 240) || null,
     createdAt: typeof record.createdAt === "number" ? record.createdAt : timestamp,
     updatedAt: typeof record.updatedAt === "number" ? record.updatedAt : timestamp
-  };
-}
-
-function createEmptyRegistry(): SyncRegistryState {
-  return {
-    version: SYNC_REGISTRY_VERSION,
-    connections: [],
-    bindings: []
   };
 }
 
@@ -118,13 +129,13 @@ function normalizeRegistryState(value: unknown): SyncRegistryState {
 
   const record = value as Record<string, unknown>;
   const connections = Array.isArray(record.connections)
-    ? record.connections.map(normalizeConnection).filter(Boolean) as SyncConnection[]
+    ? record.connections.map(normalizeConnection).filter(Boolean) as PersistedSyncConnection[]
     : [];
   const connectionIds = new Set(connections.map((connection) => connection.id));
   const bindings = Array.isArray(record.bindings)
     ? record.bindings
         .map((entry) => normalizeBinding(entry, connectionIds))
-        .filter(Boolean) as SyncVaultBinding[]
+        .filter(Boolean) as PersistedSyncVaultBinding[]
     : [];
 
   return {
@@ -186,23 +197,64 @@ function buildConnectionLabel(provider: SyncConnectionProvider, serverUrl: strin
   }
 }
 
+function toRuntimeConnection(connection: PersistedSyncConnection): SyncConnection {
+  return hydrateCachedSyncConnection({
+    ...connection,
+    managementToken: "",
+    sessionToken: ""
+  });
+}
+
+function toRuntimeBinding(binding: PersistedSyncVaultBinding): SyncVaultBinding {
+  return hydrateCachedSyncBinding({
+    ...binding,
+    syncToken: ""
+  });
+}
+
+function toPersistedConnection(connection: SyncConnection): PersistedSyncConnection {
+  const { managementToken: _managementToken, sessionToken: _sessionToken, ...persisted } = connection;
+  return persisted;
+}
+
+function toPersistedBinding(binding: SyncVaultBinding): PersistedSyncVaultBinding {
+  const { syncToken: _syncToken, ...persisted } = binding;
+  return persisted;
+}
+
 export function getSyncRegistry() {
   return readRegistryFromStorage();
 }
 
+export async function initializeSecureSyncRegistryState() {
+  const registry = getSyncRegistry();
+
+  await preloadSecureSecrets([
+    ...registry.connections.flatMap((connection) => [
+      buildSyncConnectionSecretKey(connection.id, "managementToken"),
+      buildSyncConnectionSecretKey(connection.id, "sessionToken")
+    ]),
+    ...registry.bindings.map((binding) =>
+      buildSyncBindingSecretKey(binding.id, "syncToken")
+    )
+  ]);
+
+  return registry;
+}
+
 export function listSyncConnections() {
-  return getSyncRegistry().connections;
+  return getSyncRegistry().connections.map((connection) => toRuntimeConnection(connection));
 }
 
 export function listSyncBindings() {
-  return getSyncRegistry().bindings;
+  return getSyncRegistry().bindings.map((binding) => toRuntimeBinding(binding));
 }
 
 export function getSyncBindingForVault(localVaultId: string) {
-  return getSyncRegistry().bindings.find((binding) => binding.localVaultId === localVaultId) ?? null;
+  return listSyncBindings().find((binding) => binding.localVaultId === localVaultId) ?? null;
 }
 
-export function createSyncConnection(input: {
+export async function createSyncConnection(input: {
   provider: SyncConnectionProvider;
   serverUrl: string;
   label?: string;
@@ -236,78 +288,117 @@ export function createSyncConnection(input: {
     updatedAt: timestamp
   };
 
+  await Promise.all([
+    writeSecureSecret(
+      buildSyncConnectionSecretKey(connection.id, "managementToken"),
+      connection.managementToken
+    ),
+    writeSecureSecret(
+      buildSyncConnectionSecretKey(connection.id, "sessionToken"),
+      connection.sessionToken
+    )
+  ]);
+
   writeNormalizedRegistry({
     ...registry,
-    connections: [...registry.connections, connection]
+    connections: [...registry.connections, toPersistedConnection(connection)]
   });
 
   return connection;
 }
 
-export function updateSyncConnection(connectionId: string, patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">>) {
+export async function updateSyncConnection(
+  connectionId: string,
+  patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">>
+) {
   const registry = getSyncRegistry();
-  const nextConnections = registry.connections.map((connection) =>
-    connection.id === connectionId
-      ? {
-          ...connection,
-          label:
-            typeof patch.label === "string"
-              ? sanitizeText(patch.label, 120) || connection.label
-              : connection.label,
-          serverUrl:
-            typeof patch.serverUrl === "string"
-              ? sanitizeText(patch.serverUrl, 512) || connection.serverUrl
-              : connection.serverUrl,
-          managementToken:
-            typeof patch.managementToken === "string"
-              ? sanitizeText(patch.managementToken, 512)
-              : connection.managementToken,
-          sessionToken:
-            typeof patch.sessionToken === "string"
-              ? sanitizeText(patch.sessionToken, 1024)
-              : connection.sessionToken,
-          tokenExpiresAt:
-            typeof patch.tokenExpiresAt === "number" || patch.tokenExpiresAt === null
-              ? patch.tokenExpiresAt ?? null
-              : connection.tokenExpiresAt,
-          userId:
-            typeof patch.userId === "string" || patch.userId === null
-              ? sanitizeText(patch.userId, 120) || null
-              : connection.userId,
-          userName:
-            typeof patch.userName === "string"
-              ? sanitizeText(patch.userName, 160)
-              : connection.userName,
-          userEmail:
-            typeof patch.userEmail === "string"
-              ? sanitizeText(patch.userEmail, 160)
-              : connection.userEmail,
-          updatedAt: now()
-        }
-      : connection
-  );
+  const currentConnection = registry.connections.find((connection) => connection.id === connectionId) ?? null;
+
+  if (!currentConnection) {
+    return null;
+  }
+
+  const nextConnection: SyncConnection = {
+    ...toRuntimeConnection(currentConnection),
+    label:
+      typeof patch.label === "string"
+        ? sanitizeText(patch.label, 120) || currentConnection.label
+        : currentConnection.label,
+    serverUrl:
+      typeof patch.serverUrl === "string"
+        ? sanitizeText(patch.serverUrl, 512) || currentConnection.serverUrl
+        : currentConnection.serverUrl,
+    managementToken:
+      typeof patch.managementToken === "string"
+        ? sanitizeText(patch.managementToken, 512)
+        : readCachedSecureSecret(buildSyncConnectionSecretKey(connectionId, "managementToken")),
+    sessionToken:
+      typeof patch.sessionToken === "string"
+        ? sanitizeText(patch.sessionToken, 1024)
+        : readCachedSecureSecret(buildSyncConnectionSecretKey(connectionId, "sessionToken")),
+    tokenExpiresAt:
+      typeof patch.tokenExpiresAt === "number" || patch.tokenExpiresAt === null
+        ? patch.tokenExpiresAt ?? null
+        : currentConnection.tokenExpiresAt,
+    userId:
+      typeof patch.userId === "string" || patch.userId === null
+        ? sanitizeText(patch.userId, 120) || null
+        : currentConnection.userId,
+    userName:
+      typeof patch.userName === "string"
+        ? sanitizeText(patch.userName, 160)
+        : currentConnection.userName,
+    userEmail:
+      typeof patch.userEmail === "string"
+        ? sanitizeText(patch.userEmail, 160)
+        : currentConnection.userEmail,
+    updatedAt: now()
+  };
+
+  await Promise.all([
+    typeof patch.managementToken === "string"
+      ? writeSecureSecret(
+          buildSyncConnectionSecretKey(connectionId, "managementToken"),
+          nextConnection.managementToken
+        )
+      : Promise.resolve(),
+    typeof patch.sessionToken === "string"
+      ? writeSecureSecret(
+          buildSyncConnectionSecretKey(connectionId, "sessionToken"),
+          nextConnection.sessionToken
+        )
+      : Promise.resolve()
+  ]);
 
   writeNormalizedRegistry({
     ...registry,
-    connections: nextConnections
+    connections: registry.connections.map((connection) =>
+      connection.id === connectionId ? toPersistedConnection(nextConnection) : connection
+    )
   });
 
-  return nextConnections.find((connection) => connection.id === connectionId) ?? null;
+  return nextConnection;
 }
 
-export function removeSyncConnection(connectionId: string) {
+export async function removeSyncConnection(connectionId: string) {
   const registry = getSyncRegistry();
+  const removedBindings = registry.bindings.filter((binding) => binding.connectionId === connectionId);
   const nextRegistry = {
     ...registry,
     connections: registry.connections.filter((connection) => connection.id !== connectionId),
     bindings: registry.bindings.filter((binding) => binding.connectionId !== connectionId)
   };
 
+  await Promise.all([
+    clearSyncConnectionSecrets(connectionId),
+    ...removedBindings.map((binding) => clearSyncBindingSecrets(binding.id))
+  ]);
+
   writeNormalizedRegistry(nextRegistry);
   return nextRegistry;
 }
 
-export function upsertSyncBinding(input: {
+export async function upsertSyncBinding(input: {
   localVaultId: string;
   connectionId: string;
   remoteVaultId: string;
@@ -350,9 +441,14 @@ export function upsertSyncBinding(input: {
     throw new Error("SYNC_BINDING_REQUIRED");
   }
 
+  await writeSecureSecret(
+    buildSyncBindingSecretKey(binding.id, "syncToken"),
+    binding.syncToken
+  );
+
   const nextBindings = existingBinding
-    ? registry.bindings.map((entry) => (entry.id === existingBinding.id ? binding : entry))
-    : [...registry.bindings, binding];
+    ? registry.bindings.map((entry) => (entry.id === existingBinding.id ? toPersistedBinding(binding) : entry))
+    : [...registry.bindings, toPersistedBinding(binding)];
 
   writeNormalizedRegistry({
     ...registry,
@@ -362,12 +458,15 @@ export function upsertSyncBinding(input: {
   return binding;
 }
 
-export function clearSyncBinding(localVaultId: string) {
+export async function clearSyncBinding(localVaultId: string) {
   const registry = getSyncRegistry();
+  const removedBindings = registry.bindings.filter((binding) => binding.localVaultId === localVaultId);
   const nextRegistry = {
     ...registry,
     bindings: registry.bindings.filter((binding) => binding.localVaultId !== localVaultId)
   };
+
+  await Promise.all(removedBindings.map((binding) => clearSyncBindingSecrets(binding.id)));
 
   writeNormalizedRegistry(nextRegistry);
   return nextRegistry;
@@ -405,7 +504,8 @@ export function updateSyncBindingState(
     bindings: nextBindings
   });
 
-  return nextBindings.find((binding) => binding.localVaultId === localVaultId) ?? null;
+  const nextBinding = nextBindings.find((binding) => binding.localVaultId === localVaultId) ?? null;
+  return nextBinding ? toRuntimeBinding(nextBinding) : null;
 }
 
 export function updateSyncBindingRemoteName(localVaultId: string, remoteVaultName: string) {
@@ -427,10 +527,11 @@ export function updateSyncBindingRemoteName(localVaultId: string, remoteVaultNam
     bindings: nextBindings
   });
 
-  return nextBindings.find((binding) => binding.localVaultId === localVaultId) ?? null;
+  const nextBinding = nextBindings.find((binding) => binding.localVaultId === localVaultId) ?? null;
+  return nextBinding ? toRuntimeBinding(nextBinding) : null;
 }
 
-export function removeBindingsForLocalVault(localVaultId: string) {
+export async function removeBindingsForLocalVault(localVaultId: string) {
   return clearSyncBinding(localVaultId);
 }
 
@@ -441,7 +542,11 @@ export async function migrateSyncRegistryFromLegacyVaultSettings(
   const existing = getSyncRegistry();
 
   if (existing.connections.length > 0 || existing.bindings.length > 0) {
-    return existing;
+    return {
+      connections: existing.connections.map((connection) => toRuntimeConnection(connection)),
+      bindings: existing.bindings.map((binding) => toRuntimeBinding(binding)),
+      version: existing.version
+    };
   }
 
   const timestamp = now();
@@ -548,12 +653,39 @@ export async function migrateSyncRegistryFromLegacyVaultSettings(
     }
   }
 
+  await Promise.all([
+    ...connections.map((connection) =>
+      Promise.all([
+        writeSecureSecret(
+          buildSyncConnectionSecretKey(connection.id, "managementToken"),
+          connection.managementToken
+        ),
+        writeSecureSecret(
+          buildSyncConnectionSecretKey(connection.id, "sessionToken"),
+          connection.sessionToken
+        )
+      ])
+    ),
+    ...bindings.map((binding) =>
+      writeSecureSecret(
+        buildSyncBindingSecretKey(binding.id, "syncToken"),
+        binding.syncToken
+      )
+    )
+  ]);
+
   const migrated = {
     version: SYNC_REGISTRY_VERSION,
-    connections,
-    bindings
+    connections: connections.map((connection) => toPersistedConnection(connection)),
+    bindings: bindings.map((binding) => toPersistedBinding(binding))
   } satisfies SyncRegistryState;
 
   writeNormalizedRegistry(migrated);
-  return migrated;
+  await initializeSecureSyncRegistryState();
+
+  return {
+    version: migrated.version,
+    connections,
+    bindings
+  };
 }

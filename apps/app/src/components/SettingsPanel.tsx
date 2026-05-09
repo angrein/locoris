@@ -59,12 +59,12 @@ interface SettingsPanelProps {
     userId?: string | null;
     userName?: string;
     userEmail?: string;
-  }) => void;
-  onDeleteConnection: (connectionId: string) => void;
+  }) => void | Promise<void>;
+  onDeleteConnection: (connectionId: string) => void | Promise<void>;
   onUpdateConnection: (
     connectionId: string,
     patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">>
-  ) => void;
+  ) => void | Promise<void>;
   onBindVault: (input: {
     localVaultId: string;
     connectionId: string;

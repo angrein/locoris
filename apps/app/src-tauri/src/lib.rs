@@ -1,3 +1,4 @@
+use keyring::{Entry, Error as KeyringError};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{Map, Value};
 use std::{
@@ -11,6 +12,34 @@ const DESKTOP_DATA_DIRECTORY: &str = "data";
 const DESKTOP_SETTINGS_DIRECTORY: &str = "settings";
 const DESKTOP_WEBVIEW_DIRECTORY: &str = "webview";
 const DESKTOP_CACHE_DIRECTORY: &str = "cache";
+
+fn secure_secret_service_name(identifier: &str) -> String {
+  let normalized_identifier = if identifier.trim().is_empty() {
+    "com.locoris.desktop"
+  } else {
+    identifier.trim()
+  };
+
+  format!("{normalized_identifier}.secure-secrets")
+}
+
+fn sanitize_secure_secret_key(key: &str) -> Result<String, String> {
+  let normalized_key = key.trim();
+
+  if normalized_key.is_empty() {
+    return Err("secure secret key is required".into());
+  }
+
+  Ok(normalized_key.to_string())
+}
+
+fn open_secure_secret_entry<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<Entry, String> {
+  Entry::new(
+    &secure_secret_service_name(&app.config().identifier),
+    &sanitize_secure_secret_key(key)?,
+  )
+  .map_err(|error| format!("failed to create secure secret entry: {error}"))
+}
 
 fn sanitize_vault_path_segment(local_vault_id: &str) -> String {
   let sanitized: String = local_vault_id
@@ -470,6 +499,40 @@ fn native_vault_store_delete<R: Runtime>(
   Ok(())
 }
 
+#[tauri::command]
+fn secure_secret_get<R: Runtime>(app: AppHandle<R>, key: String) -> Result<Option<String>, String> {
+  let entry = open_secure_secret_entry(&app, &key)?;
+
+  match entry.get_password() {
+    Ok(value) => Ok(Some(value)),
+    Err(KeyringError::NoEntry) => Ok(None),
+    Err(error) => Err(format!("failed to read secure secret: {error}")),
+  }
+}
+
+#[tauri::command]
+fn secure_secret_set<R: Runtime>(
+  app: AppHandle<R>,
+  key: String,
+  value: String,
+) -> Result<(), String> {
+  let entry = open_secure_secret_entry(&app, &key)?;
+
+  entry
+    .set_password(value.trim())
+    .map_err(|error| format!("failed to write secure secret: {error}"))
+}
+
+#[tauri::command]
+fn secure_secret_delete<R: Runtime>(app: AppHandle<R>, key: String) -> Result<(), String> {
+  let entry = open_secure_secret_entry(&app, &key)?;
+
+  match entry.delete_credential() {
+    Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
+    Err(error) => Err(format!("failed to delete secure secret: {error}")),
+  }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let log_level = if cfg!(debug_assertions) {
@@ -490,7 +553,10 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       native_vault_store_read,
       native_vault_store_write,
-      native_vault_store_delete
+      native_vault_store_delete,
+      secure_secret_get,
+      secure_secret_set,
+      secure_secret_delete
     ])
     .plugin(tauri_plugin_fs::init())
     .plugin(

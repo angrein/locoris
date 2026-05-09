@@ -59,10 +59,19 @@ import App from "./App";
 import "./styles/scrollbars.css";
 import "./styles.css";
 import "./i18n";
-import { flushPendingLocalVaultStorage } from "./data/db";
+import {
+  flushPendingLocalVaultStorage,
+  sanitizePersistedLocalVaultSecrets
+} from "./data/db";
 import { bootstrapDesktopRuntimeState } from "./lib/desktopRuntimeBootstrap";
+import { initializeVaultEncryptionSessions } from "./lib/e2eeSession";
 import { listLocalVaultProfiles } from "./lib/localVaults";
 import { initializePersistentClientStorage } from "./lib/persistentClientStorage";
+import {
+  listAppSettingsSecretKeys,
+  preloadSecureSecrets
+} from "./lib/secureSecretStore";
+import { initializeSecureSyncRegistryState } from "./lib/syncRegistry";
 
 function isDesktopRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -113,6 +122,11 @@ async function resetDesktopServiceWorkerState() {
 async function bootstrap() {
   await initializePersistentClientStorage();
   await bootstrapDesktopRuntimeState();
+  const localVaultIds = listLocalVaultProfiles().map((vault) => vault.id);
+  await sanitizePersistedLocalVaultSecrets(localVaultIds);
+  await initializeSecureSyncRegistryState();
+  await preloadSecureSecrets(localVaultIds.flatMap((localVaultId) => listAppSettingsSecretKeys(localVaultId)));
+  await initializeVaultEncryptionSessions(localVaultIds);
   await resetDesktopServiceWorkerState();
 
   let desktopPersistenceFlush: Promise<void> | null = null;

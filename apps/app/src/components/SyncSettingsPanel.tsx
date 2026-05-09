@@ -80,12 +80,12 @@ interface SyncSettingsPanelProps {
     userId?: string | null;
     userName?: string;
     userEmail?: string;
-  }) => void;
-  onDeleteConnection: (connectionId: string) => void;
+  }) => void | Promise<void>;
+  onDeleteConnection: (connectionId: string) => void | Promise<void>;
   onUpdateConnection: (
     connectionId: string,
     patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">>
-  ) => void;
+  ) => void | Promise<void>;
   onBindVault: (input: {
     localVaultId: string;
     connectionId: string;
@@ -1153,21 +1153,28 @@ export default function SyncSettingsPanel({
     closeModal();
   };
 
-  const handleAddSelfHostedConnection = () => {
+  const handleAddSelfHostedConnection = async () => {
     if (!selfHostedUrlDraft.trim() || !selfHostedManagementTokenDraft.trim()) {
       showFeedback("error", t("sync.urlRequired"));
       return;
     }
 
-    onCreateConnection({
-      provider: "selfHosted",
-      serverUrl: selfHostedUrlDraft.trim(),
-      label: selfHostedLabelDraft.trim() || undefined,
-      managementToken: selfHostedManagementTokenDraft.trim()
-    });
-    resetConnectionDrafts();
-    showFeedback("success", t("settings.connectionAdded"));
-    closeModal();
+    try {
+      await Promise.resolve(
+        onCreateConnection({
+          provider: "selfHosted",
+          serverUrl: selfHostedUrlDraft.trim(),
+          label: selfHostedLabelDraft.trim() || undefined,
+          managementToken: selfHostedManagementTokenDraft.trim()
+        })
+      );
+      resetConnectionDrafts();
+      showFeedback("success", t("settings.connectionAdded"));
+      closeModal();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      showFeedback("error", translateSyncManagerError(message, t));
+    }
   };
 
   const handleAddHostedConnection = async () => {
@@ -1196,14 +1203,16 @@ export default function SyncSettingsPanel({
               password: hostedPasswordDraft
             });
 
-      onCreateConnection({
+      await Promise.resolve(
+        onCreateConnection({
         provider: "hosted",
         serverUrl: hostedUrlDraft.trim(),
         sessionToken: result.session.token,
         userId: result.user.id,
         userName: result.user.name,
         userEmail: result.user.email ?? ""
-      });
+        })
+      );
 
       resetConnectionDrafts();
       showFeedback("success", hostedMode === "register" ? t("sync.hostedAccountCreated") : t("sync.hostedLoggedIn"));
@@ -1239,7 +1248,8 @@ export default function SyncSettingsPanel({
         clientId: googleDriveClientId
       });
 
-      onCreateConnection({
+      await Promise.resolve(
+        onCreateConnection({
         provider: "googleDrive",
         serverUrl: "https://www.googleapis.com",
         sessionToken: result.accessToken,
@@ -1248,7 +1258,8 @@ export default function SyncSettingsPanel({
         userName: result.userName,
         userEmail: result.userEmail,
         label: result.userEmail || result.userName || t("sync.googleDrive")
-      });
+        })
+      );
 
       resetConnectionDrafts();
       showFeedback("success", t("sync.googleDriveConnected"));
@@ -1278,14 +1289,16 @@ export default function SyncSettingsPanel({
       prompt: options?.silent ? "none" : undefined
     });
 
-    onUpdateConnection(connection.id, {
+    await Promise.resolve(
+      onUpdateConnection(connection.id, {
       sessionToken: result.accessToken,
       tokenExpiresAt: result.expiresAt,
       userId: result.userId,
       userName: result.userName,
       userEmail: result.userEmail,
       label: result.userEmail || result.userName || connection.label
-    });
+      })
+    );
 
     return {
       ...connection,
@@ -2825,7 +2838,7 @@ export default function SyncSettingsPanel({
                           title={t("sync.connectionDelete")}
                           onClick={(event) => {
                             event.stopPropagation();
-                            onDeleteConnection(connection.id);
+                            void onDeleteConnection(connection.id);
                           }}
                         >
                           <TrashGlyph />

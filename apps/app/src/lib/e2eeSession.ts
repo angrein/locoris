@@ -1,11 +1,17 @@
 import {
   listPersistentKeys,
   readPersistentString,
-  removePersistentString,
-  writePersistentString
+  removePersistentString
 } from "./persistentClientStorage";
+import {
+  buildVaultEncryptionSessionSecretKey,
+  deleteSecureSecret,
+  preloadSecureSecrets,
+  readCachedSecureSecret,
+  readSecureSecret,
+  writeSecureSecret
+} from "./secureSecretStore";
 
-const vaultPassphraseCache = new Map<string, string>();
 const VAULT_PERSISTENT_STORAGE_PREFIX = "zen-notes.vault-passphrase:";
 
 function normalizeLocalVaultId(localVaultId: string) {
@@ -16,31 +22,15 @@ function canUseSessionStorage() {
   return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
 }
 
-function buildPersistentStorageKey(localVaultId: string) {
+function buildLegacyStorageKey(localVaultId: string) {
   return `${VAULT_PERSISTENT_STORAGE_PREFIX}${localVaultId}`;
 }
 
-function readPersistedPassphrase(localVaultId: string) {
+function readLegacyPersistentPassphrase(localVaultId: string) {
   try {
-    return readPersistentString(buildPersistentStorageKey(localVaultId));
+    return readPersistentString(buildLegacyStorageKey(localVaultId));
   } catch {
     return null;
-  }
-}
-
-function persistPassphrase(localVaultId: string, passphrase: string) {
-  try {
-    writePersistentString(buildPersistentStorageKey(localVaultId), passphrase);
-  } catch {
-    // If the browser blocks localStorage, we keep the in-memory session only.
-  }
-}
-
-function removePersistedPassphrase(localVaultId: string) {
-  try {
-    removePersistentString(buildPersistentStorageKey(localVaultId));
-  } catch {
-    // Ignore storage cleanup failures and keep the app usable.
   }
 }
 
@@ -50,7 +40,7 @@ function readLegacySessionPassphrase(localVaultId: string) {
   }
 
   try {
-    return window.sessionStorage.getItem(buildPersistentStorageKey(localVaultId));
+    return window.sessionStorage.getItem(buildLegacyStorageKey(localVaultId));
   } catch {
     return null;
   }
@@ -62,29 +52,70 @@ function removeLegacySessionPassphrase(localVaultId: string) {
   }
 
   try {
-    window.sessionStorage.removeItem(buildPersistentStorageKey(localVaultId));
+    window.sessionStorage.removeItem(buildLegacyStorageKey(localVaultId));
   } catch {
     // Ignore storage cleanup failures and keep the app usable.
   }
 }
 
-export function unlockVaultEncryptionSession(localVaultId: string, passphrase: string) {
+function clearLegacyPersistentPassphrase(localVaultId: string) {
+  try {
+    removePersistentString(buildLegacyStorageKey(localVaultId));
+  } catch {
+    // Ignore storage cleanup failures and keep the app usable.
+  }
+}
+
+export async function initializeVaultEncryptionSessions(localVaultIds: readonly string[]) {
+  const normalizedLocalVaultIds = [...new Set(localVaultIds.map((localVaultId) => localVaultId.trim()).filter(Boolean))];
+
+  for (const localVaultId of normalizedLocalVaultIds) {
+    const secureKey = buildVaultEncryptionSessionSecretKey(localVaultId);
+    const secureValue = await readSecureSecret(secureKey);
+
+    if (!secureValue) {
+      const migratedValue =
+        readLegacyPersistentPassphrase(localVaultId)?.trim() ||
+        readLegacySessionPassphrase(localVaultId)?.trim() ||
+        "";
+
+      if (migratedValue) {
+        await writeSecureSecret(secureKey, migratedValue);
+      }
+    }
+
+    clearLegacyPersistentPassphrase(localVaultId);
+    removeLegacySessionPassphrase(localVaultId);
+  }
+
+  await preloadSecureSecrets(
+    normalizedLocalVaultIds.map((localVaultId) => buildVaultEncryptionSessionSecretKey(localVaultId))
+  );
+}
+
+export async function unlockVaultEncryptionSession(localVaultId: string, passphrase: string) {
   const normalizedLocalVaultId = normalizeLocalVaultId(localVaultId);
 
   if (!normalizedLocalVaultId) {
     throw new Error("LOCAL_VAULT_ID_REQUIRED");
   }
 
-  vaultPassphraseCache.set(normalizedLocalVaultId, passphrase);
-  persistPassphrase(normalizedLocalVaultId, passphrase);
-  removeLegacySessionPassphrase(normalizedLocalVaultId);
+  await writeSecureSecret(
+    buildVaultEncryptionSessionSecretKey(normalizedLocalVaultId),
+    passphrase
+  );
 }
 
-export function lockVaultEncryptionSession(localVaultId: string) {
+export async function lockVaultEncryptionSession(localVaultId: string) {
   const normalizedLocalVaultId = normalizeLocalVaultId(localVaultId);
-  vaultPassphraseCache.delete(normalizedLocalVaultId);
-  removePersistedPassphrase(normalizedLocalVaultId);
+
+  if (!normalizedLocalVaultId) {
+    return;
+  }
+
+  clearLegacyPersistentPassphrase(normalizedLocalVaultId);
   removeLegacySessionPassphrase(normalizedLocalVaultId);
+  await deleteSecureSecret(buildVaultEncryptionSessionSecretKey(normalizedLocalVaultId));
 }
 
 export function hasVaultEncryptionSession(localVaultId: string) {
@@ -98,33 +129,21 @@ export function getVaultEncryptionSessionPassphrase(localVaultId: string) {
     return null;
   }
 
-  const cachedPassphrase = vaultPassphraseCache.get(normalizedLocalVaultId);
+  const cachedPassphrase = readCachedSecureSecret(
+    buildVaultEncryptionSessionSecretKey(normalizedLocalVaultId)
+  );
 
-  if (cachedPassphrase !== undefined) {
-    return cachedPassphrase;
-  }
-
-  const persistedPassphrase = readPersistedPassphrase(normalizedLocalVaultId);
-
-  if (persistedPassphrase) {
-    vaultPassphraseCache.set(normalizedLocalVaultId, persistedPassphrase);
-    return persistedPassphrase;
-  }
-
-  const legacySessionPassphrase = readLegacySessionPassphrase(normalizedLocalVaultId);
-
-  if (!legacySessionPassphrase) {
-    return null;
-  }
-
-  vaultPassphraseCache.set(normalizedLocalVaultId, legacySessionPassphrase);
-  persistPassphrase(normalizedLocalVaultId, legacySessionPassphrase);
-  removeLegacySessionPassphrase(normalizedLocalVaultId);
-  return legacySessionPassphrase;
+  return cachedPassphrase || null;
 }
 
-export function clearVaultEncryptionSessions() {
-  vaultPassphraseCache.clear();
+export async function clearVaultEncryptionSessions(localVaultIds: readonly string[]) {
+  const normalizedLocalVaultIds = [...new Set(localVaultIds.map((localVaultId) => localVaultId.trim()).filter(Boolean))];
+
+  await Promise.all(
+    normalizedLocalVaultIds.map((localVaultId) =>
+      deleteSecureSecret(buildVaultEncryptionSessionSecretKey(localVaultId))
+    )
+  );
 
   try {
     listPersistentKeys(VAULT_PERSISTENT_STORAGE_PREFIX).forEach((key) => {

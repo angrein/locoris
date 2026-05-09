@@ -110,6 +110,7 @@ import {
   updateSyncBindingState,
   upsertSyncBinding
 } from "./lib/syncRegistry";
+import { subscribeSecureSecretChanges } from "./lib/secureSecretStore";
 import { DEFAULT_NOTE_COLOR } from "./lib/palette";
 import { hasMeaningfulCanvasContent } from "./lib/canvas";
 import { hasMeaningfulNoteContent } from "./lib/notes";
@@ -177,7 +178,9 @@ export default function App() {
   const notes = useLiveQuery(() => db.notes.toArray(), [activeLocalVaultId], []);
   const assets = useLiveQuery(() => db.assets.toArray(), [activeLocalVaultId], []);
   const syncDirtyEntries = useLiveQuery(() => db.syncDirtyEntries.toArray(), [activeLocalVaultId], []);
-  const settings = useLiveQuery(() => db.settings.get("app"), [activeLocalVaultId], undefined);
+  const rawSettings = useLiveQuery(() => db.settings.get("app"), [activeLocalVaultId], undefined);
+  const [settings, setSettings] = useState<AppSettings | undefined>(undefined);
+  const [secureSecretsVersion, setSecureSecretsVersion] = useState(0);
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
@@ -220,6 +223,39 @@ export default function App() {
   const desktopUpdateCheckStartedRef = useRef(false);
 
   useEffect(() => {
+    return subscribeSecureSecretChanges(() => {
+      setSecureSecretsVersion((current) => current + 1);
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!rawSettings) {
+      setSettings(undefined);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void readLocalVaultSettings(activeLocalVaultId)
+      .then((nextSettings) => {
+        if (!cancelled) {
+          setSettings(nextSettings ?? undefined);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSettings(undefined);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLocalVaultId, rawSettings, secureSecretsVersion]);
+
+  useEffect(() => {
     let cancelled = false;
     setVaultBooting(true);
 
@@ -238,6 +274,10 @@ export default function App() {
     setSyncConnections(listSyncConnections());
     setSyncBindings(listSyncBindings());
   };
+
+  useEffect(() => {
+    refreshSyncRegistryState();
+  }, [secureSecretsVersion]);
 
   const buildVaultEncryptionSummary = useCallback(
     (
@@ -898,7 +938,7 @@ export default function App() {
           prompt: "none"
         });
 
-        const nextConnection = updateSyncConnection(connection.id, {
+        const nextConnection = await updateSyncConnection(connection.id, {
           sessionToken: result.accessToken,
           tokenExpiresAt: result.expiresAt,
           userId: result.userId,
@@ -1882,7 +1922,7 @@ export default function App() {
         : {})
     });
 
-    unlockVaultEncryptionSession(input.localVaultId, input.passphrase);
+    await unlockVaultEncryptionSession(input.localVaultId, input.passphrase);
     await refreshVaultEncryptionSummaries([input.localVaultId]);
     setSyncFeedback({
       tone: "success",
@@ -1927,7 +1967,7 @@ export default function App() {
       getVaultDescriptor(input.localVaultId)
     );
 
-    unlockVaultEncryptionSession(input.localVaultId, input.passphrase);
+    await unlockVaultEncryptionSession(input.localVaultId, input.passphrase);
     const binding = syncBindingsByVaultId.get(input.localVaultId) ?? null;
     if (binding?.lastError === "VAULT_ENCRYPTION_LOCKED") {
       updateSyncBindingState(input.localVaultId, {
@@ -2044,7 +2084,7 @@ export default function App() {
         : {})
     });
 
-    unlockVaultEncryptionSession(input.localVaultId, input.nextPassphrase);
+    await unlockVaultEncryptionSession(input.localVaultId, input.nextPassphrase);
     await refreshVaultEncryptionSummaries([input.localVaultId]);
     setSyncFeedback({
       tone: "success",
@@ -2110,7 +2150,7 @@ export default function App() {
         : {})
     });
 
-    lockVaultEncryptionSession(input.localVaultId);
+    await lockVaultEncryptionSession(input.localVaultId);
     await refreshVaultEncryptionSummaries([input.localVaultId]);
     setSyncFeedback({
       tone: "success",
@@ -2121,7 +2161,7 @@ export default function App() {
   };
 
   const handleLockVaultEncryption = async (localVaultId: string) => {
-    lockVaultEncryptionSession(localVaultId);
+    await lockVaultEncryptionSession(localVaultId);
     await refreshVaultEncryptionSummaries([localVaultId]);
     setSyncFeedback({
       tone: "success",
@@ -2182,7 +2222,7 @@ export default function App() {
       syncStatus: "idle"
     });
 
-    unlockVaultEncryptionSession(localVaultId, passphrase.trim());
+    await unlockVaultEncryptionSession(localVaultId, passphrase.trim());
   };
 
   const handleCreateLocalVault = async (input: {
@@ -2337,7 +2377,7 @@ export default function App() {
     }
 
     await resetLocalVaultSyncBinding(localVaultId);
-    clearSyncBinding(localVaultId);
+    await clearSyncBinding(localVaultId);
 
     if (localVaultId === activeLocalVaultId) {
       clearScheduledAutoSync();
@@ -2395,13 +2435,13 @@ export default function App() {
     }
 
     removeLocalVaultProfile(localVaultId);
-    removeBindingsForLocalVault(localVaultId);
+    await removeBindingsForLocalVault(localVaultId);
     await deleteLocalVaultDatabase(localVaultId);
     setLocalVaults(listLocalVaultProfiles());
     refreshSyncRegistryState();
   };
 
-  const handleCreateSyncConnection = (input: {
+  const handleCreateSyncConnection = async (input: {
     provider: SyncConnectionProvider;
     serverUrl: string;
     label?: string;
@@ -2412,7 +2452,7 @@ export default function App() {
     userName?: string;
     userEmail?: string;
   }) => {
-    createSyncConnection(input);
+    await createSyncConnection(input);
     refreshSyncRegistryState();
   };
 
@@ -2438,15 +2478,15 @@ export default function App() {
       await resetLocalVaultSyncBinding(binding.localVaultId);
     }
 
-    removeSyncConnection(connectionId);
+    await removeSyncConnection(connectionId);
     refreshSyncRegistryState();
   };
 
-  const handleUpdateSyncConnection = (
+  const handleUpdateSyncConnection = async (
     connectionId: string,
     patch: Partial<Omit<SyncConnection, "id" | "provider" | "createdAt">>
   ) => {
-    updateSyncConnection(connectionId, patch);
+    await updateSyncConnection(connectionId, patch);
     refreshSyncRegistryState();
   };
 
@@ -2554,7 +2594,7 @@ export default function App() {
       vaultGuid: input.remoteVaultId
     });
 
-    upsertSyncBinding({
+    await upsertSyncBinding({
       ...input,
       syncStatus: "idle",
       lastError: null,

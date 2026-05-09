@@ -32,6 +32,13 @@ import {
   readNativeVaultSnapshot,
   writeNativeVaultSnapshot
 } from "../lib/nativeVaultStore";
+import {
+  APP_SETTINGS_SECRET_FIELDS,
+  buildAppSettingsSecretKey,
+  clearAppSettingsSecrets,
+  hydrateAppSettingsSecrets,
+  writeSecureSecret
+} from "../lib/secureSecretStore";
 import type {
   AppLanguage,
   AppSettings,
@@ -367,6 +374,51 @@ function buildDefaultAppSettings(language: AppLanguage, lastOpenedNoteId: string
     localDeviceId: createDeviceId(),
     lastOpenedNoteId
   };
+}
+
+function stripAppSettingsSecrets(settings: AppSettings | null | undefined): AppSettings | null {
+  if (!settings) {
+    return null;
+  }
+
+  return {
+    ...settings,
+    selfHostedToken: "",
+    hostedSessionToken: "",
+    hostedSyncToken: ""
+  };
+}
+
+function splitAppSettingsSecretPatch(patch: Partial<Omit<AppSettings, "id">>) {
+  const persistedPatch: Partial<Omit<AppSettings, "id">> = {
+    ...patch
+  };
+  const secretPatch: Partial<Pick<AppSettings, (typeof APP_SETTINGS_SECRET_FIELDS)[number]>> = {};
+
+  APP_SETTINGS_SECRET_FIELDS.forEach((field) => {
+    if (field in persistedPatch) {
+      secretPatch[field] = typeof patch[field] === "string" ? patch[field].trim() : "";
+      delete persistedPatch[field];
+    }
+  });
+
+  return {
+    persistedPatch,
+    secretPatch
+  };
+}
+
+async function writeAppSettingsSecretPatch(
+  localVaultId: string,
+  patch: Partial<Pick<AppSettings, (typeof APP_SETTINGS_SECRET_FIELDS)[number]>>
+) {
+  await Promise.all(
+    APP_SETTINGS_SECRET_FIELDS.map((field) =>
+      field in patch
+        ? writeSecureSecret(buildAppSettingsSecretKey(localVaultId, field), patch[field] ?? "")
+        : Promise.resolve()
+    )
+  );
 }
 
 function createSyncDirtyEntry(
@@ -896,7 +948,8 @@ function scheduleActiveLocalVaultDesktopBackup() {
 }
 
 function cloneSettingsForBackup(settings: AppSettings | null) {
-  return settings ? { ...settings } : null;
+  const sanitizedSettings = stripAppSettingsSecrets(settings);
+  return sanitizedSettings ? { ...sanitizedSettings } : null;
 }
 
 export async function hasLocalVaultPersistedState(localVaultId: string) {
@@ -950,7 +1003,7 @@ export async function restoreLocalVaultDesktopBackup(
   return withLocalVaultDatabase(localVaultId, async (database) => {
     const notes = sortById(backup.notes).map((note) => hydrateDesktopBackupNote(note));
     const assets = sortById(backup.assets).map((asset) => hydrateDesktopBackupAsset(asset));
-    const backupSettings = backup.settings;
+    const backupSettings = stripAppSettingsSecrets(backup.settings);
     const settings =
       backupSettings
         ? {
@@ -1224,7 +1277,7 @@ export async function ensureSeedData() {
         createSyncDirtyEntry("note", note.id, note.updatedAt)
       ]);
     await db.settings.add({
-      ...buildDefaultAppSettings(language, note.id),
+      ...stripAppSettingsSecrets(buildDefaultAppSettings(language, note.id))!,
       syncStatus: "disabled"
     });
     }
@@ -1234,7 +1287,15 @@ export async function ensureSeedData() {
 }
 
 export async function patchSettings(patch: Partial<Omit<AppSettings, "id">>) {
-  await db.settings.update("app", patch);
+  const activeLocalVaultId = getStoredActiveLocalVaultId();
+  const { persistedPatch, secretPatch } = splitAppSettingsSecretPatch(patch);
+
+  await writeAppSettingsSecretPatch(activeLocalVaultId, secretPatch);
+
+  if (Object.keys(persistedPatch).length > 0) {
+    await db.settings.update("app", persistedPatch);
+  }
+
   scheduleActiveLocalVaultDesktopBackup();
 }
 
@@ -1259,7 +1320,10 @@ export async function resetSyncBinding() {
 
 export async function readLocalVaultSettings(localVaultId: string) {
   return withLocalVaultDatabase(localVaultId, async (database) => {
-    return (await database.settings.get("app")) ?? null;
+    return hydrateAppSettingsSecrets(
+      localVaultId,
+      stripAppSettingsSecrets((await database.settings.get("app")) ?? null)
+    );
   });
 }
 
@@ -1278,7 +1342,9 @@ export async function ensureLocalVaultSettingsRecord(
     }
 
     const nextSettings = {
-      ...buildDefaultAppSettings(options?.language ?? detectLanguage(), options?.lastOpenedNoteId ?? null),
+      ...stripAppSettingsSecrets(
+        buildDefaultAppSettings(options?.language ?? detectLanguage(), options?.lastOpenedNoteId ?? null)
+      )!,
       syncStatus: "disabled" as const
     };
 
@@ -1292,8 +1358,14 @@ export async function patchLocalVaultSettings(
   localVaultId: string,
   patch: Partial<Omit<AppSettings, "id">>
 ) {
+  const { persistedPatch, secretPatch } = splitAppSettingsSecretPatch(patch);
+
+  await writeAppSettingsSecretPatch(localVaultId, secretPatch);
+
   await withLocalVaultDatabase(localVaultId, async (database) => {
-    await database.settings.update("app", patch);
+    if (Object.keys(persistedPatch).length > 0) {
+      await database.settings.update("app", persistedPatch);
+    }
   });
 
   scheduleLocalVaultDesktopBackup(localVaultId);
@@ -1308,7 +1380,7 @@ export async function writeImportedVaultSnapshot(
   }
 ) {
   await withLocalVaultDatabase(localVaultId, async (database) => {
-    const existingSettings = await database.settings.get("app");
+    const existingSettings = stripAppSettingsSecrets(await database.settings.get("app"));
     const language = input.language ?? existingSettings?.language ?? detectLanguage();
     const notes = input.snapshot.notes.map((note) => hydrateImportedNote(note));
     const assets = input.snapshot.assets.map((asset) => hydrateImportedAsset(asset));
@@ -1370,7 +1442,7 @@ export async function writeImportedVaultSnapshot(
         }
 
         const nextSettings = {
-          ...(existingSettings ?? buildDefaultAppSettings(language, nextOpenedNoteId)),
+          ...(existingSettings ?? stripAppSettingsSecrets(buildDefaultAppSettings(language, nextOpenedNoteId))!),
           language,
           syncStatus: "idle" as const,
           lastSyncAt: now(),
@@ -1391,6 +1463,8 @@ export async function writeImportedVaultSnapshot(
 }
 
 export async function resetLocalVaultSyncBinding(localVaultId: string) {
+  await clearAppSettingsSecrets(localVaultId);
+
   await withLocalVaultDatabase(localVaultId, async (database) => {
     await database.transaction("rw", [database.syncShadows, database.settings, database.notes], async () => {
       await database.syncShadows.clear();
@@ -1416,6 +1490,40 @@ export async function resetLocalVaultSyncBinding(localVaultId: string) {
   });
 
   scheduleLocalVaultDesktopBackup(localVaultId);
+}
+
+export async function sanitizePersistedLocalVaultSecrets(localVaultIds: readonly string[]) {
+  const normalizedLocalVaultIds = [...new Set(localVaultIds.map((localVaultId) => localVaultId.trim()).filter(Boolean))];
+  const updatedLocalVaultIds: string[] = [];
+
+  for (const localVaultId of normalizedLocalVaultIds) {
+    await withLocalVaultDatabase(localVaultId, async (database) => {
+      const settings = await database.settings.get("app");
+
+      if (!settings) {
+        return;
+      }
+
+      if (
+        !settings.selfHostedToken &&
+        !settings.hostedSessionToken &&
+        !settings.hostedSyncToken
+      ) {
+        return;
+      }
+
+      await database.settings.update("app", {
+        selfHostedToken: "",
+        hostedSessionToken: "",
+        hostedSyncToken: ""
+      });
+      updatedLocalVaultIds.push(localVaultId);
+    });
+  }
+
+  if (updatedLocalVaultIds.length > 0) {
+    await persistAllLocalVaultStorage(updatedLocalVaultIds);
+  }
 }
 
 export async function createProject(name: string, x: number, y: number, color?: string) {
