@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Update } from "@tauri-apps/plugin-updater";
 
 import type { LocalVaultKind, LocalVaultProfile } from "../lib/localVaults";
 import {
   checkForDesktopUpdate,
-  getDesktopAppVersion,
-  installDesktopUpdate,
+  initializeDesktopUpdateState,
+  installAvailableDesktopUpdate,
+  openDesktopUpdateReleasePage,
+  readDesktopUpdateSnapshot,
+  retryFailedDesktopUpdateInstall,
+  subscribeDesktopUpdateState,
   supportsDesktopUpdates
 } from "../lib/desktopUpdates";
 import type {
@@ -142,15 +145,6 @@ function ChevronGlyph({ expanded = false }: { expanded?: boolean }) {
 
 type SettingsView = "root" | "sync";
 
-type DesktopUpdateViewState = {
-  phase: "idle" | "checking" | "upToDate" | "available" | "downloading" | "error";
-  nextVersion: string | null;
-  body: string | null;
-  progress: number | null;
-  update: Update | null;
-  errorMessage: string | null;
-};
-
 function UpdateGlyph() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -194,15 +188,7 @@ export default function SettingsPanel({
   const { t } = useTranslation();
   const [view, setView] = useState<SettingsView>("root");
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  const [desktopAppVersion, setDesktopAppVersion] = useState<string | null>(null);
-  const [desktopUpdateState, setDesktopUpdateState] = useState<DesktopUpdateViewState>({
-    phase: "idle",
-    nextVersion: null,
-    body: null,
-    progress: null,
-    update: null,
-    errorMessage: null
-  });
+  const [desktopUpdateState, setDesktopUpdateState] = useState(() => readDesktopUpdateSnapshot());
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopUpdatesEnabled = supportsDesktopUpdates();
 
@@ -222,23 +208,9 @@ export default function SettingsPanel({
       return;
     }
 
-    let cancelled = false;
+    void initializeDesktopUpdateState();
 
-    void getDesktopAppVersion()
-      .then((version) => {
-        if (!cancelled) {
-          setDesktopAppVersion(version);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDesktopAppVersion(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    return subscribeDesktopUpdateState(setDesktopUpdateState);
   }, [desktopUpdatesEnabled]);
 
   useEffect(() => {
@@ -250,151 +222,109 @@ export default function SettingsPanel({
   }, [desktopUpdatesEnabled, desktopUpdateState.phase]);
 
   const handleCheckDesktopUpdates = async () => {
-    setDesktopUpdateState((current) => ({
-      ...current,
-      phase: "checking",
-      errorMessage: null,
-      progress: null
-    }));
-
-    try {
-      const result = await checkForDesktopUpdate();
-
-      if (result.status === "unsupported") {
-        setDesktopUpdateState({
-          phase: "error",
-          nextVersion: null,
-          body: null,
-          progress: null,
-          update: null,
-          errorMessage: t("settings.desktopUpdateUnsupported")
-        });
-        return;
-      }
-
-      setDesktopAppVersion(result.currentVersion);
-
-      if (result.status === "up-to-date") {
-        setDesktopUpdateState({
-          phase: "upToDate",
-          nextVersion: null,
-          body: null,
-          progress: null,
-          update: null,
-          errorMessage: null
-        });
-        return;
-      }
-
-      setDesktopUpdateState({
-        phase: "available",
-        nextVersion: result.nextVersion,
-        body: result.body,
-        progress: null,
-        update: result.update,
-        errorMessage: null
-      });
-    } catch (error) {
-      setDesktopUpdateState({
-        phase: "error",
-        nextVersion: null,
-        body: null,
-        progress: null,
-        update: null,
-        errorMessage: error instanceof Error ? error.message : null
-      });
-    }
+    await checkForDesktopUpdate();
   };
 
   const handleInstallDesktopUpdate = async () => {
-    const update = desktopUpdateState.update;
-
-    if (!update) {
-      return;
-    }
-
-    let totalBytes = 0;
-    let downloadedBytes = 0;
-
-    setDesktopUpdateState((current) => ({
-      ...current,
-      phase: "downloading",
-      progress: 0,
-      errorMessage: null
-    }));
-
-    try {
-      await installDesktopUpdate(update, (event) => {
-        if (event.event === "Started") {
-          totalBytes = event.data.contentLength ?? 0;
-          downloadedBytes = 0;
-          setDesktopUpdateState((current) => ({
-            ...current,
-            phase: "downloading",
-            progress: totalBytes > 0 ? 0 : null
-          }));
-          return;
-        }
-
-        if (event.event === "Progress") {
-          downloadedBytes += event.data.chunkLength;
-          setDesktopUpdateState((current) => ({
-            ...current,
-            phase: "downloading",
-            progress:
-              totalBytes > 0 ? Math.max(0, Math.min(100, Math.round((downloadedBytes / totalBytes) * 100))) : null
-          }));
-          return;
-        }
-
-        setDesktopUpdateState((current) => ({
-          ...current,
-          phase: "downloading",
-          progress: 100
-        }));
-      });
-    } catch (error) {
-      setDesktopUpdateState((current) => ({
-        ...current,
-        phase: "error",
-        progress: null,
-        errorMessage: error instanceof Error ? error.message : null
-      }));
-    }
+    await installAvailableDesktopUpdate();
   };
+
+  const handleRetryDesktopUpdate = async () => {
+    await retryFailedDesktopUpdateInstall();
+  };
+
+  const handleOpenDesktopReleasePage = async () => {
+    await openDesktopUpdateReleasePage(
+      desktopUpdateState.availableVersion ?? desktopUpdateState.lastAttemptedVersion
+    );
+  };
+
+  const desktopUpdateCurrentVersion = desktopUpdateState.currentVersion;
+  const desktopUpdatePublishedLabel = desktopUpdateState.releaseDate
+    ? new Intl.DateTimeFormat(settings.language === "ru" ? "ru-RU" : "en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(new Date(desktopUpdateState.releaseDate))
+    : null;
+
+  const desktopUpdateIssueText =
+    desktopUpdateState.issueCode === "unsupported"
+      ? t("settings.desktopUpdateUnsupported")
+      : desktopUpdateState.issueCode === "metadata-invalid"
+      ? t("settings.desktopUpdateIssueMetadataInvalid")
+      : desktopUpdateState.issueCode === "download-failed"
+      ? t("settings.desktopUpdateIssueDownloadFailed")
+      : desktopUpdateState.issueCode === "install-failed"
+      ? t("settings.desktopUpdateIssueInstallFailed")
+      : desktopUpdateState.issueCode === "install-not-applied"
+      ? t("settings.desktopUpdateIssueInstallNotApplied", {
+          version:
+            desktopUpdateState.availableVersion ??
+            desktopUpdateState.lastAttemptedVersion ??
+            "—"
+        })
+      : desktopUpdateState.issueCode === "check-failed"
+      ? t("settings.desktopUpdateIssueCheckFailed")
+      : null;
 
   const desktopUpdateDescription =
     desktopUpdateState.phase === "checking"
       ? t("settings.desktopUpdateChecking")
       : desktopUpdateState.phase === "upToDate"
-      ? t("settings.desktopUpdateUpToDate", { version: desktopAppVersion ?? "—" })
+      ? t("settings.desktopUpdateUpToDate", {
+          version: desktopUpdateCurrentVersion ?? "—"
+        })
       : desktopUpdateState.phase === "available"
-      ? t("settings.desktopUpdateAvailable", { version: desktopUpdateState.nextVersion ?? "—" })
+      ? t("settings.desktopUpdateAvailable", {
+          version: desktopUpdateState.availableVersion ?? "—"
+        })
       : desktopUpdateState.phase === "downloading"
       ? t("settings.desktopUpdateDownloading", {
           progress:
-            desktopUpdateState.progress === null ? "" : ` ${desktopUpdateState.progress}%`
+            desktopUpdateState.progress === null
+              ? ""
+              : ` ${desktopUpdateState.progress}%`
         })
-      : desktopUpdateState.phase === "error"
-      ? desktopUpdateState.errorMessage || t("settings.desktopUpdateError")
-      : desktopAppVersion
-      ? t("settings.desktopUpdateCurrent", { version: desktopAppVersion })
+      : desktopUpdateState.phase === "restarting"
+      ? t("settings.desktopUpdateRestarting")
+      : desktopUpdateState.phase === "failed"
+      ? desktopUpdateIssueText ?? t("settings.desktopUpdateError")
+      : desktopUpdateCurrentVersion
+      ? t("settings.desktopUpdateCurrent", {
+          version: desktopUpdateCurrentVersion
+        })
       : t("settings.desktopUpdateCurrentUnknown");
 
-  const desktopUpdateActionLabel =
+  const desktopUpdatePrimaryActionLabel =
     desktopUpdateState.phase === "checking"
       ? t("settings.desktopUpdateCheckingAction")
       : desktopUpdateState.phase === "available"
       ? t("settings.desktopUpdateInstall")
-      : desktopUpdateState.phase === "downloading"
+      : desktopUpdateState.phase === "downloading" ||
+        desktopUpdateState.phase === "restarting"
       ? t("settings.desktopUpdateInstalling")
+      : desktopUpdateState.phase === "failed" && desktopUpdateState.canRetryInstall
+      ? t("settings.desktopUpdateRetry")
       : t("settings.desktopUpdateCheck");
 
-  const desktopUpdateAction =
-    desktopUpdateState.phase === "available" ? handleInstallDesktopUpdate : handleCheckDesktopUpdates;
+  const desktopUpdatePrimaryAction =
+    desktopUpdateState.phase === "available"
+      ? handleInstallDesktopUpdate
+      : desktopUpdateState.phase === "failed" && desktopUpdateState.canRetryInstall
+      ? handleRetryDesktopUpdate
+      : handleCheckDesktopUpdates;
 
-  const desktopUpdateActionDisabled =
-    desktopUpdateState.phase === "checking" || desktopUpdateState.phase === "downloading";
+  const desktopUpdatePrimaryActionDisabled =
+    desktopUpdateState.phase === "checking" ||
+    desktopUpdateState.phase === "downloading" ||
+    desktopUpdateState.phase === "restarting";
+
+  const shouldShowOpenReleaseAction =
+    desktopUpdateState.canOpenReleasePage &&
+    (desktopUpdateState.phase === "available" || desktopUpdateState.phase === "failed");
 
   if (view === "sync") {
     return (
@@ -538,23 +468,73 @@ export default function SettingsPanel({
               <div className="settings-row-copy settings-update-copy">
                 <strong>{t("settings.desktopUpdateTitle")}</strong>
                 <span>{desktopUpdateDescription}</span>
-                {desktopUpdateState.body ? <p className="settings-update-note">{desktopUpdateState.body}</p> : null}
+                {desktopUpdateState.releaseBody ? (
+                  <p className="settings-update-note">{desktopUpdateState.releaseBody}</p>
+                ) : null}
+                {desktopUpdatePublishedLabel ? (
+                  <p className="settings-update-meta">
+                    {t("settings.desktopUpdatePublished", {
+                      date: desktopUpdatePublishedLabel
+                    })}
+                  </p>
+                ) : null}
+                {desktopUpdateState.phase === "failed" && desktopUpdateIssueText ? (
+                  <p className="settings-update-error">{desktopUpdateIssueText}</p>
+                ) : null}
+                {desktopUpdateState.issueDetail ? (
+                  <p className="settings-update-detail">
+                    {t("settings.desktopUpdateDetail", {
+                      detail: desktopUpdateState.issueDetail
+                    })}
+                  </p>
+                ) : null}
+                {desktopUpdateState.phase === "downloading" &&
+                desktopUpdateState.progress !== null ? (
+                  <div
+                    className="settings-update-progress"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={desktopUpdateState.progress}
+                  >
+                    <span
+                      className="settings-update-progress-fill"
+                      style={{ width: `${desktopUpdateState.progress}%` }}
+                    />
+                  </div>
+                ) : null}
                 <p className="settings-update-hint">{t("settings.desktopUpdateHint")}</p>
               </div>
               <div className="settings-update-side">
                 <span className="settings-row-count">
-                  {t("settings.appVersionChip", { version: desktopAppVersion ?? "—" })}
+                  {t("settings.appVersionChip", {
+                    version: desktopUpdateCurrentVersion ?? "—"
+                  })}
                 </span>
-                <button
-                  type="button"
-                  className="settings-row-action"
-                  onClick={() => {
-                    void desktopUpdateAction();
-                  }}
-                  disabled={desktopUpdateActionDisabled}
-                >
-                  <span>{desktopUpdateActionLabel}</span>
-                </button>
+                <div className="settings-update-actions">
+                  <button
+                    type="button"
+                    className="settings-row-action"
+                    onClick={() => {
+                      void desktopUpdatePrimaryAction();
+                    }}
+                    disabled={desktopUpdatePrimaryActionDisabled}
+                  >
+                    <span>{desktopUpdatePrimaryActionLabel}</span>
+                  </button>
+                  {shouldShowOpenReleaseAction ? (
+                    <button
+                      type="button"
+                      className="settings-row-action settings-row-action-secondary"
+                      onClick={() => {
+                        void handleOpenDesktopReleasePage();
+                      }}
+                      disabled={desktopUpdatePrimaryActionDisabled}
+                    >
+                      <span>{t("settings.desktopUpdateOpenRelease")}</span>
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>

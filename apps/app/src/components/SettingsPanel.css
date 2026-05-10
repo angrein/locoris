@@ -322,6 +322,21 @@
   justify-items: end;
 }
 
+.settings-update-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.settings-row-action.settings-row-action-secondary {
+  background: transparent;
+  border-color: rgba(160, 177, 245, 0.18);
+  color: rgba(214, 223, 255, 0.9);
+}
+
+.settings-update-meta,
+.settings-update-error,
+.settings-update-detail,
 .settings-update-note,
 .settings-update-hint {
   margin: 2px 0 0;
@@ -336,6 +351,39 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.settings-update-meta {
+  color: rgba(198, 207, 238, 0.76);
+}
+
+.settings-update-error {
+  color: rgba(255, 160, 160, 0.92);
+}
+
+.settings-update-detail {
+  color: rgba(209, 217, 245, 0.74);
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
+  word-break: break-word;
+}
+
+.settings-update-progress {
+  position: relative;
+  width: min(260px, 100%);
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(160, 177, 245, 0.08);
+}
+
+.settings-update-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(252, 217, 124, 0.92), rgba(147, 173, 255, 0.96));
+  box-shadow: 0 0 18px rgba(147, 173, 255, 0.28);
 }
 
 @media (max-width: 720px) {
@@ -355,6 +403,10 @@
 
   .settings-update-side {
     width: 100%;
+    justify-items: stretch;
+  }
+
+  .settings-update-actions {
     justify-items: stretch;
   }
 

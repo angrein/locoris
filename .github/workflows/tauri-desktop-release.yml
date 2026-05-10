@@ -9,6 +9,8 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   LOCORIS_DESKTOP_BUILD: "true"
+  VITE_GOOGLE_DRIVE_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_CLIENT_ID }}
+  VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID }}
 
 permissions:
   contents: write
@@ -46,6 +48,12 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: Validate Google Drive OAuth env
+        run: >
+          node -e "const required=['VITE_GOOGLE_DRIVE_CLIENT_ID','VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID'];
+          const missing=required.filter((key)=>!process.env[key]||!process.env[key].trim());
+          if(missing.length){console.error('Missing GitHub Actions variables: '+missing.join(', ')); process.exit(1);}"
+
       - name: Build and publish Locoris desktop release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -60,3 +68,38 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  validate-release-metadata:
+    needs: release-desktop
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve release version
+        id: release-version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == app-v* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME#app-v}" >> "$GITHUB_OUTPUT"
+          else
+            VERSION="$(node -p "require('./apps/app/package.json').version")"
+            echo "tag=app-v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate updater metadata
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          node ./scripts/validate-release-metadata.mjs
+          --repo angrein/locoris
+          --tag "${{ steps.release-version.outputs.tag }}"
+          --expected-version "${{ steps.release-version.outputs.version }}"
+          --targets "darwin-aarch64,windows-x86_64"

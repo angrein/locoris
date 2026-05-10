@@ -79,7 +79,14 @@ import {
   getDisplayVaultName,
   hasExplicitDisplayName
 } from "./lib/displayNames";
-import { checkForDesktopUpdate, supportsDesktopUpdates } from "./lib/desktopUpdates";
+import {
+  initializeDesktopUpdateState,
+  readDesktopUpdateSnapshot,
+  startAutomaticDesktopUpdateCheck,
+  subscribeDesktopUpdateState,
+  supportsDesktopUpdates,
+  type DesktopUpdateSnapshot
+} from "./lib/desktopUpdates";
 import {
   connectGoogleDriveAccount,
   deleteHostedVault,
@@ -203,9 +210,13 @@ export default function App() {
     title: string;
   } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
-  const [desktopUpdateChip, setDesktopUpdateChip] = useState<{
-    version: string;
-  } | null>(null);
+  const [desktopUpdateChip, setDesktopUpdateChip] = useState<
+    | {
+        kind: "available" | "issue";
+        version: string | null;
+      }
+    | null
+  >(null);
   const [isDocumentVisible, setIsDocumentVisible] = useState(
     typeof document === "undefined" ? true : document.visibilityState !== "hidden"
   );
@@ -221,12 +232,47 @@ export default function App() {
   const previousVisibilityRef = useRef(isDocumentVisible);
   const previousOrbitalEditorNoteIdRef = useRef<string | null>(null);
   const newDocumentDraftIdsRef = useRef<Set<string>>(new Set());
-  const desktopUpdateCheckStartedRef = useRef(false);
-
   useEffect(() => {
     return subscribeSecureSecretChanges(() => {
       setSecureSecretsVersion((current) => current + 1);
     });
+  }, [t]);
+
+  useEffect(() => {
+    if (!supportsDesktopUpdates()) {
+      setDesktopUpdateChip(null);
+      return () => undefined;
+    }
+
+    const syncDesktopUpdateChip = (snapshot: DesktopUpdateSnapshot) => {
+      if (snapshot.phase === "available" && snapshot.availableVersion) {
+        setDesktopUpdateChip({
+          kind: "available",
+          version: snapshot.availableVersion
+        });
+        return;
+      }
+
+      if (
+        snapshot.phase === "failed" &&
+        snapshot.issueCode &&
+        snapshot.issueCode !== "check-failed" &&
+        snapshot.issueCode !== "unsupported"
+      ) {
+        setDesktopUpdateChip({
+          kind: "issue",
+          version: snapshot.availableVersion ?? snapshot.lastAttemptedVersion
+        });
+        return;
+      }
+
+      setDesktopUpdateChip(null);
+    };
+
+    void initializeDesktopUpdateState();
+    syncDesktopUpdateChip(readDesktopUpdateSnapshot());
+
+    return subscribeDesktopUpdateState(syncDesktopUpdateChip);
   }, []);
 
   useEffect(() => {
@@ -450,36 +496,11 @@ export default function App() {
   }, [settings]);
 
   useEffect(() => {
-    if (!online || !supportsDesktopUpdates() || desktopUpdateCheckStartedRef.current) {
+    if (!online || !supportsDesktopUpdates()) {
       return;
     }
 
-    desktopUpdateCheckStartedRef.current = true;
-    let cancelled = false;
-
-    void checkForDesktopUpdate()
-      .then((result) => {
-        if (cancelled) {
-          return;
-        }
-
-        if (result.status === "available") {
-          setDesktopUpdateChip({
-            version: result.nextVersion
-          });
-        } else {
-          setDesktopUpdateChip(null);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDesktopUpdateChip(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    void startAutomaticDesktopUpdateCheck();
   }, [online]);
 
   useEffect(() => {
@@ -3068,8 +3089,20 @@ export default function App() {
         updateChip={
           desktopUpdateChip
             ? {
-                text: t("settings.desktopUpdateChip", { version: desktopUpdateChip.version }),
-                title: t("settings.desktopUpdateChipTitle", { version: desktopUpdateChip.version })
+                text:
+                  desktopUpdateChip.kind === "issue"
+                    ? t("settings.desktopUpdateIssueChip")
+                    : t("settings.desktopUpdateChip", {
+                        version: desktopUpdateChip.version ?? "—"
+                      }),
+                title:
+                  desktopUpdateChip.kind === "issue"
+                    ? t("settings.desktopUpdateIssueChipTitle", {
+                        version: desktopUpdateChip.version ?? "—"
+                      })
+                    : t("settings.desktopUpdateChipTitle", {
+                        version: desktopUpdateChip.version ?? "—"
+                      })
               }
             : null
         }

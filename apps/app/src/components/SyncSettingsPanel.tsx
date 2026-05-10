@@ -182,6 +182,13 @@ type ConnectionAvailabilityState =
   | "unavailable"
   | "authError";
 
+type ValidatedSelfHostedDraft = {
+  serverUrl: string;
+  managementToken: string;
+  label: string;
+  remoteVaults: RemoteVaultCatalogEntry[];
+};
+
 type RemoteVaultCatalogEntry = SyncRemoteVault;
 
 function ChevronLeftGlyph() {
@@ -534,6 +541,8 @@ export default function SyncSettingsPanel({
   const [selfHostedLabelDraft, setSelfHostedLabelDraft] = useState("");
   const [selfHostedUrlDraft, setSelfHostedUrlDraft] = useState("");
   const [selfHostedManagementTokenDraft, setSelfHostedManagementTokenDraft] = useState("");
+  const [selfHostedDraftError, setSelfHostedDraftError] = useState<string | null>(null);
+  const [selfHostedEditingConnectionId, setSelfHostedEditingConnectionId] = useState<string | null>(null);
   const [hostedMode, setHostedMode] = useState<HostedMode>("login");
   const [hostedUrlDraft, setHostedUrlDraft] = useState("");
   const [hostedNameDraft, setHostedNameDraft] = useState("");
@@ -585,6 +594,9 @@ export default function SyncSettingsPanel({
     () => new Set(sortedVaults.map((vault) => vault.name.trim().toLowerCase())),
     [sortedVaults]
   );
+  const selfHostedEditingConnection = selfHostedEditingConnectionId
+    ? connectionsById.get(selfHostedEditingConnectionId) ?? null
+    : null;
 
   const normalizeRemoteVaultEntries = useCallback(
     (
@@ -1077,6 +1089,7 @@ export default function SyncSettingsPanel({
   const closeModal = () => {
     setPanelModal(null);
     setConfirmState(null);
+    resetConnectionDrafts();
     pendingVaultEncryptionContinuationRef.current = null;
     setVaultNameDraft("");
     setVaultNameError(null);
@@ -1090,9 +1103,11 @@ export default function SyncSettingsPanel({
   };
 
   const resetConnectionDrafts = () => {
+    setSelfHostedEditingConnectionId(null);
     setSelfHostedLabelDraft("");
     setSelfHostedUrlDraft("");
     setSelfHostedManagementTokenDraft("");
+    setSelfHostedDraftError(null);
     setHostedMode("login");
     setHostedUrlDraft("");
     setHostedNameDraft("");
@@ -1102,6 +1117,42 @@ export default function SyncSettingsPanel({
     setEncryptionPassphraseConfirmDraft("");
     setEncryptionNextPassphraseDraft("");
     setEncryptionNextPassphraseConfirmDraft("");
+  };
+
+  const openSelfHostedConnectionModal = (connection?: SyncConnection | null) => {
+    setSelfHostedEditingConnectionId(connection?.id ?? null);
+    setSelfHostedLabelDraft(connection?.label ?? "");
+    setSelfHostedUrlDraft(connection?.serverUrl ?? "");
+    setSelfHostedManagementTokenDraft(connection?.managementToken ?? "");
+    setSelfHostedDraftError(null);
+    setPanelModal({ kind: "addSelfHosted" });
+  };
+
+  const validateSelfHostedConnectionDraft = async (): Promise<ValidatedSelfHostedDraft | null> => {
+    const serverUrl = selfHostedUrlDraft.trim();
+    const managementToken = selfHostedManagementTokenDraft.trim();
+    const label = selfHostedLabelDraft.trim();
+
+    if (!serverUrl) {
+      setSelfHostedDraftError(t("sync.urlRequired"));
+      return null;
+    }
+
+    if (!managementToken) {
+      setSelfHostedDraftError(t("sync.tokenRequired"));
+      return null;
+    }
+
+    const remoteVaults = normalizeRemoteVaultEntries(
+      (await loadPersonalServerVaults(serverUrl, managementToken)).vaults
+    );
+
+    return {
+      serverUrl,
+      managementToken,
+      label,
+      remoteVaults
+    };
   };
 
   const handleCreateVault = async () => {
@@ -1167,27 +1218,79 @@ export default function SyncSettingsPanel({
     closeModal();
   };
 
-  const handleAddSelfHostedConnection = async () => {
-    if (!selfHostedUrlDraft.trim() || !selfHostedManagementTokenDraft.trim()) {
-      showFeedback("error", t("sync.urlRequired"));
-      return;
-    }
+  const handleSaveSelfHostedConnection = async () => {
+    const busyToken = selfHostedEditingConnection
+      ? `self-hosted:${selfHostedEditingConnection.id}`
+      : "self-hosted:new";
+
+    setSelfHostedDraftError(null);
+    setBusyKey(busyToken);
 
     try {
-      await Promise.resolve(
-        onCreateConnection({
-          provider: "selfHosted",
-          serverUrl: selfHostedUrlDraft.trim(),
-          label: selfHostedLabelDraft.trim() || undefined,
-          managementToken: selfHostedManagementTokenDraft.trim()
-        })
-      );
-      resetConnectionDrafts();
-      showFeedback("success", t("settings.connectionAdded"));
+      const validated = await validateSelfHostedConnectionDraft();
+
+      if (!validated) {
+        return;
+      }
+
+      if (selfHostedEditingConnection) {
+        await Promise.resolve(
+          onUpdateConnection(selfHostedEditingConnection.id, {
+            serverUrl: validated.serverUrl,
+            managementToken: validated.managementToken,
+            label: validated.label || selfHostedEditingConnection.label
+          })
+        );
+
+        setRemoteVaultsByConnectionId((current) => ({
+          ...current,
+          [selfHostedEditingConnection.id]: validated.remoteVaults
+        }));
+        setRemoteVaultErrors((current) => ({
+          ...current,
+          [selfHostedEditingConnection.id]: null
+        }));
+        setConnectionAvailability((current) => ({
+          ...current,
+          [selfHostedEditingConnection.id]: "available"
+        }));
+        showFeedback("success", t("settings.connectionUpdated"));
+      } else {
+        await Promise.resolve(
+          onCreateConnection({
+            provider: "selfHosted",
+            serverUrl: validated.serverUrl,
+            label: validated.label || undefined,
+            managementToken: validated.managementToken
+          })
+        );
+        showFeedback("success", t("settings.connectionAdded"));
+      }
+
       closeModal();
     } catch (error) {
       const message = error instanceof Error ? error.message : "SYNC_FAILED";
-      showFeedback("error", translateSyncManagerError(message, t));
+      const translated = translateSyncManagerError(message, t);
+
+      setSelfHostedDraftError(translated);
+
+      if (selfHostedEditingConnection) {
+        setRemoteVaultErrors((current) => ({
+          ...current,
+          [selfHostedEditingConnection.id]: translated
+        }));
+        setConnectionAvailability((current) => ({
+          ...current,
+          [selfHostedEditingConnection.id]:
+            message === "UNAUTHORIZED"
+              ? "authError"
+              : message === "SERVER_UNAVAILABLE" || message === "HTTP_404"
+                ? "unavailable"
+                : current[selfHostedEditingConnection.id] ?? "checking"
+        }));
+      }
+    } finally {
+      setBusyKey((current) => (current === busyToken ? null : current));
     }
   };
 
@@ -2517,6 +2620,8 @@ export default function SyncSettingsPanel({
                           : availability === "offline"
                             ? "is-offline"
                             : "is-neutral";
+                  const canRepairSelfHostedAuth =
+                    connection.provider === "selfHosted" && availability === "authError";
 
                   return (
                     <article
@@ -2577,6 +2682,21 @@ export default function SyncSettingsPanel({
                                 ? t("settings.googleDriveSessionReady")
                               : `${t("sync.managementToken")}: ${maskToken(connection.managementToken)}`}
                           </span>
+                          {canRepairSelfHostedAuth ? (
+                            <div className="sync-settings-card-actions">
+                              <button
+                                type="button"
+                                className="sync-settings-inline-action"
+                                disabled={busyKey !== null}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openSelfHostedConnectionModal(connection);
+                                }}
+                              >
+                                {t("settings.selfHostedReconnect")}
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
@@ -2608,6 +2728,14 @@ export default function SyncSettingsPanel({
                               onClick={() => {
                                 void (async () => {
                                   let nextConnection = connection;
+
+                                  if (
+                                    connection.provider === "selfHosted" &&
+                                    availability === "authError"
+                                  ) {
+                                    openSelfHostedConnectionModal(connection);
+                                    return;
+                                  }
 
                                   if (
                                     connection.provider === "googleDrive" &&
@@ -2680,6 +2808,19 @@ export default function SyncSettingsPanel({
                               <div className="sync-settings-remote-empty is-error">
                                 <strong>{t("settings.remoteVaultLoadFailed")}</strong>
                                 <span>{remoteError}</span>
+                                {connection.provider === "selfHosted" &&
+                                availability === "authError" ? (
+                                  <button
+                                    type="button"
+                                    className="sync-settings-inline-action"
+                                    disabled={busyKey !== null}
+                                    onClick={() => {
+                                      openSelfHostedConnectionModal(connection);
+                                    }}
+                                  >
+                                    {t("settings.selfHostedReconnect")}
+                                  </button>
+                                ) : null}
                                 {connection.provider === "googleDrive" &&
                                 availability === "authError" ? (
                                   <button
@@ -2923,6 +3064,14 @@ export default function SyncSettingsPanel({
 
               void (async () => {
                 if (
+                  selectedVaultConnection?.provider === "selfHosted" &&
+                  connectionAvailability[selectedVaultConnection.id] === "authError"
+                ) {
+                  openSelfHostedConnectionModal(selectedVaultConnection);
+                  return;
+                }
+
+                if (
                   selectedVaultBinding &&
                   selectedVaultEncryption?.enabled &&
                   (selectedVaultEncryption.state === "locked" ||
@@ -2965,6 +3114,9 @@ export default function SyncSettingsPanel({
           >
             {selectedVaultBinding?.syncStatus === "syncing"
               ? t("sync.syncing")
+              : selectedVaultConnection?.provider === "selfHosted" &&
+                  connectionAvailability[selectedVaultConnection.id] === "authError"
+                ? t("settings.selfHostedReconnect")
               : selectedVaultBinding &&
                   selectedVaultEncryption?.enabled &&
                   (selectedVaultEncryption.state === "locked" ||
@@ -3013,11 +3165,13 @@ export default function SyncSettingsPanel({
                           })
                         : panelModal.kind === "addConnection"
                           ? t("settings.connectionCatalogTitle")
-                          : panelModal.kind === "addGoogleDrive"
-                            ? t("settings.googleDriveConnectionTitle")
-                            : panelModal.kind === "addHosted"
-                              ? t("settings.hostedConnectionTitle")
-                              : t("settings.selfHostedConnectionTitle")}
+                        : panelModal.kind === "addGoogleDrive"
+                          ? t("settings.googleDriveConnectionTitle")
+                          : panelModal.kind === "addHosted"
+                            ? t("settings.hostedConnectionTitle")
+                              : selfHostedEditingConnection
+                                ? t("settings.selfHostedReconnectTitle")
+                                : t("settings.selfHostedConnectionTitle")}
                 </h3>
               </div>
               <button type="button" className="sync-settings-icon-button" onClick={closeModal} title={t("orbit.closeModal")}>
@@ -3397,7 +3551,7 @@ export default function SyncSettingsPanel({
                   <button
                     type="button"
                     className="sync-settings-provider-card"
-                    onClick={() => setPanelModal({ kind: "addSelfHosted" })}
+                    onClick={() => openSelfHostedConnectionModal()}
                   >
                     <span className="sync-settings-provider-icon" style={{ "--item-color": providerAccent("selfHosted") } as CSSProperties}>
                       <SelfHostedGlyph />
@@ -3436,32 +3590,76 @@ export default function SyncSettingsPanel({
 
             {panelModal.kind === "addSelfHosted" ? (
               <div className="sync-settings-modal-body">
-                <p className="sync-settings-modal-copy">{t("settings.selfHostedModalDescription")}</p>
+                <p className="sync-settings-modal-copy">
+                  {selfHostedEditingConnection
+                    ? t("settings.selfHostedReconnectDescription")
+                    : t("settings.selfHostedModalDescription")}
+                </p>
                 <input
                   className="sync-settings-input"
                   value={selfHostedUrlDraft}
-                  onChange={(event) => setSelfHostedUrlDraft(event.target.value)}
+                  onChange={(event) => {
+                    setSelfHostedUrlDraft(event.target.value);
+                    if (selfHostedDraftError) {
+                      setSelfHostedDraftError(null);
+                    }
+                  }}
                   placeholder={t("sync.endpointPlaceholder")}
                   autoFocus
                 />
                 <input
                   className="sync-settings-input"
                   value={selfHostedManagementTokenDraft}
-                  onChange={(event) => setSelfHostedManagementTokenDraft(event.target.value)}
+                  onChange={(event) => {
+                    setSelfHostedManagementTokenDraft(event.target.value);
+                    if (selfHostedDraftError) {
+                      setSelfHostedDraftError(null);
+                    }
+                  }}
                   placeholder={t("sync.managementTokenPlaceholder")}
                 />
                 <input
                   className="sync-settings-input"
                   value={selfHostedLabelDraft}
-                  onChange={(event) => setSelfHostedLabelDraft(event.target.value)}
+                  onChange={(event) => {
+                    setSelfHostedLabelDraft(event.target.value);
+                    if (selfHostedDraftError) {
+                      setSelfHostedDraftError(null);
+                    }
+                  }}
                   placeholder={t("settings.connectionLabelOptional")}
                 />
+                <div className="sync-settings-note-shell">
+                  <span className="sync-settings-note-chip">CHECK</span>
+                  <span className={`sync-settings-note-copy ${selfHostedDraftError ? "is-error" : ""}`}>
+                    {selfHostedDraftError ?? t("settings.selfHostedValidationHint")}
+                  </span>
+                </div>
                 <div className="sync-settings-modal-actions">
                   <button type="button" className="sync-settings-inline-action" onClick={closeModal}>
                     {t("dialog.cancel")}
                   </button>
-                  <button type="button" className="sync-settings-primary-action" onClick={handleAddSelfHostedConnection}>
-                    {t("settings.addConnection")}
+                  <button
+                    type="button"
+                    className="sync-settings-primary-action"
+                    disabled={
+                      busyKey ===
+                      (selfHostedEditingConnection
+                        ? `self-hosted:${selfHostedEditingConnection.id}`
+                        : "self-hosted:new")
+                    }
+                    onClick={() => {
+                      void handleSaveSelfHostedConnection();
+                    }}
+                  >
+                    {busyKey ===
+                    (selfHostedEditingConnection
+                      ? `self-hosted:${selfHostedEditingConnection.id}`
+                      : "self-hosted:new")
+                      ? t("sync.syncing")
+                      : selfHostedEditingConnection
+                        ? t("settings.selfHostedReconnectSave")
+                        : t("settings.selfHostedConnectAction")}
                   </button>
                 </div>
               </div>

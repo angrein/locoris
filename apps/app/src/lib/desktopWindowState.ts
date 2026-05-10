@@ -85,9 +85,6 @@ export async function initializeDesktopWindowStatePersistence() {
       if (!payload) {
         scheduleWindowStateSave();
       }
-    }),
-    currentWindow.onCloseRequested(async () => {
-      await flushWindowState();
     })
   ]);
 

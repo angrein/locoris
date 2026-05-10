@@ -70,7 +70,22 @@ Notes:
 - desktop prefers `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID`
 - if the desktop variable is missing, desktop falls back to `VITE_GOOGLE_DRIVE_CLIENT_ID`
 
-## 4. Run The App
+## 4. Configure GitHub Actions Builds
+
+GitHub desktop builds do not see your local `apps/app/.env`, so release workflows must get the same values from repository variables.
+
+In your GitHub repository:
+
+1. Open `Settings`
+2. Open `Secrets and variables` → `Actions`
+3. Open the `Variables` tab
+4. Add:
+   - `VITE_GOOGLE_DRIVE_CLIENT_ID`
+   - `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID`
+
+Locoris release workflows inject these variables into Vite at build time. If either variable is missing, CI now fails early with a clear error instead of shipping a build with broken Google Drive sync.
+
+## 5. Run The App
 
 ### Web
 
@@ -98,7 +113,7 @@ Open the app, then:
 
 After authorization, Locoris stores vault data in Google Drive `appDataFolder`, not in the user-visible Drive UI.
 
-## 5. Desktop Callback Details
+## 6. Desktop Callback Details
 
 Native builds complete Google OAuth through a local loopback callback.
 
@@ -109,7 +124,7 @@ Native builds complete Google OAuth through a local loopback callback.
 
 This keeps desktop OAuth out of embedded webviews and avoids browser-only popup flows.
 
-## 6. What To Expect
+## 7. What To Expect
 
 - Google Drive becomes a regular sync method inside the existing multi-vault UI.
 - Each remote vault gets its own file in `appDataFolder`.

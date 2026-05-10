@@ -411,15 +411,31 @@ const ru = {
     desktopUpdateUpToDate: "Установлена последняя версия {{version}}.",
     desktopUpdateAvailable: "Доступна версия {{version}}.",
     desktopUpdateDownloading: "Скачиваем обновление…{{progress}}",
+    desktopUpdateRestarting: "Завершаем обновление и перезапускаем приложение…",
     desktopUpdateInstall: "Установить",
     desktopUpdateInstalling: "Устанавливаем…",
     desktopUpdateCheck: "Проверить обновления",
+    desktopUpdateRetry: "Повторить установку",
+    desktopUpdateOpenRelease: "Открыть страницу релиза",
     desktopUpdateChip: "Обновление {{version}}",
     desktopUpdateChipTitle: "Доступна версия {{version}}. Открой настройки, чтобы установить обновление.",
+    desktopUpdateIssueChip: "Проблема с обновлением",
+    desktopUpdateIssueChipTitle:
+      "Последняя попытка desktop-обновления для версии {{version}} требует внимания. Открой настройки, чтобы выбрать следующий шаг.",
     desktopUpdateHint:
-      "После установки приложение перезапустится автоматически. Обновления доступны только в desktop-версии Locoris.",
+      "После успешной установки приложение перезапустится автоматически. Если автоустановка не смогла завершиться, здесь можно повторить попытку или открыть страницу релиза и установить ту же версию вручную.",
+    desktopUpdatePublished: "Опубликовано {{date}}.",
+    desktopUpdateDetail: "Подробности: {{detail}}",
     desktopUpdateError: "Не удалось проверить или установить обновление.",
     desktopUpdateUnsupported: "Проверка обновлений доступна только в desktop-версии приложения.",
+    desktopUpdateIssueCheckFailed: "Не удалось завершить проверку обновлений.",
+    desktopUpdateIssueMetadataInvalid:
+      "Метаданные релиза для этой сборки неполные или неконсистентные.",
+    desktopUpdateIssueDownloadFailed:
+      "Пакет обновления не удалось скачать полностью.",
+    desktopUpdateIssueInstallFailed: "Скачанное обновление не удалось применить.",
+    desktopUpdateIssueInstallNotApplied:
+      "Приложение перезапустилось, но не переключилось на версию {{version}}.",
     syncKicker: "Синхронизация",
     syncManagerIntro:
       "Подключай каждое локальное хранилище к одному удаленному способу. Один способ синхронизации может обслуживать несколько хранилищ, а все связи видны прямо в этом экране.",
@@ -504,6 +520,14 @@ const ru = {
     hostedConnectionDescription: "Облачная синхронизация для твоего пространства Locoris.",
     selfHostedConnectionTitle: "Подключить свой сервер",
     selfHostedConnectionDescription: "Персональный сервер с поддержкой нескольких хранилищ.",
+    selfHostedReconnectTitle: "Обновить доступ к своему серверу",
+    selfHostedReconnectDescription:
+      "Обнови адрес сервера или management token. Locoris сначала проверит доступ, и только потом сохранит изменения.",
+    selfHostedReconnect: "Обновить токен",
+    selfHostedReconnectSave: "Проверить и сохранить",
+    selfHostedConnectAction: "Проверить и подключить",
+    selfHostedValidationHint:
+      "Locoris сначала проверит адрес сервера и management token. Если сервер их примет, подключение сразу сохранится.",
     googleDriveConnectionTitle: "Подключить Google Drive",
     googleDriveConnectionDescription: "Синхронизация через скрытую appDataFolder внутри твоего Google-аккаунта.",
     googleDriveReconnect: "Обновить Google Drive auth",
@@ -538,6 +562,7 @@ const ru = {
     connectionUnavailable: "Недоступен",
     connectionAuthError: "Нужен вход",
     connectionOffline: "Оффлайн",
+    connectionUpdated: "Способ синхронизации обновлен.",
     boundToConnection: "Привязан к {{connection}}",
     linkedVaultCount: "{{count}} связанных хранилищ",
     remoteVaultCount: "{{count}} удаленных хранилищ",
