@@ -1,4 +1,6 @@
 import {
+  cloneElement,
+  isValidElement,
   useEffect,
   useMemo,
   useRef,
@@ -2013,6 +2015,12 @@ export default function OrbitalMapView({
     Record<string, { x: number; y: number }>
   >({});
   const [activeModal, setActiveModal] = useState<"settings" | "trash" | null>(null);
+  const resolvedSettingsModalSlot =
+    settingsModalSlot && isValidElement(settingsModalSlot)
+      ? cloneElement(settingsModalSlot, {
+          onClose: () => setActiveModal(null)
+        } as { onClose: () => void })
+      : settingsModalSlot;
   const [isCanvasEditorFullscreen, setIsCanvasEditorFullscreen] = useState(false);
   const [isDocumentVisible, setIsDocumentVisible] = useState(
     typeof document === "undefined" ? true : document.visibilityState !== "hidden"
@@ -8225,7 +8233,7 @@ export default function OrbitalMapView({
               <span aria-hidden="true">×</span>
             </button>
             <div className="orbital-modal-content orbital-utility-modal-content">
-              {activeModal === "settings" ? settingsModalSlot : trashModalSlot}
+              {activeModal === "settings" ? resolvedSettingsModalSlot : trashModalSlot}
             </div>
           </div>
         </div>

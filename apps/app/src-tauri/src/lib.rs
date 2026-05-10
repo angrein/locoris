@@ -409,8 +409,17 @@ fn desktop_google_oauth_success_html() -> &'static str {
   <body>
     <main>
       <h1>Locoris is connected</h1>
-      <p>You can close this browser tab and return to the app.</p>
+      <p>Locoris should continue automatically now. If it doesn't, switch back to the app.</p>
     </main>
+    <script>
+      window.setTimeout(() => {
+        try {
+          window.close();
+        } catch (_) {
+          // Best-effort only.
+        }
+      }, 200);
+    </script>
   </body>
 </html>"#
 }
@@ -538,9 +547,7 @@ fn desktop_google_oauth_prepare_loopback(
   spawn_desktop_google_oauth_listener(listener, sender);
 
   Ok(DesktopGoogleOauthLoopbackSession {
-    redirect_uri: format!(
-      "http://{GOOGLE_DESKTOP_LOOPBACK_HOST}:{local_port}{GOOGLE_DESKTOP_LOOPBACK_PATH}"
-    ),
+    redirect_uri: format!("http://{GOOGLE_DESKTOP_LOOPBACK_HOST}:{local_port}"),
   })
 }
 

@@ -172,10 +172,10 @@ function getClientIdFromEnv() {
   const desktopClientId = import.meta.env.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID?.trim() ?? "";
 
   if (isDesktopGoogleDriveOauthRuntime()) {
-    return desktopClientId || webClientId;
+    return desktopClientId;
   }
 
-  return webClientId || desktopClientId;
+  return webClientId;
 }
 
 export function getGoogleDriveClientId() {

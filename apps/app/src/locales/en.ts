@@ -319,6 +319,8 @@ const en = {
     hostedTokenRequired: "Bind this local vault to a hosted vault first.",
     googleDriveClientIdRequired:
       "Set VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID for desktop builds or VITE_GOOGLE_DRIVE_CLIENT_ID for web before connecting Google Drive.",
+    googleDriveDesktopConfigInvalid:
+      "Google rejected the desktop OAuth request. Make sure the desktop build uses VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID from a Desktop app client, not a web client ID.",
     googleDriveAuthRequired:
       "Google Drive session expired. Refresh the authorization to continue loading remote vaults.",
     googleDriveConnected: "Google Drive connected.",
@@ -540,7 +542,7 @@ const en = {
     googleDriveSdkLoading:
       "Preparing native Google authorization. As soon as it is ready, the connect button becomes available.",
     googleDriveSdkReady:
-      "Google authorization is ready. Locoris will open your system browser and return to the app automatically.",
+      "Google authorization is ready. Locoris will open your system browser and continue after Google returns to the local callback.",
     selfHostedModalDescription:
       "Enter the personal server endpoint and management token. After that the server will be ready for vault connections.",
     hostedModalDescription:

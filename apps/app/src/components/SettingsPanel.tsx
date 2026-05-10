@@ -109,6 +109,7 @@ interface SettingsPanelProps {
     currentPassphrase?: string;
   }) => void | Promise<void>;
   onLockVaultEncryption: (localVaultId: string) => void | Promise<void>;
+  onClose: () => void;
 }
 
 function LanguageGlyph() {
@@ -183,7 +184,8 @@ export default function SettingsPanel({
   onUnlockVaultEncryption,
   onChangeVaultEncryptionPassphrase,
   onDisableVaultEncryption,
-  onLockVaultEncryption
+  onLockVaultEncryption,
+  onClose
 }: SettingsPanelProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<SettingsView>("root");
@@ -339,6 +341,7 @@ export default function SettingsPanel({
         vaultEncryptionById={vaultEncryptionById}
         syncFeedback={syncFeedback}
         onBack={() => setView("root")}
+        onClose={onClose}
         onSelectLocalVault={onSelectLocalVault}
         onCreateLocalVault={onCreateLocalVault}
         onRenameLocalVault={onRenameLocalVault}

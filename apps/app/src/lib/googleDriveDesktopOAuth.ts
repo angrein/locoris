@@ -70,6 +70,17 @@ function getDesktopClientSecretFromEnv() {
   return normalizeText(import.meta.env.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET);
 }
 
+async function focusDesktopWindow() {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const currentWindow = getCurrentWindow();
+    await currentWindow.show();
+    await currentWindow.setFocus();
+  } catch {
+    // Best-effort polish only; the OAuth flow itself should not fail if focus restore is unavailable.
+  }
+}
+
 function isDesktopGoogleDriveRuntime() {
   return typeof window !== "undefined" && isTauri();
 }
@@ -174,6 +185,7 @@ async function parseGoogleTokenResponse(response: Response) {
 
   if (!response.ok) {
     const message = normalizeText(payload?.error);
+    const description = normalizeText(payload?.error_description);
 
     if (
       message === "invalid_grant" ||
@@ -183,7 +195,11 @@ async function parseGoogleTokenResponse(response: Response) {
       throw new Error("GOOGLE_DRIVE_AUTH_REQUIRED");
     }
 
-    throw new Error(message || "GOOGLE_OAUTH_FAILED");
+    if (message === "invalid_request") {
+      throw new Error("GOOGLE_OAUTH_INVALID_REQUEST");
+    }
+
+    throw new Error(description || message || "GOOGLE_OAUTH_FAILED");
   }
 
   if (!payload?.access_token) {
@@ -386,6 +402,7 @@ export async function connectGoogleDriveDesktopAccount(options: {
     await openSystemBrowserForOauth(authorizationUrl);
 
     const callbackPayload = await waitForDesktopLoopbackCallback();
+    await focusDesktopWindow();
 
     if (callbackPayload.error === "access_denied") {
       throw new Error("GOOGLE_OAUTH_ACCESS_DENIED");

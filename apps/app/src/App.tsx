@@ -3079,6 +3079,7 @@ export default function App() {
             }
             onDisableVaultEncryption={(input) => void handleDisableVaultEncryption(input)}
             onLockVaultEncryption={(localVaultId) => void handleLockVaultEncryption(localVaultId)}
+            onClose={() => undefined}
           />
         }
         showClose={false}

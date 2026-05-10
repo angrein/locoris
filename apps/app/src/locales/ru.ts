@@ -321,6 +321,8 @@ const ru = {
     hostedTokenRequired: "Сначала привяжи это локальное хранилище к облачному хранилищу.",
     googleDriveClientIdRequired:
       "Для Google Drive сначала задай VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID для desktop-сборок или VITE_GOOGLE_DRIVE_CLIENT_ID для web-сборки.",
+    googleDriveDesktopConfigInvalid:
+      "Google отклонил desktop OAuth-запрос. Проверь, что в desktop-сборке задан именно VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID от клиента типа Desktop app, а не web client ID.",
     googleDriveAuthRequired:
       "Сессия Google Drive истекла. Обнови авторизацию, чтобы снова загружать удаленные хранилища.",
     googleDriveConnected: "Google Drive подключен.",
@@ -543,7 +545,7 @@ const ru = {
     googleDriveSdkLoading:
       "Подготавливаем нативную авторизацию Google. Как только она будет готова, кнопку подключения можно нажать.",
     googleDriveSdkReady:
-      "Авторизация Google готова. Locoris откроет системный браузер и сам вернётся в приложение.",
+      "Авторизация Google готова. Locoris откроет системный браузер и продолжит подключение после локального callback Google.",
     selfHostedModalDescription:
       "Укажи адрес персонального сервера и management token. После этого можно сразу подключать хранилища прямо на этом экране.",
     hostedModalDescription:

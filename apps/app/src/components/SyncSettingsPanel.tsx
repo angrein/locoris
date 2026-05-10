@@ -58,6 +58,7 @@ interface SyncSettingsPanelProps {
   vaultEncryptionById: Record<string, VaultEncryptionSummary>;
   syncFeedback?: SyncFeedbackState;
   onBack: () => void;
+  onClose: () => void;
   onSelectLocalVault: (localVaultId: string) => void;
   onCreateLocalVault: (input: {
     name: string;
@@ -384,6 +385,8 @@ function translateSyncManagerError(message: string, t: ReturnType<typeof useTran
       return t("sync.googleDriveAuthRequired");
     case "GOOGLE_DRIVE_CLIENT_ID_REQUIRED":
       return t("sync.googleDriveClientIdRequired");
+    case "GOOGLE_OAUTH_INVALID_REQUEST":
+      return t("sync.googleDriveDesktopConfigInvalid");
     case "GOOGLE_OAUTH_NOT_READY":
       return t("sync.googleDrivePreparing");
     case "GOOGLE_OAUTH_POPUP_CLOSED":
@@ -474,6 +477,7 @@ export default function SyncSettingsPanel({
   vaultEncryptionById,
   syncFeedback = null,
   onBack,
+  onClose,
   onSelectLocalVault,
   onCreateLocalVault,
   onRenameLocalVault,
@@ -2296,17 +2300,29 @@ export default function SyncSettingsPanel({
 
   return (
     <section className="sync-settings-shell">
-      <button
-        type="button"
-        className="sync-settings-back sync-settings-back-floating"
-        onClick={onBack}
-        aria-label={t("settings.back")}
-        title={t("settings.back")}
-      >
-        <span className="sync-settings-back-icon" aria-hidden="true">
-          <ChevronLeftGlyph />
-        </span>
-      </button>
+      <div className="sync-settings-controls">
+        <button
+          type="button"
+          className="sync-settings-back"
+          onClick={onBack}
+          aria-label={t("settings.back")}
+          title={t("settings.back")}
+        >
+          <span className="sync-settings-back-icon" aria-hidden="true">
+            <ChevronLeftGlyph />
+          </span>
+        </button>
+        <div className="sync-settings-controls-spacer" />
+        <button
+          type="button"
+          className="sync-settings-close"
+          onClick={onClose}
+          aria-label={t("orbit.closeModal")}
+          title={t("orbit.closeModal")}
+        >
+          <span className="sync-settings-close-icon" aria-hidden="true">×</span>
+        </button>
+      </div>
 
       <header className="sync-settings-header">
         <div className="sync-settings-heading">
