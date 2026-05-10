@@ -371,176 +371,188 @@ export default function SettingsPanel({
           <h2 className="panel-title settings-panel-title">{t("settings.title")}</h2>
           <p className="settings-panel-caption">{t("settings.caption")}</p>
         </div>
-        <span className={`status-chip ${online ? "online" : "offline"}`}>
-          {online ? t("settings.networkOnline") : t("settings.networkOffline")}
-        </span>
       </header>
 
-      <div className="settings-panel-block">
-        <div className="settings-panel-block-head">
-          <p className="panel-kicker settings-panel-block-kicker">{t("settings.general")}</p>
-        </div>
-
-        <div className="settings-row-stack">
-          <div className="settings-row settings-row-static">
-            <span className="settings-row-icon" aria-hidden="true">
-              <LanguageGlyph />
-            </span>
-            <div className="settings-row-copy">
-              <strong>{t("settings.language")}</strong>
-              <span>{t("settings.languageDescription")}</span>
-            </div>
-            <div className="settings-language-picker" ref={languageMenuRef}>
-              <button
-                type="button"
-                className="settings-row-action"
-                onClick={() => setLanguageMenuOpen((current) => !current)}
-                aria-expanded={languageMenuOpen}
-              >
-                <span>{currentLanguageLabel}</span>
-                <span className="settings-row-action-icon" aria-hidden="true">
-                  <ChevronGlyph expanded={languageMenuOpen} />
-                </span>
-              </button>
-
-              {languageMenuOpen ? (
-                <div className="settings-language-menu" role="menu">
-                  <button
-                    type="button"
-                    className={`settings-language-option ${settings.language === "en" ? "is-active" : ""}`}
-                    onClick={() => {
-                      onLanguageChange("en");
-                      setLanguageMenuOpen(false);
-                    }}
-                    role="menuitemradio"
-                    aria-checked={settings.language === "en"}
-                  >
-                    <strong>{t("settings.languageEnglish")}</strong>
-                    <span>English</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`settings-language-option ${settings.language === "ru" ? "is-active" : ""}`}
-                    onClick={() => {
-                      onLanguageChange("ru");
-                      setLanguageMenuOpen(false);
-                    }}
-                    role="menuitemradio"
-                    aria-checked={settings.language === "ru"}
-                  >
-                    <strong>{t("settings.languageRussian")}</strong>
-                    <span>Русский</span>
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <button type="button" className="settings-row" onClick={() => setView("sync")}>
-            <span className="settings-row-icon" aria-hidden="true">
-              <SyncGlyph />
-            </span>
-            <div className="settings-row-copy">
-              <strong>{t("settings.syncTitle")}</strong>
-              <span>{t("settings.syncDescription", { vaultCount: localVaults.length, connectionCount: syncConnections.length })}</span>
-            </div>
-            <span className="settings-row-side">
-              <span className="settings-row-count">{syncBindings.length}</span>
-              <span className="settings-row-action-icon" aria-hidden="true">
-                <ChevronGlyph />
-              </span>
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {desktopUpdatesEnabled ? (
-        <div className="settings-panel-block">
+      <div className="settings-panel-grid">
+        <section className="settings-panel-block settings-panel-block-primary">
           <div className="settings-panel-block-head">
-            <p className="panel-kicker settings-panel-block-kicker">{t("settings.app")}</p>
+            <p className="panel-kicker settings-panel-block-kicker">{t("settings.general")}</p>
           </div>
 
           <div className="settings-row-stack">
-            <div className="settings-row settings-row-static settings-update-row">
+            <div className="settings-row settings-row-static is-language">
               <span className="settings-row-icon" aria-hidden="true">
-                <UpdateGlyph />
+                <LanguageGlyph />
               </span>
-              <div className="settings-row-copy settings-update-copy">
-                <strong>{t("settings.desktopUpdateTitle")}</strong>
-                <span>{desktopUpdateDescription}</span>
-                {desktopUpdateState.releaseBody ? (
-                  <p className="settings-update-note">{desktopUpdateState.releaseBody}</p>
-                ) : null}
-                {desktopUpdatePublishedLabel ? (
-                  <p className="settings-update-meta">
-                    {t("settings.desktopUpdatePublished", {
-                      date: desktopUpdatePublishedLabel
-                    })}
-                  </p>
-                ) : null}
-                {desktopUpdateState.phase === "failed" && desktopUpdateIssueText ? (
-                  <p className="settings-update-error">{desktopUpdateIssueText}</p>
-                ) : null}
-                {desktopUpdateState.issueDetail ? (
-                  <p className="settings-update-detail">
-                    {t("settings.desktopUpdateDetail", {
-                      detail: desktopUpdateState.issueDetail
-                    })}
-                  </p>
-                ) : null}
-                {desktopUpdateState.phase === "downloading" &&
-                desktopUpdateState.progress !== null ? (
-                  <div
-                    className="settings-update-progress"
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={desktopUpdateState.progress}
-                  >
-                    <span
-                      className="settings-update-progress-fill"
-                      style={{ width: `${desktopUpdateState.progress}%` }}
-                    />
-                  </div>
-                ) : null}
-                <p className="settings-update-hint">{t("settings.desktopUpdateHint")}</p>
+              <div className="settings-row-copy">
+                <strong>{t("settings.language")}</strong>
+                <span>{t("settings.languageDescription")}</span>
               </div>
-              <div className="settings-update-side">
-                <span className="settings-row-count">
-                  {t("settings.appVersionChip", {
-                    version: desktopUpdateCurrentVersion ?? "—"
-                  })}
-                </span>
-                <div className="settings-update-actions">
-                  <button
-                    type="button"
-                    className="settings-row-action"
-                    onClick={() => {
-                      void desktopUpdatePrimaryAction();
-                    }}
-                    disabled={desktopUpdatePrimaryActionDisabled}
-                  >
-                    <span>{desktopUpdatePrimaryActionLabel}</span>
-                  </button>
-                  {shouldShowOpenReleaseAction ? (
+              <div className="settings-language-picker" ref={languageMenuRef}>
+                <button
+                  type="button"
+                  className="settings-row-action settings-language-trigger"
+                  onClick={() => setLanguageMenuOpen((current) => !current)}
+                  aria-expanded={languageMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  <span>{currentLanguageLabel}</span>
+                  <span className="settings-row-action-icon" aria-hidden="true">
+                    <ChevronGlyph expanded={languageMenuOpen} />
+                  </span>
+                </button>
+
+                {languageMenuOpen ? (
+                  <div className="settings-language-menu" role="menu">
                     <button
                       type="button"
-                      className="settings-row-action settings-row-action-secondary"
+                      className={`settings-language-option ${settings.language === "en" ? "is-active" : ""}`}
                       onClick={() => {
-                        void handleOpenDesktopReleasePage();
+                        onLanguageChange("en");
+                        setLanguageMenuOpen(false);
+                      }}
+                      role="menuitemradio"
+                      aria-checked={settings.language === "en"}
+                    >
+                      <div className="settings-language-option-copy">
+                        <strong>{t("settings.languageEnglish")}</strong>
+                        <span>English</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={`settings-language-option ${settings.language === "ru" ? "is-active" : ""}`}
+                      onClick={() => {
+                        onLanguageChange("ru");
+                        setLanguageMenuOpen(false);
+                      }}
+                      role="menuitemradio"
+                      aria-checked={settings.language === "ru"}
+                    >
+                      <div className="settings-language-option-copy">
+                        <strong>{t("settings.languageRussian")}</strong>
+                        <span>Русский</span>
+                      </div>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="settings-row settings-row-destination is-sync"
+              onClick={() => setView("sync")}
+            >
+              <span className="settings-row-icon settings-destination-icon" aria-hidden="true">
+                <SyncGlyph />
+              </span>
+              <div className="settings-row-copy">
+                <strong>{t("settings.syncTitle")}</strong>
+                <span>
+                  {t("settings.syncDescription", {
+                    vaultCount: localVaults.length,
+                    connectionCount: syncConnections.length
+                  })}
+                </span>
+              </div>
+              <span className="settings-row-side">
+                <span className="settings-row-count">{syncBindings.length}</span>
+                <span className="settings-row-action-icon" aria-hidden="true">
+                  <ChevronGlyph />
+                </span>
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {desktopUpdatesEnabled ? (
+          <section className="settings-panel-block settings-panel-block-updater">
+            <div className="settings-panel-block-head">
+              <p className="panel-kicker settings-panel-block-kicker">{t("settings.app")}</p>
+            </div>
+
+            <div className="settings-row-stack">
+              <div className="settings-row settings-row-static settings-update-row is-update">
+                <span className="settings-row-icon settings-destination-icon" aria-hidden="true">
+                  <UpdateGlyph />
+                </span>
+                <div className="settings-row-copy settings-update-copy">
+                  <strong>{t("settings.desktopUpdateTitle")}</strong>
+                  <span>{desktopUpdateDescription}</span>
+                  {desktopUpdateState.releaseBody ? (
+                    <p className="settings-update-note">{desktopUpdateState.releaseBody}</p>
+                  ) : null}
+                  {desktopUpdatePublishedLabel ? (
+                    <p className="settings-update-meta">
+                      {t("settings.desktopUpdatePublished", {
+                        date: desktopUpdatePublishedLabel
+                      })}
+                    </p>
+                  ) : null}
+                  {desktopUpdateState.phase === "failed" && desktopUpdateIssueText ? (
+                    <p className="settings-update-error">{desktopUpdateIssueText}</p>
+                  ) : null}
+                  {desktopUpdateState.issueDetail ? (
+                    <p className="settings-update-detail">
+                      {t("settings.desktopUpdateDetail", {
+                        detail: desktopUpdateState.issueDetail
+                      })}
+                    </p>
+                  ) : null}
+                  {desktopUpdateState.phase === "downloading" &&
+                  desktopUpdateState.progress !== null ? (
+                    <div
+                      className="settings-update-progress"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={desktopUpdateState.progress}
+                    >
+                      <span
+                        className="settings-update-progress-fill"
+                        style={{ width: `${desktopUpdateState.progress}%` }}
+                      />
+                    </div>
+                  ) : null}
+                  <p className="settings-update-hint">{t("settings.desktopUpdateHint")}</p>
+                </div>
+                <div className="settings-update-side">
+                  <span className="settings-row-count">
+                    {t("settings.appVersionChip", {
+                      version: desktopUpdateCurrentVersion ?? "—"
+                    })}
+                  </span>
+                  <div className="settings-update-actions">
+                    <button
+                      type="button"
+                      className="settings-row-action"
+                      onClick={() => {
+                        void desktopUpdatePrimaryAction();
                       }}
                       disabled={desktopUpdatePrimaryActionDisabled}
                     >
-                      <span>{t("settings.desktopUpdateOpenRelease")}</span>
+                      <span>{desktopUpdatePrimaryActionLabel}</span>
                     </button>
-                  ) : null}
+                    {shouldShowOpenReleaseAction ? (
+                      <button
+                        type="button"
+                        className="settings-row-action settings-row-action-secondary"
+                        onClick={() => {
+                          void handleOpenDesktopReleasePage();
+                        }}
+                        disabled={desktopUpdatePrimaryActionDisabled}
+                      >
+                        <span>{t("settings.desktopUpdateOpenRelease")}</span>
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
+        ) : null}
         </div>
-      ) : null}
-
     </section>
   );
 }

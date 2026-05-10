@@ -62,6 +62,7 @@ Then set:
 ```env
 VITE_GOOGLE_DRIVE_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
 VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID=your-desktop-client-id.apps.googleusercontent.com
+VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET=optional-desktop-client-secret
 ```
 
 Notes:
@@ -69,6 +70,7 @@ Notes:
 - web uses `VITE_GOOGLE_DRIVE_CLIENT_ID`
 - desktop prefers `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID`
 - if the desktop variable is missing, desktop falls back to `VITE_GOOGLE_DRIVE_CLIENT_ID`
+- some Google Desktop clients also issue a companion secret; Locoris can use it through `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET`, but leaves it optional because Google documents it as optional for installed apps
 
 ## 4. Configure GitHub Actions Builds
 
@@ -82,6 +84,7 @@ In your GitHub repository:
 4. Add:
    - `VITE_GOOGLE_DRIVE_CLIENT_ID`
    - `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID`
+   - `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET` if your Desktop client includes one
 
 Locoris release workflows inject these variables into Vite at build time. If either variable is missing, CI now fails early with a clear error instead of shipping a build with broken Google Drive sync.
 
@@ -118,7 +121,7 @@ After authorization, Locoris stores vault data in Google Drive `appDataFolder`, 
 Native builds complete Google OAuth through a local loopback callback.
 
 - Locoris opens the system browser
-- Google redirects back to `http://127.0.0.1:<random-port>/oauth/google-drive`
+- Google redirects back to `http://127.0.0.1:<random-port>/`
 - Locoris captures the authorization code locally
 - the refresh token is stored in native secure storage
 

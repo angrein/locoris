@@ -971,7 +971,7 @@ export default function SyncSettingsPanel({
       let changed = false;
 
       syncConnections.forEach((connection) => {
-        next[connection.id] = current[connection.id] ?? true;
+        next[connection.id] = current[connection.id] ?? false;
         if (next[connection.id] !== current[connection.id]) {
           changed = true;
         }
@@ -2296,26 +2296,26 @@ export default function SyncSettingsPanel({
 
   return (
     <section className="sync-settings-shell">
-      <header className="sync-settings-header">
-        <div className="sync-settings-header-main">
-          <button type="button" className="sync-settings-back" onClick={onBack}>
-            <span className="sync-settings-back-icon" aria-hidden="true">
-              <ChevronLeftGlyph />
-            </span>
-            <span>{t("settings.back")}</span>
-          </button>
-          <div className="sync-settings-heading">
-            <p className="panel-kicker sync-settings-kicker">{t("settings.syncKicker")}</p>
-            <h2 className="panel-title sync-settings-title">{t("settings.syncTitle")}</h2>
-            <p className="sync-settings-caption">{t("settings.syncManagerIntro")}</p>
-          </div>
-        </div>
-        <span className={`status-chip ${online ? "online" : "offline"}`}>
-          {online ? t("settings.networkOnline") : t("settings.networkOffline")}
+      <button
+        type="button"
+        className="sync-settings-back sync-settings-back-floating"
+        onClick={onBack}
+        aria-label={t("settings.back")}
+        title={t("settings.back")}
+      >
+        <span className="sync-settings-back-icon" aria-hidden="true">
+          <ChevronLeftGlyph />
         </span>
+      </button>
+
+      <header className="sync-settings-header">
+        <div className="sync-settings-heading">
+          <h2 className="panel-title sync-settings-title">{t("settings.syncTitle")}</h2>
+          <p className="sync-settings-caption">{t("settings.syncManagerIntro")}</p>
+        </div>
       </header>
 
-      <div className="sync-settings-stage" ref={stageRef}>
+      <div className="sync-settings-columns-shell" ref={stageRef}>
         <svg className="sync-settings-links" aria-hidden="true">
           {linkMetrics.map((metric) => (
             <g key={metric.id}>
@@ -2367,219 +2367,225 @@ export default function SyncSettingsPanel({
 
         <div className="sync-settings-columns">
           <section className="sync-settings-column is-vaults">
-            <div className="sync-settings-column-head">
-              <div className="sync-settings-column-copy">
-                <span className="setting-label">{t("settings.vaultsTitle")}</span>
-                <p>{t("settings.vaultsDescription")}</p>
-              </div>
-              <button
-                type="button"
-                className="sync-settings-icon-button"
-                onClick={openCreateVaultModal}
-                title={t("sync.localVaultCreate")}
-              >
-                <PlusGlyph />
-              </button>
-            </div>
-
-            <div className="sync-settings-card-list" ref={vaultListRef}>
-              {sortedVaults.map((vault) => {
-                const isActive = vault.id === activeLocalVaultId;
-                const isSelected = vault.id === selectedLocalVaultId;
-                const binding = bindingsByVaultId.get(vault.id) ?? null;
-                const bindingConnection = binding ? connectionsById.get(binding.connectionId) ?? null : null;
-                const encryption = resolveVaultEncryptionSummary(vault);
-                const privateEncryptionVisible =
-                  vault.vaultKind === "private" && encryption.state !== "disabled";
-                const needsUnlock =
-                  (binding?.lastError === "VAULT_ENCRYPTION_LOCKED" || encryption.state === "locked") &&
-                  encryption.enabled;
-                const statusLabel = !binding
-                  ? t("settings.statusUnbound")
-                  : needsUnlock
-                    ? t("settings.statusUnlockRequired")
-                    : binding.syncStatus === "syncing"
-                    ? t("settings.statusSyncing")
-                    : binding.syncStatus === "error"
-                      ? t("settings.statusError")
-                      : t("settings.statusReady");
-
-                return (
-                  <article
-                    key={vault.id}
-                    ref={(node) => registerVaultRef(vault.id, node)}
-                    className={`sync-settings-card sync-settings-vault-card ${isSelected ? "is-selected" : ""} ${isActive ? "is-active" : ""} ${pendingBindVaultId === vault.id ? "is-binding-source" : ""}`}
-                    onClick={() => onSelectLocalVault(vault.id)}
+              <div className="sync-settings-column-head">
+                <div className="sync-settings-column-copy">
+                  <span className="setting-label">{t("settings.vaultsTitle")}</span>
+                  <p>{t("settings.vaultsDescription")}</p>
+                </div>
+                <div className="sync-settings-column-actions">
+                  <span className="sync-settings-column-pill is-vaults">{sortedVaults.length}</span>
+                  <button
+                    type="button"
+                    className="sync-settings-icon-button"
+                    onClick={openCreateVaultModal}
+                    title={t("sync.localVaultCreate")}
                   >
-                    <div className="sync-settings-card-main">
-                      <div className="sync-settings-card-copy">
-                        <div className="sync-settings-chip-row sync-settings-chip-row-card">
-                          {isActive ? <span className="sync-settings-chip is-accent">{t("sync.localVaultActive")}</span> : null}
-                          {vault.vaultKind === "private" ? (
-                            <span className="sync-settings-chip is-private">
-                              {t("settings.vaultKindPrivate")}
-                            </span>
-                          ) : (
-                            <span className="sync-settings-chip is-default">
-                              {t("settings.vaultKindRegular")}
-                            </span>
-                          )}
-                          {privateEncryptionVisible ? (
+                    <PlusGlyph />
+                  </button>
+                </div>
+              </div>
+
+              <div className="sync-settings-card-list" ref={vaultListRef}>
+                {sortedVaults.map((vault) => {
+                  const isActive = vault.id === activeLocalVaultId;
+                  const isSelected = vault.id === selectedLocalVaultId;
+                  const binding = bindingsByVaultId.get(vault.id) ?? null;
+                  const bindingConnection = binding ? connectionsById.get(binding.connectionId) ?? null : null;
+                  const encryption = resolveVaultEncryptionSummary(vault);
+                  const privateEncryptionVisible =
+                    vault.vaultKind === "private" && encryption.state !== "disabled";
+                  const needsUnlock =
+                    (binding?.lastError === "VAULT_ENCRYPTION_LOCKED" || encryption.state === "locked") &&
+                    encryption.enabled;
+                  const statusLabel = !binding
+                    ? t("settings.statusUnbound")
+                    : needsUnlock
+                      ? t("settings.statusUnlockRequired")
+                      : binding.syncStatus === "syncing"
+                        ? t("settings.statusSyncing")
+                        : binding.syncStatus === "error"
+                          ? t("settings.statusError")
+                          : t("settings.statusReady");
+
+                  return (
+                    <article
+                      key={vault.id}
+                      ref={(node) => registerVaultRef(vault.id, node)}
+                      className={`sync-settings-card sync-settings-vault-card ${isSelected ? "is-selected" : ""} ${isActive ? "is-active" : ""} ${pendingBindVaultId === vault.id ? "is-binding-source" : ""}`}
+                      onClick={() => onSelectLocalVault(vault.id)}
+                    >
+                      <div className="sync-settings-card-main">
+                        <div className="sync-settings-card-copy">
+                          <div className="sync-settings-chip-row sync-settings-chip-row-card">
+                            {isActive ? <span className="sync-settings-chip is-accent">{t("sync.localVaultActive")}</span> : null}
+                            {vault.vaultKind === "private" ? (
+                              <span className="sync-settings-chip is-private">
+                                {t("settings.vaultKindPrivate")}
+                              </span>
+                            ) : (
+                              <span className="sync-settings-chip is-default">
+                                {t("settings.vaultKindRegular")}
+                              </span>
+                            )}
+                            {privateEncryptionVisible ? (
+                              <span
+                                className={`sync-settings-chip ${
+                                  encryption.state === "ready" ? "is-encrypted-ready" : "is-encrypted-locked"
+                                }`}
+                              >
+                                {encryption.state === "ready"
+                                  ? t("settings.vaultEncryptionReady")
+                                  : t("settings.vaultEncryptionLocked")}
+                              </span>
+                            ) : null}
                             <span
                               className={`sync-settings-chip ${
-                                encryption.state === "ready" ? "is-encrypted-ready" : "is-encrypted-locked"
-                              }`}
-                            >
-                              {encryption.state === "ready"
-                                ? t("settings.vaultEncryptionReady")
-                                : t("settings.vaultEncryptionLocked")}
-                            </span>
-                          ) : null}
-                          <span
-                            className={`sync-settings-chip ${
-                              !bindingConnection
-                                ? "is-unbound"
-                                : needsUnlock
-                                  ? "is-info"
-                                  : binding?.syncStatus === "error"
-                                  ? "is-error"
-                                  : binding?.syncStatus === "syncing"
+                                !bindingConnection
+                                  ? "is-unbound"
+                                  : needsUnlock
                                     ? "is-info"
-                                    : "is-ready"
-                            }`}
-                          >
-                            {statusLabel}
-                          </span>
-                        </div>
-                        <div className="sync-settings-card-titleline">
-                          <span
-                            className="sync-settings-card-icon"
-                            style={{ "--item-color": bindingConnection ? providerAccent(bindingConnection.provider) : "#e7d6a2" } as CSSProperties}
-                          >
-                            <VaultGlyph />
-                          </span>
-                          {privateEncryptionVisible ? (
-                            <span
-                              className={`sync-settings-encryption-badge ${
-                                encryption.state === "ready" ? "is-ready" : "is-locked"
+                                    : binding?.syncStatus === "error"
+                                      ? "is-error"
+                                      : binding?.syncStatus === "syncing"
+                                        ? "is-info"
+                                        : "is-ready"
                               }`}
-                              title={
-                                encryption.state === "ready"
-                                  ? t("settings.vaultEncryptionReady")
-                                  : t("settings.vaultEncryptionLocked")
-                              }
                             >
-                              <LockGlyph />
+                              {statusLabel}
+                            </span>
+                          </div>
+                          <div className="sync-settings-card-titleline">
+                            <span
+                              className="sync-settings-card-icon"
+                              style={{ "--item-color": bindingConnection ? providerAccent(bindingConnection.provider) : "#e7d6a2" } as CSSProperties}
+                            >
+                              <VaultGlyph />
+                            </span>
+                            {privateEncryptionVisible ? (
+                              <span
+                                className={`sync-settings-encryption-badge ${
+                                  encryption.state === "ready" ? "is-ready" : "is-locked"
+                                }`}
+                                title={
+                                  encryption.state === "ready"
+                                    ? t("settings.vaultEncryptionReady")
+                                    : t("settings.vaultEncryptionLocked")
+                                }
+                              >
+                                <LockGlyph />
+                              </span>
+                            ) : null}
+                            <strong>{getVaultLabel(vault)}</strong>
+                          </div>
+                          <span className="sync-settings-card-meta">
+                            {bindingConnection
+                              ? t("settings.boundToConnection", {
+                                  connection: bindingConnection.label
+                                })
+                              : t("sync.localVaultUnbound")}
+                          </span>
+                          {binding ? (
+                            <span className="sync-settings-card-submeta">
+                              {binding.remoteVaultName} · {formatTime(binding.lastSyncAt, i18n.language)}
                             </span>
                           ) : null}
-                          <strong>{getVaultLabel(vault)}</strong>
                         </div>
-                        <span className="sync-settings-card-meta">
-                          {bindingConnection
-                            ? t("settings.boundToConnection", {
-                                connection: bindingConnection.label
-                              })
-                            : t("sync.localVaultUnbound")}
-                        </span>
-                          {binding ? (
-                          <span className="sync-settings-card-submeta">
-                            {binding.remoteVaultName} · {formatTime(binding.lastSyncAt, i18n.language)}
-                          </span>
-                        ) : null}
                       </div>
-                    </div>
 
-                    <div className="sync-settings-card-actions">
-                      {privateEncryptionVisible ? (
+                      <div className="sync-settings-card-actions">
+                        {privateEncryptionVisible ? (
+                          <button
+                            type="button"
+                            className={`sync-settings-icon-button ${
+                              encryption.state === "ready" ? "is-encryption-ready" : ""
+                            }`}
+                            title={
+                              encryption.state === "ready"
+                                ? t("settings.manageVaultEncryption")
+                                : t("settings.unlockVaultEncryption")
+                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openVaultEncryptionModal(vault, {
+                                view: encryption.state === "locked" ? "unlock" : "default"
+                              });
+                            }}
+                          >
+                            <LockGlyph />
+                          </button>
+                        ) : null}
                         <button
                           type="button"
-                          className={`sync-settings-icon-button ${
-                            encryption.state === "ready" ? "is-encryption-ready" : ""
-                          }`}
-                          title={
-                            encryption.state === "ready"
-                              ? t("settings.manageVaultEncryption")
-                              : t("settings.unlockVaultEncryption")
-                          }
+                          className="sync-settings-icon-button sync-settings-link-handle"
+                          title={t("settings.linkVault")}
+                          onPointerDown={(event) => startLinkDraft(event, vault.id)}
                           onClick={(event) => {
                             event.stopPropagation();
-                            openVaultEncryptionModal(vault, {
-                              view: encryption.state === "locked" ? "unlock" : "default"
-                            });
+                            setPendingBindVaultId(vault.id);
                           }}
                         >
-                          <LockGlyph />
+                          <LinkGlyph />
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="sync-settings-icon-button sync-settings-link-handle"
-                        title={t("settings.linkVault")}
-                        onPointerDown={(event) => startLinkDraft(event, vault.id)}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setPendingBindVaultId(vault.id);
-                        }}
-                      >
-                        <LinkGlyph />
-                      </button>
-                      {binding ? (
+                        {binding ? (
+                          <button
+                            type="button"
+                            className="sync-settings-icon-button"
+                            title={t("settings.disconnectVault")}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void onClearBinding(vault.id);
+                            }}
+                          >
+                            <UnlinkGlyph />
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="sync-settings-icon-button"
-                          title={t("settings.disconnectVault")}
+                          title={t("sync.localVaultRename")}
                           onClick={(event) => {
                             event.stopPropagation();
-                            void onClearBinding(vault.id);
+                            openRenameVaultModal(vault);
                           }}
                         >
-                          <UnlinkGlyph />
+                          <EditGlyph />
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="sync-settings-icon-button"
-                        title={t("sync.localVaultRename")}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          openRenameVaultModal(vault);
-                        }}
-                      >
-                        <EditGlyph />
-                      </button>
-                      <button
-                        type="button"
-                        className="sync-settings-icon-button is-danger"
-                        title={t("sync.localVaultDelete")}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          requestDeleteLocalVault(vault);
-                        }}
-                      >
-                        <TrashGlyph />
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="sync-settings-column is-connections">
-            <div className="sync-settings-column-head">
-              <div className="sync-settings-column-copy">
-                <span className="setting-label">{t("settings.connectionsTitle")}</span>
-                <p>{t("settings.connectionsDescription")}</p>
+                        <button
+                          type="button"
+                          className="sync-settings-icon-button is-danger"
+                          title={t("sync.localVaultDelete")}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            requestDeleteLocalVault(vault);
+                          }}
+                        >
+                          <TrashGlyph />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
-              <button
-                type="button"
-                className="sync-settings-icon-button"
-                onClick={() => setPanelModal({ kind: "addConnection" })}
-                title={t("settings.addConnection")}
-              >
-                <PlusGlyph />
-              </button>
-            </div>
+            </section>
+
+            <section className="sync-settings-column is-connections">
+              <div className="sync-settings-column-head">
+                <div className="sync-settings-column-copy">
+                  <span className="setting-label">{t("settings.connectionsTitle")}</span>
+                  <p>{t("settings.connectionsDescription")}</p>
+                </div>
+                <div className="sync-settings-column-actions">
+                  <span className="sync-settings-column-pill is-connections">{syncConnections.length}</span>
+                  <button
+                    type="button"
+                    className="sync-settings-icon-button"
+                    onClick={() => setPanelModal({ kind: "addConnection" })}
+                    title={t("settings.addConnection")}
+                  >
+                    <PlusGlyph />
+                  </button>
+                </div>
+              </div>
 
             <div className="sync-settings-card-list" ref={connectionListRef}>
               {syncConnections.length === 0 ? (
@@ -2595,7 +2601,7 @@ export default function SyncSettingsPanel({
                   const remoteCount = remoteVaults.length;
                   const remoteError = remoteVaultErrors[connection.id] ?? null;
                   const isRemoteLoading = remoteVaultLoading[connection.id] ?? false;
-                  const remoteSectionExpanded = expandedRemoteConnectionIds[connection.id] ?? true;
+                  const remoteSectionExpanded = expandedRemoteConnectionIds[connection.id] ?? false;
                   const canBindSelected = pendingBindVaultId !== null;
                   const availability = online
                     ? connectionAvailability[connection.id] ?? "checking"
@@ -2654,12 +2660,6 @@ export default function SyncSettingsPanel({
                                   ? t("sync.googleDrive")
                                   : t("sync.selfHosted")}
                             </span>
-                            <span className="sync-settings-chip is-count">
-                              {t("settings.linkedVaultCount", { count: boundCount })}
-                            </span>
-                            <span className="sync-settings-chip is-neutral">
-                              {t("settings.remoteVaultCount", { count: remoteCount })}
-                            </span>
                             <span className={`sync-settings-chip ${availabilityChipClass}`}>{availabilityLabel}</span>
                           </div>
                           <div className="sync-settings-card-titleline">
@@ -2682,6 +2682,22 @@ export default function SyncSettingsPanel({
                                 ? t("settings.googleDriveSessionReady")
                               : `${t("sync.managementToken")}: ${maskToken(connection.managementToken)}`}
                           </span>
+                          <div className="sync-settings-connection-stats">
+                            <span className="sync-settings-mini-chip">
+                              {t("settings.linkedVaultCount", { count: boundCount })}
+                            </span>
+                            <span className="sync-settings-mini-chip">
+                              {t("settings.remoteVaultCount", { count: remoteCount })}
+                            </span>
+                            {previewNames.map((name) => (
+                              <span key={`${connection.id}-${name}`} className="sync-settings-mini-chip">
+                                {name}
+                              </span>
+                            ))}
+                            {boundCount > previewNames.length ? (
+                              <span className="sync-settings-mini-chip">+{boundCount - previewNames.length}</span>
+                            ) : null}
+                          </div>
                           {canRepairSelfHostedAuth ? (
                             <div className="sync-settings-card-actions">
                               <button
@@ -2699,19 +2715,6 @@ export default function SyncSettingsPanel({
                           ) : null}
                         </div>
                       </div>
-
-                      {previewNames.length > 0 ? (
-                        <div className="sync-settings-preview-chips">
-                          {previewNames.map((name) => (
-                            <span key={`${connection.id}-${name}`} className="sync-settings-mini-chip">
-                              {name}
-                            </span>
-                          ))}
-                          {boundCount > previewNames.length ? (
-                            <span className="sync-settings-mini-chip">+{boundCount - previewNames.length}</span>
-                          ) : null}
-                        </div>
-                      ) : null}
 
                       <div className="sync-settings-remote-section" onClick={(event) => event.stopPropagation()}>
                         <div className="sync-settings-remote-head">
@@ -3038,94 +3041,6 @@ export default function SyncSettingsPanel({
           </button>
         </div>
       ) : null}
-
-      <div className="sync-settings-footer">
-        <div className="sync-settings-footer-copy">
-          <strong>{selectedVault?.name ?? t("sync.localVault")}</strong>
-          <span>
-            {selectedVaultBinding &&
-            selectedVaultEncryption?.enabled &&
-            (selectedVaultEncryption.state === "locked" ||
-              selectedVaultBinding.lastError === "VAULT_ENCRYPTION_LOCKED")
-              ? t("settings.vaultEncryptionUnlockToContinueSync")
-              : selectedVaultConnection && selectedVaultBinding
-              ? `${selectedVaultConnection.label} · ${formatTime(selectedVaultBinding.lastSyncAt, i18n.language)}`
-              : t("settings.statusUnbound")}
-          </span>
-        </div>
-        <div className="sync-settings-footer-actions">
-          <button
-            type="button"
-            className="sync-settings-primary-action"
-            onClick={() => {
-              if (!selectedVault) {
-                return;
-              }
-
-              void (async () => {
-                if (
-                  selectedVaultConnection?.provider === "selfHosted" &&
-                  connectionAvailability[selectedVaultConnection.id] === "authError"
-                ) {
-                  openSelfHostedConnectionModal(selectedVaultConnection);
-                  return;
-                }
-
-                if (
-                  selectedVaultBinding &&
-                  selectedVaultEncryption?.enabled &&
-                  (selectedVaultEncryption.state === "locked" ||
-                    selectedVaultBinding.lastError === "VAULT_ENCRYPTION_LOCKED")
-                ) {
-                  setInternalFeedback(null);
-                  openVaultEncryptionModal(selectedVault, {
-                    view: "unlock",
-                    continuation: "sync",
-                    continuationAction: async () => {
-                      await onRunVaultSync(selectedVault.id);
-                    }
-                  });
-                  return;
-                }
-
-                if (
-                  selectedVaultConnection?.provider === "googleDrive" &&
-                  connectionAvailability[selectedVaultConnection.id] === "authError"
-                ) {
-                  try {
-                    setBusyKey(`reauth:${selectedVaultConnection.id}`);
-                    await reauthorizeGoogleDriveConnection(selectedVaultConnection);
-                  } catch (error) {
-                    const message = error instanceof Error ? error.message : "SYNC_FAILED";
-                    showFeedback("error", translateSyncManagerError(message, t));
-                    setBusyKey(null);
-                    return;
-                  } finally {
-                    setBusyKey((current) =>
-                      current === `reauth:${selectedVaultConnection.id}` ? null : current
-                    );
-                  }
-                }
-
-                await onRunVaultSync(selectedVault.id);
-              })();
-            }}
-            disabled={!selectedVaultBinding || selectedVaultBinding.syncStatus === "syncing"}
-          >
-            {selectedVaultBinding?.syncStatus === "syncing"
-              ? t("sync.syncing")
-              : selectedVaultConnection?.provider === "selfHosted" &&
-                  connectionAvailability[selectedVaultConnection.id] === "authError"
-                ? t("settings.selfHostedReconnect")
-              : selectedVaultBinding &&
-                  selectedVaultEncryption?.enabled &&
-                  (selectedVaultEncryption.state === "locked" ||
-                    selectedVaultBinding.lastError === "VAULT_ENCRYPTION_LOCKED")
-                ? t("settings.unlockVaultEncryption")
-                : t("sync.syncNow")}
-          </button>
-        </div>
-      </div>
 
       {feedback ? (
         <div className={`sync-settings-feedback ${feedback.tone === "error" ? "is-error" : "is-success"}`}>

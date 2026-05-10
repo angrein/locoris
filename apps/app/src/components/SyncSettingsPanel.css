@@ -1,53 +1,73 @@
 .sync-settings-shell {
-  display: grid;
-  gap: 14px;
+  width: min(100%, 1180px);
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-width: 0;
+  min-height: 0;
+  position: relative;
 }
 
 .sync-settings-header,
-.sync-settings-stage,
+.sync-settings-columns-shell,
 .sync-settings-binding-hint,
-.sync-settings-footer,
 .sync-settings-feedback {
-  border-radius: 22px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
+  border-radius: 24px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
   background:
-    linear-gradient(180deg, rgba(15, 18, 34, 0.95), rgba(8, 10, 20, 0.95)),
-    rgba(8, 10, 20, 0.95);
+    linear-gradient(180deg, rgba(15, 18, 34, 0.95), rgba(8, 10, 20, 0.96)),
+    rgba(8, 10, 20, 0.96);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 18px 42px rgba(2, 4, 12, 0.18);
+    inset 0 1px 0 rgba(255, 255, 255, 0.034),
+    0 16px 40px rgba(2, 4, 12, 0.16);
 }
 
 .sync-settings-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px;
-}
-
-.sync-settings-header-main {
-  min-width: 0;
-  display: grid;
-  gap: 10px;
+  display: block;
+  padding: 35px 15px 10px 15px;
 }
 
 .sync-settings-back {
-  width: fit-content;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
   padding: 0;
-  border: 0;
-  background: transparent;
-  color: rgba(239, 243, 255, 0.86);
-  font-size: 0.72rem;
-  line-height: 1;
+  border-radius: 999px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.022)),
+    rgba(8, 10, 20, 0.74);
+  color: rgba(241, 245, 255, 0.88);
+  backdrop-filter: blur(14px);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.sync-settings-back-floating {
+  position: absolute;
+  top: -2px;
+  left: 2px;
+  z-index: 2;
 }
 
 .sync-settings-back:hover {
-  color: rgba(255, 240, 188, 0.94);
+  border-color: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 22%, rgba(147, 173, 255, 0.14));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 8%, rgba(8, 10, 20, 0.78));
+  color: rgba(255, 250, 230, 0.96);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
+  transform: translateY(-1px);
 }
 
 .sync-settings-back-icon,
@@ -64,14 +84,16 @@
 }
 
 .sync-settings-icon-button {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   padding: 0;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
-  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.02);
   color: rgba(234, 238, 255, 0.84);
   transition:
     border-color 160ms ease,
@@ -81,7 +103,9 @@
 
 .sync-settings-icon-button:hover {
   border-color: rgba(255, 224, 138, 0.16);
-  background: rgba(255, 224, 138, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 224, 138, 0.07), rgba(255, 255, 255, 0.02)),
+    rgba(255, 224, 138, 0.05);
   color: rgba(255, 240, 191, 0.94);
 }
 
@@ -168,32 +192,71 @@
 .sync-settings-heading {
   min-width: 0;
   display: grid;
-  gap: 6px;
-}
-
-.sync-settings-kicker {
-  color: rgba(255, 224, 138, 0.82);
+  gap: 3px;
 }
 
 .sync-settings-title {
   margin: 0;
-  font-size: 1rem;
-  line-height: 1.2;
+  font-size: 0.88rem;
+  line-height: 1.14;
   letter-spacing: 0.03em;
 }
 
 .sync-settings-caption {
   margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.58;
+  max-width: none;
+  font-size: 0.69rem;
+  line-height: 1.4;
   color: rgba(196, 203, 235, 0.78);
 }
 
-.sync-settings-stage {
+.sync-settings-columns-shell {
   position: relative;
-  padding: 12px;
-  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
+  padding: 12px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.sync-settings-column-actions,
+.sync-settings-connection-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sync-settings-column-pill {
+  min-height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.67rem;
+  line-height: 1;
+  color: rgba(238, 242, 255, 0.84);
+}
+
+.sync-settings-column-pill.is-vaults {
+  border-color: rgba(255, 224, 138, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 224, 138, 0.08), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+  color: rgba(255, 242, 204, 0.95);
+}
+
+.sync-settings-column-pill.is-connections {
+  border-color: rgba(115, 247, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(115, 247, 255, 0.08), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+  color: rgba(206, 252, 255, 0.95);
 }
 
 .sync-settings-links {
@@ -264,66 +327,42 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 18px;
-  align-items: start;
+  grid-template-columns: minmax(300px, 0.92fr) minmax(340px, 1.08fr);
+  gap: 12px;
+  align-items: stretch;
   min-height: 0;
-}
-
-.sync-settings-columns::before {
-  content: "";
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-  background: linear-gradient(
-    180deg,
-    transparent,
-    rgba(115, 247, 255, 0.12) 20%,
-    rgba(255, 224, 138, 0.16) 50%,
-    rgba(168, 195, 255, 0.12) 80%,
-    transparent
-  );
-  box-shadow: 0 0 18px rgba(115, 247, 255, 0.08);
-  pointer-events: none;
+  height: 100%;
 }
 
 .sync-settings-column {
-  position: relative;
   min-width: 0;
   min-height: 0;
-  align-self: start;
+  align-self: stretch;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   padding: 12px;
-  border-radius: 22px;
-  border: 1px solid rgba(147, 173, 255, 0.08);
+  border-radius: 20px;
+  border: 1px solid rgba(147, 173, 255, 0.1);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.016), rgba(255, 255, 255, 0.008)),
-    rgba(255, 255, 255, 0.01);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.024);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.012);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.028),
+    0 14px 30px rgba(2, 4, 12, 0.1);
+  overflow: hidden;
 }
 
-.sync-settings-column::after {
-  content: "";
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 0;
-  height: 1px;
-  border-radius: 999px;
-  pointer-events: none;
+.sync-settings-column.is-vaults {
+  background:
+    linear-gradient(180deg, rgba(255, 224, 138, 0.06), rgba(255, 255, 255, 0.012) 32%, rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.012);
 }
 
-.sync-settings-column.is-vaults::after {
-  background: linear-gradient(90deg, rgba(255, 224, 138, 0.34), transparent 78%);
-}
-
-.sync-settings-column.is-connections::after {
-  background: linear-gradient(90deg, rgba(115, 247, 255, 0.34), transparent 78%);
+.sync-settings-column.is-connections {
+  background:
+    linear-gradient(180deg, rgba(115, 247, 255, 0.06), rgba(255, 255, 255, 0.012) 32%, rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.012);
 }
 
 .sync-settings-column-head {
@@ -342,22 +381,23 @@
 
 .sync-settings-column-copy p {
   margin: 0;
-  font-size: 0.74rem;
-  line-height: 1.55;
+  font-size: 0.68rem;
+  line-height: 1.4;
   color: rgba(188, 195, 228, 0.74);
 }
 
 .sync-settings-card-list {
   display: grid;
-  gap: 6px;
+  gap: 10px;
   min-width: 0;
   min-height: 0;
-  max-height: min(56vh, 480px);
+  max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
   align-content: start;
   grid-auto-rows: max-content;
-  padding-right: 4px;
+  padding-right: 2px;
+  overscroll-behavior: contain;
 }
 
 .sync-settings-card-list > * {
@@ -371,29 +411,45 @@
   display: grid;
   gap: 10px;
   min-width: 0;
-  padding: 11px 12px;
+  padding: 15px;
   align-self: start;
   align-content: start;
-  border-radius: 18px;
-  border: 1px solid rgba(147, 173, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border-radius: 20px;
+  border: 1px solid rgba(147, 173, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.02);
   transition:
     border-color 160ms ease,
     background 160ms ease,
-    box-shadow 160ms ease;
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 .sync-settings-card:hover,
 .sync-settings-provider-card:hover {
+  box-shadow: 0 16px 34px rgba(2, 4, 12, 0.14);
+  transform: translateY(-1px);
+}
+
+.sync-settings-vault-card:hover,
+.sync-settings-provider-card:hover {
   border-color: rgba(255, 224, 138, 0.16);
   background:
-    linear-gradient(180deg, rgba(255, 224, 138, 0.04), rgba(255, 255, 255, 0.012)),
-    rgba(255, 255, 255, 0.028);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+    linear-gradient(180deg, rgba(255, 224, 138, 0.06), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.026);
+}
+
+.sync-settings-connection-card:hover,
+.sync-settings-remote-card:hover {
+  border-color: rgba(115, 247, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(115, 247, 255, 0.06), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.026);
 }
 
 .sync-settings-empty-card {
-  padding: 14px 12px;
+  padding: 18px 16px;
 }
 
 .sync-settings-empty-card strong {
@@ -412,14 +468,14 @@
 .sync-settings-connection-card.is-bind-target {
   border-color: rgba(255, 224, 138, 0.18);
   background:
-    linear-gradient(180deg, rgba(255, 224, 138, 0.055), rgba(255, 255, 255, 0.014)),
-    rgba(255, 255, 255, 0.032);
+    linear-gradient(180deg, rgba(255, 224, 138, 0.08), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.03);
 }
 
 .sync-settings-vault-card.is-active {
   border-color: rgba(115, 247, 255, 0.18);
   background:
-    linear-gradient(180deg, rgba(115, 247, 255, 0.05), rgba(255, 255, 255, 0.014)),
+    linear-gradient(180deg, rgba(115, 247, 255, 0.08), rgba(255, 255, 255, 0.016)),
     rgba(255, 255, 255, 0.03);
 }
 
@@ -432,7 +488,7 @@
 .sync-settings-connection-card {
   gap: 8px;
   min-width: 0;
-  padding: 10px 11px;
+  padding: 13px;
   border-color: color-mix(in srgb, var(--connection-accent, rgba(147, 173, 255, 0.08)) 14%, rgba(147, 173, 255, 0.08));
 }
 
@@ -441,7 +497,7 @@
 }
 
 .sync-settings-connection-card .sync-settings-card-copy {
-  gap: 2px;
+  gap: 3px;
 }
 
 .sync-settings-connection-card .sync-settings-card-actions-wide {
@@ -577,23 +633,22 @@
 
 .sync-settings-chip-row-card {
   width: 100%;
-  padding-bottom: 2px;
+  padding-bottom: 0;
 }
 
 .sync-settings-chip,
 .sync-settings-mini-chip {
-  min-height: 22px;
-  padding: 0 8px;
+  min-height: 24px;
+  padding: 0 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
-  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
   font-size: 0.64rem;
   line-height: 1;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: rgba(238, 242, 255, 0.86);
 }
 
@@ -701,14 +756,14 @@
 
 .sync-settings-remote-section {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  padding: 10px 10px 8px;
-  border-radius: 16px;
-  border: 1px solid rgba(147, 173, 255, 0.08);
+  padding: 13px;
+  border-radius: 18px;
+  border: 1px solid rgba(147, 173, 255, 0.1);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.008)),
-    rgba(255, 255, 255, 0.012);
+    linear-gradient(180deg, rgba(115, 247, 255, 0.05), rgba(255, 255, 255, 0.012) 26%, rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.014);
 }
 
 .sync-settings-remote-head,
@@ -766,13 +821,23 @@
   display: grid;
   gap: 8px;
   min-width: 0;
-  padding: 9px 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(147, 173, 255, 0.08);
-  background: rgba(255, 255, 255, 0.018);
+  padding: 11px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(147, 173, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(124, 232, 188, 0.05), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.018);
+}
+
+.sync-settings-remote-card:hover {
+  border-color: rgba(124, 232, 188, 0.18);
+  background:
+    linear-gradient(180deg, rgba(124, 232, 188, 0.08), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.024);
 }
 
 .sync-settings-remote-card .sync-settings-card-copy {
+  min-width: 0;
   gap: 2px;
 }
 
@@ -780,14 +845,32 @@
   gap: 8px;
 }
 
+.sync-settings-remote-card .sync-settings-card-titleline strong,
+.sync-settings-remote-card .sync-settings-card-meta,
+.sync-settings-remote-card .sync-settings-card-submeta {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
 .sync-settings-remote-card .sync-settings-card-actions {
   justify-content: flex-start;
+  min-width: 0;
+  align-items: stretch;
 }
 
 .sync-settings-remote-card .sync-settings-inline-action {
   min-height: 29px;
   padding: 0 10px;
   font-size: 0.68rem;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 170px;
+}
+
+.sync-settings-remote-card .sync-settings-card-actions .sync-settings-icon-button {
+  flex: 0 0 auto;
 }
 
 .sync-settings-remote-empty.is-error {
@@ -811,14 +894,16 @@
 
 .sync-settings-inline-action,
 .sync-settings-primary-action {
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 36px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.022);
   color: rgba(239, 243, 255, 0.9);
   font-size: 0.72rem;
   line-height: 1;
@@ -832,8 +917,11 @@
 .sync-settings-inline-action:hover,
 .sync-settings-primary-action:hover {
   border-color: rgba(255, 224, 138, 0.16);
-  background: rgba(255, 224, 138, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 224, 138, 0.08), rgba(255, 255, 255, 0.022)),
+    rgba(255, 224, 138, 0.05);
   color: rgba(255, 241, 197, 0.96);
+  transform: translateY(-1px);
 }
 
 .sync-settings-inline-action.is-danger:hover {
@@ -845,8 +933,8 @@
 .sync-settings-primary-action {
   border-color: rgba(255, 224, 138, 0.18);
   background:
-    linear-gradient(180deg, rgba(255, 224, 138, 0.07), rgba(255, 255, 255, 0.014)),
-    rgba(255, 255, 255, 0.032);
+    linear-gradient(180deg, rgba(255, 224, 138, 0.1), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.036);
 }
 
 .sync-settings-primary-action.is-danger {
@@ -882,50 +970,45 @@
 }
 
 .sync-settings-binding-hint,
-.sync-settings-footer,
 .sync-settings-feedback {
-  padding: 12px 14px;
+  padding: 8px 12px;
 }
 
-.sync-settings-binding-hint,
-.sync-settings-footer {
+.sync-settings-binding-hint {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
-.sync-settings-binding-copy,
-.sync-settings-footer-copy {
+.sync-settings-binding-copy {
   min-width: 0;
   flex: 1;
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .sync-settings-binding-copy strong,
-.sync-settings-footer-copy strong,
 .sync-settings-provider-copy strong {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   line-height: 1.3;
   font-weight: 600;
   color: rgba(244, 247, 255, 0.96);
 }
 
 .sync-settings-binding-copy span,
-.sync-settings-footer-copy span,
 .sync-settings-provider-copy span,
 .sync-settings-modal-copy {
   margin: 0;
-  font-size: 0.72rem;
-  line-height: 1.55;
+  font-size: 0.65rem;
+  line-height: 1.35;
   color: rgba(187, 194, 226, 0.76);
 }
 
 .sync-settings-feedback {
-  font-size: 0.74rem;
-  line-height: 1.5;
+  font-size: 0.65rem;
+  line-height: 1.35;
   color: rgba(244, 247, 255, 0.94);
 }
 
@@ -958,28 +1041,40 @@
   inset: 0;
   background: rgba(4, 6, 14, 0.62);
   backdrop-filter: blur(8px);
+  outline: none;
+  box-shadow: none;
 }
 
 .sync-settings-modal-card {
   position: relative;
   z-index: 1;
-  width: min(560px, calc(100vw - 36px));
+  width: min(600px, calc(100vw - 36px));
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 24px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  gap: 14px;
+  padding: 18px;
+  border-radius: 28px;
+  border: 1px solid rgba(147, 173, 255, 0.14);
   background:
-    radial-gradient(circle at top right, rgba(255, 224, 138, 0.08), transparent 26%),
     linear-gradient(180deg, rgba(18, 20, 38, 0.98), rgba(8, 10, 19, 0.98)),
     rgba(8, 10, 19, 0.98);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 30px 80px rgba(1, 2, 10, 0.34);
+    0 34px 84px rgba(1, 2, 10, 0.36);
+  outline: none;
+}
+
+.sync-settings-modal-dim:focus,
+.sync-settings-modal-dim:focus-visible,
+.sync-settings-modal-card:focus,
+.sync-settings-modal-card:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 34px 84px rgba(1, 2, 10, 0.36);
 }
 
 .sync-settings-modal-card.is-compact {
-  width: min(460px, calc(100vw - 36px));
+  width: min(500px, calc(100vw - 36px));
 }
 
 .sync-settings-modal-head {
@@ -997,7 +1092,7 @@
 
 .sync-settings-modal-heading h3 {
   margin: 0;
-  font-size: 0.96rem;
+  font-size: 1rem;
   line-height: 1.28;
   color: rgba(245, 247, 255, 0.98);
 }
@@ -1009,11 +1104,13 @@
 
 .sync-settings-input {
   width: 100%;
-  min-height: 42px;
-  padding: 0 13px;
-  border-radius: 14px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
-  background: rgba(255, 255, 255, 0.024);
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.024);
   color: rgba(245, 247, 255, 0.96);
   font-size: 0.8rem;
   line-height: 1;
@@ -1030,8 +1127,8 @@
 
 .sync-settings-input:focus {
   border-color: rgba(255, 224, 138, 0.2);
-  background: rgba(255, 255, 255, 0.03);
-  box-shadow: 0 0 0 3px rgba(255, 224, 138, 0.06);
+  background: rgba(255, 255, 255, 0.032);
+  box-shadow: 0 0 0 3px rgba(255, 224, 138, 0.07);
 }
 
 .sync-settings-vault-kind-picker {
@@ -1072,14 +1169,14 @@
 
 .sync-settings-provider-grid {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .sync-settings-provider-card {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   text-align: left;
 }
 
@@ -1097,12 +1194,12 @@
 .sync-settings-note-shell {
   display: grid;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(147, 173, 255, 0.12);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.008)),
-    rgba(255, 255, 255, 0.012);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.024), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.014);
 }
 
 .sync-settings-note-chip {
@@ -1191,6 +1288,17 @@
   color: rgba(255, 241, 197, 0.96);
 }
 
+.sync-settings-connection-stats {
+  padding-top: 3px;
+}
+
+.sync-settings-connection-stats .sync-settings-mini-chip {
+  border-color: rgba(147, 173, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.024);
+}
+
 @keyframes sync-settings-flow {
   from {
     stroke-dashoffset: 0;
@@ -1209,21 +1317,22 @@
   .sync-settings-columns {
     grid-template-columns: 1fr;
   }
-
-  .sync-settings-columns::before {
-    display: none;
-  }
 }
 
 @media (max-width: 720px) {
   .sync-settings-header,
-  .sync-settings-binding-hint,
-  .sync-settings-footer {
+  .sync-settings-binding-hint {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .sync-settings-footer-actions,
+  .sync-settings-header,
+  .sync-settings-columns-shell,
+  .sync-settings-binding-hint,
+  .sync-settings-feedback {
+    border-radius: 24px;
+  }
+
   .sync-settings-modal-actions {
     width: 100%;
     justify-content: stretch;
@@ -1244,11 +1353,6 @@
     flex-wrap: wrap;
   }
 
-  .sync-settings-card-list {
-    max-height: min(38vh, 300px);
-    overflow-x: hidden;
-  }
-
   .sync-settings-modal-layer {
     padding: 12px;
     align-items: flex-end;
@@ -1258,5 +1362,9 @@
   .sync-settings-modal-card.is-compact {
     width: min(100%, 100%);
     border-radius: 24px 24px 18px 18px;
+  }
+
+  .sync-settings-card-list {
+    padding-right: 2px;
   }
 }

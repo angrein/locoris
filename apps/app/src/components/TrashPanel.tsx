@@ -39,13 +39,10 @@ export default function TrashPanel({
     <section className="trash-panel-shell">
       <header className="trash-panel-header">
         <div className="trash-panel-heading">
-          <p className="panel-kicker trash-panel-kicker">{labels.title}</p>
           <h2 className="panel-title trash-panel-title">{labels.title}</h2>
-          <p className="trash-panel-caption">
-            {notes.length} {labels.noteCount}
-          </p>
+          {notes.length === 0 ? <p className="trash-panel-caption">{labels.emptyDescription}</p> : null}
         </div>
-        <div className="trash-panel-toolbar">
+        <div className="trash-panel-tools">
           <span className="trash-panel-chip">
             {notes.length} {labels.noteCount}
           </span>
@@ -62,55 +59,63 @@ export default function TrashPanel({
 
       {notes.length === 0 ? (
         <div className="trash-empty-card">
-          <strong>{labels.emptyTitle}</strong>
-          <p>{labels.emptyDescription}</p>
+          <div className="trash-empty-card-copy">
+            <strong>{labels.emptyTitle}</strong>
+            <p>{labels.emptyDescription}</p>
+          </div>
         </div>
       ) : (
-        <div className="trash-list">
-          {notes.map((note) => (
-            <article className="trash-card" key={note.id}>
-              <div className="trash-card-head">
-                <div className="trash-card-copy">
-                  <h3>{getDisplayNoteTitle(note, language)}</h3>
-                  <p>{getDisplayNotePreview(note, language)}</p>
-                </div>
-                <div className="trash-card-chip-stack">
-                  <span className="trash-card-chip is-type">
-                    {note.contentType === "canvas" ? labels.canvasType : labels.noteType}
-                  </span>
-                  <span className="trash-card-chip">
-                    {formatTimestamp(note.trashedAt ?? note.updatedAt, language)}
-                  </span>
-                </div>
-              </div>
+        <div className="trash-list-scroll">
+          <div className="trash-list">
+            {notes.map((note) => {
+              const deletedAt = formatTimestamp(note.trashedAt ?? note.updatedAt, language);
+              const folderLabel = note.folderId
+                ? folderPathMap.get(note.folderId) ?? labels.allNotes
+                : labels.allNotes;
+              const preview = getDisplayNotePreview(note, language);
 
-              <div className="trash-card-meta">
-                <span className="trash-card-meta-chip">
-                  {labels.folder}: {note.folderId ? folderPathMap.get(note.folderId) ?? labels.allNotes : labels.allNotes}
-                </span>
-                <span className="trash-card-meta-chip">
-                  {labels.deletedAt}: {formatTimestamp(note.trashedAt ?? note.updatedAt, language)}
-                </span>
-              </div>
+              return (
+                <article
+                  className={`trash-card ${note.contentType === "canvas" ? "is-canvas" : "is-note"}`}
+                  key={note.id}
+                >
+                  <div className="trash-card-head">
+                    <div className="trash-card-copy">
+                      <div className="trash-card-titleline">
+                        <h3>{getDisplayNoteTitle(note, language)}</h3>
+                        <span className="trash-card-chip is-type">
+                          {note.contentType === "canvas" ? labels.canvasType : labels.noteType}
+                        </span>
+                      </div>
+                      {preview ? <p>{preview}</p> : null}
+                      <div className="trash-card-meta-inline">
+                        <span>
+                          {folderLabel} · {deletedAt}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="trash-card-actions">
-                <button
-                  type="button"
-                  className="trash-card-action is-primary"
-                  onClick={() => onRestore(note.id)}
-                >
-                  {labels.restore}
-                </button>
-                <button
-                  type="button"
-                  className="trash-card-action is-danger"
-                  onClick={() => onDelete(note.id)}
-                >
-                  {labels.deletePermanently}
-                </button>
-              </div>
-            </article>
-          ))}
+                  <div className="trash-card-actions">
+                    <button
+                      type="button"
+                      className="trash-card-action is-primary"
+                      onClick={() => onRestore(note.id)}
+                    >
+                      {labels.restore}
+                    </button>
+                    <button
+                      type="button"
+                      className="trash-card-action is-danger"
+                      onClick={() => onDelete(note.id)}
+                    >
+                      {labels.deletePermanently}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
       )}
     </section>

@@ -9,7 +9,8 @@ const GOOGLE_DRIVE_APP_DATA_SCOPE = "https://www.googleapis.com/auth/drive.appda
 const GOOGLE_DRIVE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about";
 const GOOGLE_OAUTH_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_DESKTOP_LOOPBACK_PATH = "/oauth/google-drive";
+const GOOGLE_DESKTOP_LOOPBACK_PATH = "/";
+const GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH = "/oauth/google-drive";
 const GOOGLE_DESKTOP_CALLBACK_TIMEOUT_MS = 180_000;
 
 type GoogleDriveAboutResponse = {
@@ -65,6 +66,10 @@ function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getDesktopClientSecretFromEnv() {
+  return normalizeText(import.meta.env.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET);
+}
+
 function isDesktopGoogleDriveRuntime() {
   return typeof window !== "undefined" && isTauri();
 }
@@ -101,7 +106,10 @@ function parseDesktopOAuthCallback(urlValue: string) {
   try {
     const parsedUrl = new URL(urlValue);
 
-    if (parsedUrl.pathname !== GOOGLE_DESKTOP_LOOPBACK_PATH) {
+    if (
+      parsedUrl.pathname !== GOOGLE_DESKTOP_LOOPBACK_PATH &&
+      parsedUrl.pathname !== GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH
+    ) {
       return null;
     }
 
@@ -187,6 +195,7 @@ async function parseGoogleTokenResponse(response: Response) {
 
 async function exchangeDesktopAuthorizationCode(input: {
   clientId: string;
+  clientSecret?: string;
   code: string;
   codeVerifier: string;
   redirectUri: string;
@@ -198,6 +207,11 @@ async function exchangeDesktopAuthorizationCode(input: {
     grant_type: "authorization_code",
     redirect_uri: input.redirectUri
   });
+  const clientSecret = normalizeText(input.clientSecret);
+
+  if (clientSecret) {
+    body.set("client_secret", clientSecret);
+  }
 
   let response: Response;
 
@@ -218,6 +232,7 @@ async function exchangeDesktopAuthorizationCode(input: {
 
 async function refreshDesktopAccessToken(input: {
   clientId: string;
+  clientSecret?: string;
   refreshToken: string;
 }) {
   const body = new URLSearchParams({
@@ -225,6 +240,11 @@ async function refreshDesktopAccessToken(input: {
     refresh_token: input.refreshToken,
     grant_type: "refresh_token"
   });
+  const clientSecret = normalizeText(input.clientSecret);
+
+  if (clientSecret) {
+    body.set("client_secret", clientSecret);
+  }
 
   let response: Response;
 
@@ -335,6 +355,7 @@ export async function connectGoogleDriveDesktopAccount(options: {
   prompt?: string;
 }) {
   const clientId = normalizeText(options.clientId);
+  const clientSecret = getDesktopClientSecretFromEnv();
 
   if (!clientId) {
     throw new Error("GOOGLE_DRIVE_CLIENT_ID_REQUIRED");
@@ -380,6 +401,7 @@ export async function connectGoogleDriveDesktopAccount(options: {
 
     const tokenPayload = await exchangeDesktopAuthorizationCode({
       clientId,
+      clientSecret,
       code: callbackPayload.code,
       codeVerifier,
       redirectUri: loopbackSession.redirectUri
@@ -396,6 +418,7 @@ export async function refreshGoogleDriveDesktopAccountSession(options: {
   connectionId: string;
 }) {
   const clientId = normalizeText(options.clientId);
+  const clientSecret = getDesktopClientSecretFromEnv();
 
   if (!clientId) {
     throw new Error("GOOGLE_DRIVE_CLIENT_ID_REQUIRED");
@@ -415,6 +438,7 @@ export async function refreshGoogleDriveDesktopAccountSession(options: {
 
   const tokenPayload = await refreshDesktopAccessToken({
     clientId,
+    clientSecret,
     refreshToken
   });
 

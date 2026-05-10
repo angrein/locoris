@@ -19,7 +19,8 @@ const DESKTOP_DATA_DIRECTORY: &str = "data";
 const DESKTOP_SETTINGS_DIRECTORY: &str = "settings";
 const DESKTOP_WEBVIEW_DIRECTORY: &str = "webview";
 const DESKTOP_CACHE_DIRECTORY: &str = "cache";
-const GOOGLE_DESKTOP_LOOPBACK_PATH: &str = "/oauth/google-drive";
+const GOOGLE_DESKTOP_LOOPBACK_PATH: &str = "/";
+const GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH: &str = "/oauth/google-drive";
 const GOOGLE_DESKTOP_LOOPBACK_HOST: &str = "127.0.0.1";
 const GOOGLE_DESKTOP_LOOPBACK_LISTENER_TIMEOUT_SECS: u64 = 190;
 
@@ -454,6 +455,12 @@ fn desktop_google_oauth_extract_request_target(request: &str) -> Option<&str> {
   Some(target)
 }
 
+fn desktop_google_oauth_is_callback_target(target: &str) -> bool {
+  target == GOOGLE_DESKTOP_LOOPBACK_PATH
+    || target.starts_with("/?")
+    || target.starts_with(GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH)
+}
+
 fn spawn_desktop_google_oauth_listener(
   listener: TcpListener,
   sender: mpsc::Sender<DesktopGoogleOauthCallbackPayload>,
@@ -477,7 +484,7 @@ fn spawn_desktop_google_oauth_listener(
           if let Some(target) = desktop_google_oauth_extract_request_target(&request) {
             let url = format!("http://{GOOGLE_DESKTOP_LOOPBACK_HOST}:{local_port}{target}");
 
-            if target.starts_with(GOOGLE_DESKTOP_LOOPBACK_PATH) {
+            if desktop_google_oauth_is_callback_target(target) {
               desktop_google_oauth_write_http_response(
                 &mut stream,
                 "200 OK",
