@@ -21,7 +21,8 @@ const DESKTOP_WEBVIEW_DIRECTORY: &str = "webview";
 const DESKTOP_CACHE_DIRECTORY: &str = "cache";
 const GOOGLE_DESKTOP_LOOPBACK_PATH: &str = "/";
 const GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH: &str = "/oauth/google-drive";
-const GOOGLE_DESKTOP_LOOPBACK_HOST: &str = "127.0.0.1";
+const GOOGLE_DESKTOP_LOOPBACK_BIND_HOST: &str = "127.0.0.1";
+const GOOGLE_DESKTOP_LOOPBACK_REDIRECT_HOST: &str = "localhost";
 const GOOGLE_DESKTOP_LOOPBACK_LISTENER_TIMEOUT_SECS: u64 = 190;
 const GOOGLE_OAUTH_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
@@ -609,7 +610,9 @@ fn spawn_desktop_google_oauth_listener(
           let request = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
 
           if let Some(target) = desktop_google_oauth_extract_request_target(&request) {
-            let url = format!("http://{GOOGLE_DESKTOP_LOOPBACK_HOST}:{local_port}{target}");
+            let url = format!(
+              "http://{GOOGLE_DESKTOP_LOOPBACK_REDIRECT_HOST}:{local_port}{target}"
+            );
 
             if desktop_google_oauth_is_callback_target(target) {
               desktop_google_oauth_write_http_response(
@@ -645,7 +648,7 @@ fn spawn_desktop_google_oauth_listener(
 fn desktop_google_oauth_prepare_loopback(
   state: State<'_, DesktopGoogleOauthState>,
 ) -> Result<DesktopGoogleOauthLoopbackSession, String> {
-  let listener = TcpListener::bind((GOOGLE_DESKTOP_LOOPBACK_HOST, 0))
+  let listener = TcpListener::bind((GOOGLE_DESKTOP_LOOPBACK_BIND_HOST, 0))
     .map_err(|error| format!("failed to start local Google OAuth callback listener: {error}"))?;
   let local_port = listener
     .local_addr()
@@ -665,7 +668,7 @@ fn desktop_google_oauth_prepare_loopback(
   spawn_desktop_google_oauth_listener(listener, sender);
 
   Ok(DesktopGoogleOauthLoopbackSession {
-    redirect_uri: format!("http://{GOOGLE_DESKTOP_LOOPBACK_HOST}:{local_port}"),
+    redirect_uri: format!("http://{GOOGLE_DESKTOP_LOOPBACK_REDIRECT_HOST}:{local_port}"),
   })
 }
 
