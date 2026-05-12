@@ -1,6 +1,6 @@
 use keyring::{Entry, Error as KeyringError};
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
   fs,
@@ -23,6 +23,7 @@ const GOOGLE_DESKTOP_LOOPBACK_PATH: &str = "/";
 const GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH: &str = "/oauth/google-drive";
 const GOOGLE_DESKTOP_LOOPBACK_HOST: &str = "127.0.0.1";
 const GOOGLE_DESKTOP_LOOPBACK_LISTENER_TIMEOUT_SECS: u64 = 190;
+const GOOGLE_OAUTH_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
 #[derive(Default)]
 struct DesktopGoogleOauthState {
@@ -39,6 +40,35 @@ struct DesktopGoogleOauthLoopbackSession {
 #[serde(rename_all = "camelCase")]
 struct DesktopGoogleOauthCallbackPayload {
   url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopGoogleOauthExchangeCodeInput {
+  client_id: String,
+  client_secret: Option<String>,
+  code: String,
+  code_verifier: String,
+  redirect_uri: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopGoogleOauthRefreshTokenInput {
+  client_id: String,
+  client_secret: Option<String>,
+  refresh_token: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct DesktopGoogleOauthTokenResponse {
+  access_token: Option<String>,
+  expires_in: Option<u64>,
+  refresh_token: Option<String>,
+  scope: Option<String>,
+  token_type: Option<String>,
+  error: Option<String>,
+  error_description: Option<String>,
 }
 
 fn secure_secret_service_name(identifier: &str) -> String {
@@ -470,6 +500,94 @@ fn desktop_google_oauth_is_callback_target(target: &str) -> bool {
     || target.starts_with(GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH)
 }
 
+fn trim_oauth_value(value: Option<String>) -> Option<String> {
+  value.and_then(|entry| {
+    let trimmed = entry.trim();
+
+    if trimmed.is_empty() {
+      None
+    } else {
+      Some(trimmed.to_string())
+    }
+  })
+}
+
+async fn desktop_google_oauth_submit_token_request(
+  mut params: Vec<(&'static str, String)>,
+) -> Result<DesktopGoogleOauthTokenResponse, String> {
+  params.retain(|(_key, value)| !value.trim().is_empty());
+  let encoded_body = url::form_urlencoded::Serializer::new(String::new())
+    .extend_pairs(params.iter().map(|(key, value)| (*key, value.as_str())))
+    .finish();
+
+  let response = reqwest::Client::new()
+    .post(GOOGLE_OAUTH_TOKEN_URL)
+    .header("Content-Type", "application/x-www-form-urlencoded")
+    .body(encoded_body)
+    .send()
+    .await
+    .map_err(|error| {
+      log::warn!("Desktop Google OAuth token request failed to reach Google: {error}");
+      "SERVER_UNAVAILABLE".to_string()
+    })?;
+  let status = response.status();
+  let raw_payload = response
+    .text()
+    .await
+    .map_err(|error| {
+      log::warn!("Desktop Google OAuth token response could not be decoded: {error}");
+      "GOOGLE_OAUTH_FAILED".to_string()
+    })?;
+  let payload = serde_json::from_str::<DesktopGoogleOauthTokenResponse>(&raw_payload).map_err(|error| {
+    log::warn!(
+      "Desktop Google OAuth token response JSON could not be parsed: {error}; payload=`{raw_payload}`"
+    );
+    "GOOGLE_OAUTH_FAILED".to_string()
+  })?;
+
+  if !status.is_success() {
+    let error_code = payload.error.as_deref().map(str::trim).unwrap_or_default();
+    let error_description = payload
+      .error_description
+      .as_deref()
+      .map(str::trim)
+      .unwrap_or_default();
+
+    log::warn!(
+      "Desktop Google OAuth token exchange failed with status {}: error=`{}` description=`{}`",
+      status,
+      error_code,
+      error_description
+    );
+
+    if matches!(error_code, "invalid_grant" | "invalid_client" | "unauthorized_client") {
+      return Err("GOOGLE_DRIVE_AUTH_REQUIRED".into());
+    }
+
+    if !error_description.is_empty() {
+      return Err(error_description.to_string());
+    }
+
+    if !error_code.is_empty() {
+      return Err(error_code.to_string());
+    }
+
+    return Err("GOOGLE_OAUTH_FAILED".into());
+  }
+
+  if payload
+    .access_token
+    .as_deref()
+    .map(str::trim)
+    .unwrap_or_default()
+    .is_empty()
+  {
+    return Err("GOOGLE_DRIVE_AUTH_REQUIRED".into());
+  }
+
+  Ok(payload)
+}
+
 fn spawn_desktop_google_oauth_listener(
   listener: TcpListener,
   sender: mpsc::Sender<DesktopGoogleOauthCallbackPayload>,
@@ -569,6 +687,40 @@ fn desktop_google_oauth_wait_for_callback(
     Err(mpsc::RecvTimeoutError::Timeout) => Err("GOOGLE_OAUTH_REDIRECT_TIMEOUT".into()),
     Err(mpsc::RecvTimeoutError::Disconnected) => Err("GOOGLE_OAUTH_CALLBACK_FAILED".into()),
   }
+}
+
+#[tauri::command]
+async fn desktop_google_oauth_exchange_code(
+  input: DesktopGoogleOauthExchangeCodeInput,
+) -> Result<DesktopGoogleOauthTokenResponse, String> {
+  desktop_google_oauth_submit_token_request(vec![
+    ("client_id", input.client_id.trim().to_string()),
+    (
+      "client_secret",
+      trim_oauth_value(input.client_secret).unwrap_or_default(),
+    ),
+    ("code", input.code.trim().to_string()),
+    ("code_verifier", input.code_verifier.trim().to_string()),
+    ("grant_type", "authorization_code".to_string()),
+    ("redirect_uri", input.redirect_uri.trim().to_string()),
+  ])
+  .await
+}
+
+#[tauri::command]
+async fn desktop_google_oauth_refresh_token(
+  input: DesktopGoogleOauthRefreshTokenInput,
+) -> Result<DesktopGoogleOauthTokenResponse, String> {
+  desktop_google_oauth_submit_token_request(vec![
+    ("client_id", input.client_id.trim().to_string()),
+    (
+      "client_secret",
+      trim_oauth_value(input.client_secret).unwrap_or_default(),
+    ),
+    ("refresh_token", input.refresh_token.trim().to_string()),
+    ("grant_type", "refresh_token".to_string()),
+  ])
+  .await
 }
 
 #[tauri::command]
@@ -834,6 +986,8 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       desktop_google_oauth_prepare_loopback,
       desktop_google_oauth_wait_for_callback,
+      desktop_google_oauth_exchange_code,
+      desktop_google_oauth_refresh_token,
       native_vault_store_read,
       native_vault_store_write,
       native_vault_store_delete,

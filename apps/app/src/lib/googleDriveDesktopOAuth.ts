@@ -8,7 +8,6 @@ import {
 const GOOGLE_DRIVE_APP_DATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const GOOGLE_DRIVE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about";
 const GOOGLE_OAUTH_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_DESKTOP_LOOPBACK_PATH = "/";
 const GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH = "/oauth/google-drive";
 const GOOGLE_DESKTOP_CALLBACK_TIMEOUT_MS = 180_000;
@@ -209,6 +208,23 @@ async function parseGoogleTokenResponse(response: Response) {
   return payload;
 }
 
+async function invokeDesktopGoogleOauth<T>(
+  command: string,
+  args: Record<string, unknown>
+): Promise<T> {
+  try {
+    return await invoke<T>(command, args);
+  } catch (error) {
+    const message =
+      typeof error === "string"
+        ? error
+        : error instanceof Error
+          ? error.message
+          : "GOOGLE_OAUTH_FAILED";
+    throw new Error(message);
+  }
+}
+
 async function exchangeDesktopAuthorizationCode(input: {
   clientId: string;
   clientSecret?: string;
@@ -216,34 +232,15 @@ async function exchangeDesktopAuthorizationCode(input: {
   codeVerifier: string;
   redirectUri: string;
 }) {
-  const body = new URLSearchParams({
-    client_id: input.clientId,
-    code: input.code,
-    code_verifier: input.codeVerifier,
-    grant_type: "authorization_code",
-    redirect_uri: input.redirectUri
+  return invokeDesktopGoogleOauth<GoogleDesktopTokenResponse>("desktop_google_oauth_exchange_code", {
+    input: {
+      clientId: input.clientId,
+      clientSecret: normalizeText(input.clientSecret) || null,
+      code: input.code,
+      codeVerifier: input.codeVerifier,
+      redirectUri: input.redirectUri
+    }
   });
-  const clientSecret = normalizeText(input.clientSecret);
-
-  if (clientSecret) {
-    body.set("client_secret", clientSecret);
-  }
-
-  let response: Response;
-
-  try {
-    response = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body
-    });
-  } catch {
-    throw new Error("SERVER_UNAVAILABLE");
-  }
-
-  return parseGoogleTokenResponse(response);
 }
 
 async function refreshDesktopAccessToken(input: {
@@ -251,32 +248,13 @@ async function refreshDesktopAccessToken(input: {
   clientSecret?: string;
   refreshToken: string;
 }) {
-  const body = new URLSearchParams({
-    client_id: input.clientId,
-    refresh_token: input.refreshToken,
-    grant_type: "refresh_token"
+  return invokeDesktopGoogleOauth<GoogleDesktopTokenResponse>("desktop_google_oauth_refresh_token", {
+    input: {
+      clientId: input.clientId,
+      clientSecret: normalizeText(input.clientSecret) || null,
+      refreshToken: input.refreshToken
+    }
   });
-  const clientSecret = normalizeText(input.clientSecret);
-
-  if (clientSecret) {
-    body.set("client_secret", clientSecret);
-  }
-
-  let response: Response;
-
-  try {
-    response = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body
-    });
-  } catch {
-    throw new Error("SERVER_UNAVAILABLE");
-  }
-
-  return parseGoogleTokenResponse(response);
 }
 
 async function loadGoogleDriveAccountProfile(accessToken: string) {
