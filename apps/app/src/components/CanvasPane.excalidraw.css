@@ -4,31 +4,31 @@
 }
 
 .canvas-stage-shell .excalidraw .main-menu-trigger {
-  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgba(147, 173, 255, 0.14));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgb(var(--line-rgb) / 0.14));
   border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
-    rgba(8, 10, 22, 0.88);
+    rgb(var(--surface-deep-rgb) / 0.88);
   box-shadow:
     0 14px 34px rgba(0, 0, 0, 0.26),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .canvas-stage-shell .excalidraw .main-menu-trigger:hover {
-  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 26%, rgba(147, 173, 255, 0.16));
+  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 26%, rgb(var(--line-rgb) / 0.16));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    color-mix(in srgb, var(--canvas-accent, var(--gold)) 8%, rgba(8, 10, 22, 0.9));
+    color-mix(in srgb, var(--canvas-accent, var(--gold)) 8%, rgb(var(--surface-deep-rgb) / 0.9));
 }
 
 .canvas-stage-shell .excalidraw .help-icon,
 .canvas-stage-shell .excalidraw .default-sidebar-trigger,
 .canvas-stage-shell .excalidraw .sidebar-trigger {
-  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgba(147, 173, 255, 0.14));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgb(var(--line-rgb) / 0.14));
   border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
-    rgba(8, 10, 22, 0.94) !important;
+    rgb(var(--surface-deep-rgb) / 0.94) !important;
   color: var(--text);
   box-shadow:
     0 14px 34px rgba(0, 0, 0, 0.26),
@@ -39,10 +39,10 @@
 .canvas-stage-shell .excalidraw .help-icon:hover,
 .canvas-stage-shell .excalidraw .default-sidebar-trigger:hover,
 .canvas-stage-shell .excalidraw .sidebar-trigger:hover {
-  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 26%, rgba(147, 173, 255, 0.16));
+  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 26%, rgb(var(--line-rgb) / 0.16));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    color-mix(in srgb, var(--canvas-accent, var(--gold)) 8%, rgba(8, 10, 22, 0.96)) !important;
+    color-mix(in srgb, var(--canvas-accent, var(--gold)) 8%, rgb(var(--surface-deep-rgb) / 0.96)) !important;
 }
 
 .canvas-stage-shell .excalidraw .help-icon svg,
@@ -53,10 +53,10 @@
 
 .canvas-stage-shell .excalidraw .zoom-actions,
 .canvas-stage-shell .excalidraw .undo-redo-buttons {
-  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgba(147, 173, 255, 0.14));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgb(var(--line-rgb) / 0.14));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
-    rgba(8, 10, 22, 0.94);
+    rgb(var(--surface-deep-rgb) / 0.94);
   box-shadow:
     0 14px 34px rgba(0, 0, 0, 0.26),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -66,7 +66,7 @@
 .canvas-stage-shell .excalidraw .undo-redo-buttons button {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
-    rgba(8, 10, 22, 0.92) !important;
+    rgb(var(--surface-deep-rgb) / 0.92) !important;
   color: var(--text);
 }
 
@@ -74,11 +74,11 @@
 .canvas-stage-shell .excalidraw .undo-redo-buttons button:hover {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    color-mix(in srgb, var(--canvas-accent, var(--gold)) 10%, rgba(8, 10, 22, 0.94)) !important;
+    color-mix(in srgb, var(--canvas-accent, var(--gold)) 10%, rgb(var(--surface-deep-rgb) / 0.94)) !important;
 }
 
 .canvas-stage-shell .excalidraw .dropdown-menu {
-  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgba(147, 173, 255, 0.14));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgb(var(--line-rgb) / 0.14));
   border-radius: 20px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--canvas-accent, var(--gold)) 8%, transparent), transparent 52%),
@@ -161,11 +161,11 @@
 }
 
 .canvas-stage-shell .excalidraw .layer-ui__library {
-  border: 1px solid rgba(147, 173, 255, 0.14);
+  border: 1px solid rgb(var(--line-rgb) / 0.14);
   border-radius: 20px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.015)),
-    rgba(8, 10, 22, 0.96);
+    rgb(var(--surface-deep-rgb) / 0.96);
   box-shadow:
     0 18px 42px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -199,16 +199,16 @@
 
 .canvas-stage-shell .excalidraw .library-unit--hover,
 .canvas-stage-shell .excalidraw .library-unit--selected {
-  border-color: rgba(147, 173, 255, 0.24);
+  border-color: rgb(var(--line-rgb) / 0.24);
 }
 
 .canvas-stage-shell .excalidraw .library-unit__checkbox .Checkbox-box {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(147, 173, 255, 0.22);
+  border-color: rgb(var(--line-rgb) / 0.22);
 }
 
 .canvas-stage-shell .excalidraw .library-unit__checkbox.is-checked .Checkbox-box {
-  background: rgba(147, 173, 255, 0.22) !important;
+  background: rgb(var(--line-rgb) / 0.22) !important;
 }
 
 .canvas-stage-shell .excalidraw .library-unit__checkbox.is-checked .Checkbox-box svg {
@@ -217,19 +217,19 @@
 
 .canvas-stage-shell .excalidraw .library-actions-counter,
 .canvas-stage-shell .excalidraw .library-unit__adder {
-  background: rgba(147, 173, 255, 0.18);
+  background: rgb(var(--line-rgb) / 0.18);
   color: var(--text);
 }
 
 .canvas-stage-shell .excalidraw .library-menu-control-buttons--at-bottom::before {
-  background: rgba(147, 173, 255, 0.12);
+  background: rgb(var(--line-rgb) / 0.12);
 }
 
 .canvas-stage-shell .excalidraw .library-menu-browse-button {
-  border: 1px solid rgba(147, 173, 255, 0.14);
+  border: 1px solid rgb(var(--line-rgb) / 0.14);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
-    rgba(8, 10, 22, 0.92);
+    rgb(var(--surface-deep-rgb) / 0.92);
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -237,11 +237,11 @@
 .canvas-stage-shell .excalidraw .library-menu-browse-button:hover {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    rgba(10, 12, 24, 0.96);
+    rgb(var(--surface-deep-rgb) / 0.96);
 }
 
 .canvas-stage-shell .excalidraw .layer-ui__library .dropdown-menu .dropdown-menu-container {
-  border: 1px solid rgba(147, 173, 255, 0.14);
+  border: 1px solid rgb(var(--line-rgb) / 0.14);
   background:
     linear-gradient(180deg, rgba(13, 15, 30, 0.98), rgba(7, 9, 19, 0.99));
   box-shadow:
@@ -254,7 +254,7 @@
 .canvas-stage-shell .excalidraw .layer-ui__library .dropdown-menu-item--selected {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
-    rgba(147, 173, 255, 0.08);
+    rgb(var(--line-rgb) / 0.08);
 }
 
 .canvas-stage-shell .excalidraw canvas,
@@ -312,7 +312,7 @@
 }
 
 .canvas-mainmenu-swatch {
-  --swatch-ring: color-mix(in srgb, var(--canvas-accent, var(--gold)) 18%, rgba(147, 173, 255, 0.16));
+  --swatch-ring: color-mix(in srgb, var(--canvas-accent, var(--gold)) 18%, rgb(var(--line-rgb) / 0.16));
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -330,7 +330,7 @@
 
 .canvas-mainmenu-swatch:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 28%, rgba(147, 173, 255, 0.2));
+  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 28%, rgb(var(--line-rgb) / 0.2));
 }
 
 .canvas-mainmenu-swatch.is-active {
@@ -348,7 +348,7 @@
   display: grid;
   gap: 8px;
   padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 14%, rgba(147, 173, 255, 0.1));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 14%, rgb(var(--line-rgb) / 0.1));
   border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
@@ -377,7 +377,7 @@
   width: 38px;
   height: 38px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgba(147, 173, 255, 0.14));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgb(var(--line-rgb) / 0.14));
   border-radius: 12px;
   background: rgba(7, 9, 20, 0.92);
   cursor: pointer;
@@ -401,7 +401,7 @@
   min-width: 0;
   min-height: 38px;
   padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 14%, rgba(147, 173, 255, 0.12));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 14%, rgb(var(--line-rgb) / 0.12));
   border-radius: 12px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.014)),
@@ -432,7 +432,7 @@
   border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.008)),
-    rgba(10, 12, 24, 0.34);
+    rgb(var(--surface-deep-rgb) / 0.34);
   color: var(--text);
   font: inherit;
   font-size: 0.8rem;
@@ -441,10 +441,10 @@
 }
 
 .canvas-mainmenu-action:hover {
-  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgba(147, 173, 255, 0.1));
+  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgb(var(--line-rgb) / 0.1));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
-    color-mix(in srgb, var(--canvas-accent, var(--gold)) 9%, rgba(10, 12, 24, 0.58));
+    color-mix(in srgb, var(--canvas-accent, var(--gold)) 9%, rgb(var(--surface-deep-rgb) / 0.58));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.03),
     0 10px 22px rgba(0, 0, 0, 0.16);
@@ -452,12 +452,12 @@
 }
 
 .canvas-stage-shell .excalidraw .color-picker__button[data-canvas-quick-color] {
-  border-color: rgba(147, 173, 255, 0.18);
+  border-color: rgb(var(--line-rgb) / 0.18);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .canvas-stage-shell .excalidraw .color-picker__button[data-canvas-quick-color]:hover::after {
-  box-shadow: 0 0 0 1px rgba(147, 173, 255, 0.34);
+  box-shadow: 0 0 0 1px rgb(var(--line-rgb) / 0.34);
 }
 
 .canvas-stage-shell
@@ -479,7 +479,7 @@
   flex-direction: column;
   min-width: 16.5rem;
   max-height: min(22rem, 60vh);
-  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgba(147, 173, 255, 0.14));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, rgb(var(--line-rgb) / 0.14));
   border-radius: 20px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--canvas-accent, var(--gold)) 8%, transparent), transparent 52%),
@@ -495,10 +495,10 @@
   top: 0;
   z-index: 1;
   height: 42px;
-  border-bottom: 1px solid rgba(147, 173, 255, 0.12);
+  border-bottom: 1px solid rgb(var(--line-rgb) / 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.016)),
-    rgba(8, 10, 22, 0.96);
+    rgb(var(--surface-deep-rgb) / 0.96);
 }
 
 .canvas-stage-shell .excalidraw .canvas-font-picker-popover .QuickSearch__input {
@@ -540,7 +540,7 @@
   border-radius: 999px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04)),
-    color-mix(in srgb, var(--canvas-accent, var(--gold)) 24%, rgba(18, 24, 44, 0.92));
+    color-mix(in srgb, var(--canvas-accent, var(--gold)) 24%, rgb(var(--surface-strong-rgb) / 0.92));
   background-clip: padding-box;
 }
 
@@ -555,7 +555,7 @@
 
 .canvas-stage-shell .excalidraw .dropdown-menu.fonts .dropdown-menu-group-title {
   margin: 0 4px 2px;
-  color: color-mix(in srgb, var(--text-dim) 92%, rgba(255, 224, 138, 0.26));
+  color: color-mix(in srgb, var(--text-dim) 92%, rgb(var(--gold-rgb) / 0.26));
   font-size: 0.64rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -577,7 +577,7 @@
   color: var(--text);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008)),
-    rgba(10, 12, 24, 0.42) !important;
+    rgb(var(--surface-deep-rgb) / 0.42) !important;
   transition:
     border-color 160ms ease,
     background 160ms ease,
@@ -588,10 +588,10 @@
 .canvas-stage-shell .excalidraw .dropdown-menu.fonts .dropdown-menu-item:hover,
 .canvas-stage-shell .excalidraw .dropdown-menu.fonts .dropdown-menu-item:focus-visible,
 .canvas-stage-shell .excalidraw .dropdown-menu.fonts.manual-hover .dropdown-menu-item--hovered {
-  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 18%, rgba(147, 173, 255, 0.12));
+  border-color: color-mix(in srgb, var(--canvas-accent, var(--gold)) 18%, rgb(var(--line-rgb) / 0.12));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
-    color-mix(in srgb, var(--canvas-accent, var(--gold)) 9%, rgba(12, 16, 30, 0.96)) !important;
+    color-mix(in srgb, var(--canvas-accent, var(--gold)) 9%, rgb(var(--surface-deep-rgb) / 0.96)) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.032),
     0 8px 20px rgba(0, 0, 0, 0.16);
@@ -603,12 +603,12 @@
   border: 1px solid color-mix(
     in srgb,
     var(--canvas-accent, var(--gold)) 28%,
-    rgba(147, 173, 255, 0.12)
+    rgb(var(--line-rgb) / 0.12)
   );
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018)),
     linear-gradient(90deg, color-mix(in srgb, var(--canvas-accent, var(--gold)) 16%, transparent), transparent 24%),
-    rgba(8, 10, 22, 0.96) !important;
+    rgb(var(--surface-deep-rgb) / 0.96) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.038),
     0 12px 24px rgba(0, 0, 0, 0.18);
@@ -668,12 +668,12 @@
 .excalidraw .Dialog.canvas-export-dialog .Island,
 .excalidraw .Dialog.HelpDialog .Island,
 .excalidraw .Dialog.confirm-dialog .Island {
-  border: 1px solid color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 16%, rgba(147, 173, 255, 0.14));
+  border: 1px solid color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 16%, rgb(var(--line-rgb) / 0.14));
   border-radius: 28px;
   background:
     radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 12%, transparent), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.012)),
-    rgba(8, 10, 22, 0.98);
+    rgb(var(--surface-deep-rgb) / 0.98);
   box-shadow:
     0 28px 64px rgba(0, 0, 0, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -688,17 +688,17 @@
   --canvas-export-border: color-mix(
     in srgb,
     var(--canvas-dialog-accent, var(--gold)) 18%,
-    rgba(147, 173, 255, 0.12)
+    rgb(var(--line-rgb) / 0.12)
   );
   --canvas-export-border-strong: color-mix(
     in srgb,
     var(--canvas-dialog-accent, var(--gold)) 34%,
-    rgba(147, 173, 255, 0.18)
+    rgb(var(--line-rgb) / 0.18)
   );
-  --canvas-export-surface: rgba(8, 10, 22, 0.84);
+  --canvas-export-surface: rgb(var(--surface-deep-rgb) / 0.84);
   --canvas-export-surface-strong: rgba(10, 13, 27, 0.92);
   --canvas-export-surface-soft: rgba(12, 15, 30, 0.68);
-  --canvas-export-text-muted: color-mix(in srgb, var(--text-dim) 88%, rgba(255, 224, 138, 0.18));
+  --canvas-export-text-muted: color-mix(in srgb, var(--text-dim) 88%, rgb(var(--gold-rgb) / 0.18));
 }
 
 .excalidraw .Dialog.canvas-export-dialog .Modal__content {
@@ -712,7 +712,7 @@
   border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.016)),
-    rgba(8, 10, 22, 0.88);
+    rgb(var(--surface-deep-rgb) / 0.88);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.036),
     0 10px 24px rgba(0, 0, 0, 0.2);
@@ -728,7 +728,7 @@
   border-color: var(--canvas-export-border-strong);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 8%, rgba(8, 10, 22, 0.94));
+    color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 8%, rgb(var(--surface-deep-rgb) / 0.94));
   transform: translateY(-1px);
 }
 
@@ -741,7 +741,7 @@
 .excalidraw .Dialog.confirm-dialog .Dialog__title {
   margin: 0;
   padding: 0 0 14px;
-  border-bottom: 1px solid rgba(147, 173, 255, 0.12);
+  border-bottom: 1px solid rgb(var(--line-rgb) / 0.12);
   color: var(--text);
   font-family: var(--font-display, var(--font-ui));
   font-size: 1.1rem;
@@ -779,7 +779,7 @@
   border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
-    rgba(10, 12, 24, 0.9);
+    rgb(var(--surface-deep-rgb) / 0.9);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.028),
     0 16px 36px rgba(0, 0, 0, 0.18);
@@ -874,7 +874,7 @@
   align-items: center;
   min-height: 48px;
   padding: 10px 2px;
-  border-bottom: 1px solid rgba(147, 173, 255, 0.1);
+  border-bottom: 1px solid rgb(var(--line-rgb) / 0.1);
 }
 
 .excalidraw .Dialog.canvas-export-dialog .ImageExportModal__settings__setting:last-of-type {
@@ -947,7 +947,7 @@
   color: var(--text);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.02)),
-    color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 18%, rgba(10, 12, 24, 0.98));
+    color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 18%, rgb(var(--surface-deep-rgb) / 0.98));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.038),
     0 8px 18px rgba(0, 0, 0, 0.14);
@@ -956,7 +956,7 @@
 .excalidraw .Dialog.canvas-export-dialog .RadioGroup__choice.active:hover {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.072), rgba(255, 255, 255, 0.022)),
-    color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 22%, rgba(10, 12, 24, 0.98));
+    color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 22%, rgb(var(--surface-deep-rgb) / 0.98));
 }
 
 .excalidraw .Dialog.canvas-export-dialog .Switch {
@@ -989,11 +989,11 @@
   border-color: color-mix(
     in srgb,
     var(--canvas-dialog-accent, var(--gold)) 44%,
-    rgba(147, 173, 255, 0.18)
+    rgb(var(--line-rgb) / 0.18)
   );
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.012)),
-    color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 58%, rgba(10, 12, 24, 0.88));
+    color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 58%, rgb(var(--surface-deep-rgb) / 0.88));
 }
 
 .excalidraw .Dialog.canvas-export-dialog .Switch.toggled::before {
@@ -1024,18 +1024,18 @@
     var(--canvas-dialog-accent, var(--gold)) 48%,
     rgba(255, 255, 255, 0.14)
   );
-  --back-color: color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 34%, rgba(10, 12, 24, 0.98));
+  --back-color: color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 34%, rgb(var(--surface-deep-rgb) / 0.98));
 }
 
 .excalidraw .Dialog.canvas-export-dialog .ImageExportModal__settings__buttons__button:nth-child(2) {
   --text-color: color-mix(in srgb, var(--text) 94%, rgba(255, 233, 178, 0.6));
-  --border-color: color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 22%, rgba(147, 173, 255, 0.12));
+  --border-color: color-mix(in srgb, var(--canvas-dialog-accent, var(--gold)) 22%, rgb(var(--line-rgb) / 0.12));
   --back-color: rgba(12, 15, 30, 0.92);
 }
 
 .excalidraw .Dialog.canvas-export-dialog .ImageExportModal__settings__buttons__button:nth-child(3) {
   --text-color: #dff9ff;
-  --border-color: rgba(115, 247, 255, 0.24);
+  --border-color: rgb(var(--cyan-rgb) / 0.24);
   --back-color: rgba(7, 33, 44, 0.92);
 }
 
@@ -1087,16 +1087,16 @@
 }
 
 .excalidraw .Dialog.HelpDialog .HelpDialog__island-content {
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.024), rgba(255, 255, 255, 0.012)),
-    rgba(10, 12, 24, 0.84);
+    rgb(var(--surface-deep-rgb) / 0.84);
   overflow: hidden;
 }
 
 .excalidraw .Dialog.HelpDialog .HelpDialog__shortcut {
-  border-bottom: 1px solid rgba(147, 173, 255, 0.08);
+  border-bottom: 1px solid rgb(var(--line-rgb) / 0.08);
   color: var(--text);
   font-size: 0.8rem;
 }
@@ -1106,8 +1106,8 @@
 }
 
 .excalidraw .Dialog.HelpDialog .HelpDialog__key {
-  background: rgba(147, 173, 255, 0.14);
-  border: 1px solid rgba(147, 173, 255, 0.18);
+  background: rgb(var(--line-rgb) / 0.14);
+  border: 1px solid rgb(var(--line-rgb) / 0.18);
   color: var(--text);
   border-radius: 10px;
   padding: 0.42rem 0.56rem;
@@ -1137,21 +1137,21 @@
   min-height: 42px;
   padding: 0 16px;
   border-radius: 14px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.015)),
-    rgba(10, 12, 24, 0.82);
+    rgb(var(--surface-deep-rgb) / 0.82);
   color: var(--text);
   transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
 }
 
 .excalidraw .Dialog.confirm-dialog .Dialog__action-button:hover {
   transform: translateY(-1px);
-  border-color: rgba(147, 173, 255, 0.18);
+  border-color: rgb(var(--line-rgb) / 0.18);
 }
 
 .excalidraw .Dialog.confirm-dialog .Dialog__action-button--danger {
-  border-color: color-mix(in srgb, #ff8b7a 26%, rgba(147, 173, 255, 0.14));
+  border-color: color-mix(in srgb, #ff8b7a 26%, rgb(var(--line-rgb) / 0.14));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.015)),
     rgba(96, 29, 24, 0.86);
@@ -1159,7 +1159,7 @@
 }
 
 .excalidraw .Dialog.confirm-dialog .Dialog__action-button--danger:hover {
-  border-color: color-mix(in srgb, #ff8b7a 40%, rgba(147, 173, 255, 0.14));
+  border-color: color-mix(in srgb, #ff8b7a 40%, rgb(var(--line-rgb) / 0.14));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.016)),
     rgba(116, 35, 28, 0.9);

@@ -1152,6 +1152,34 @@ async function writeGoogleDriveJournalState(
   return sanitizeText(response.id, record.journalFileId ?? "") || null;
 }
 
+async function ensureGoogleDriveJournalState(
+  accessToken: string,
+  record: Pick<GoogleDriveRemoteVaultRecord, "id" | "journalFileId">
+) {
+  const journalState = await readGoogleDriveJournalState(accessToken, record);
+
+  if (journalState.fileId) {
+    return {
+      journalFileId: journalState.fileId,
+      entries: journalState.blob.entries
+    };
+  }
+
+  const journalFileId = await writeGoogleDriveJournalState(
+    accessToken,
+    {
+      id: record.id,
+      journalFileId: null
+    },
+    journalState.blob.entries
+  );
+
+  return {
+    journalFileId,
+    entries: journalState.blob.entries
+  };
+}
+
 export async function connectGoogleDriveAccount(options?: {
   clientId?: string;
   loginHint?: string;
@@ -1427,14 +1455,10 @@ export async function saveGoogleDriveRemoteEnvelope(
     parents: existing ? undefined : [GOOGLE_DRIVE_APP_FOLDER],
     payload: blob
   });
-  const journalFileId = await writeGoogleDriveJournalState(
-    accessToken,
-    {
-      id: input.vaultId,
-      journalFileId: existing?.journalFileId ?? null
-    },
-    []
-  );
+  const { journalFileId } = await ensureGoogleDriveJournalState(accessToken, {
+    id: input.vaultId,
+    journalFileId: existing?.journalFileId ?? null
+  });
   const record: GoogleDriveRemoteVaultRecord = {
     id: input.vaultId,
     name: sanitizeText(input.vaultName, input.vaultId),
@@ -1456,6 +1480,78 @@ export async function saveGoogleDriveRemoteEnvelope(
   });
 
   return record;
+}
+
+export async function appendGoogleDriveJournalEntry(
+  accessToken: string,
+  input: {
+    vaultId: string;
+    revision: string;
+    baseRevision: string | null;
+    changes?: SyncChangeSet | null;
+    encryptedChanges?: SyncEncryptedPayload | null;
+    fallbackDeviceId?: string;
+  }
+) {
+  const record = await getRemoteVaultRecord(accessToken, input.vaultId);
+
+  if (!record) {
+    throw new Error("VAULT_NOT_FOUND");
+  }
+
+  const { journalFileId, entries } = await ensureGoogleDriveJournalState(accessToken, {
+    id: input.vaultId,
+    journalFileId: record.journalFileId ?? null
+  });
+  const nextEntry: GoogleDriveVaultJournalEntry = input.encryptedChanges
+    ? {
+        revision: input.revision,
+        baseRevision: input.baseRevision,
+        createdAt: now(),
+        changes: null,
+        encryptedChanges: input.encryptedChanges
+      }
+    : {
+        revision: input.revision,
+        baseRevision: input.baseRevision,
+        createdAt: now(),
+        changes: normalizeChangeSetPayload(
+          input.changes,
+          input.fallbackDeviceId ?? "google-drive"
+        ),
+        encryptedChanges: null
+      };
+  const nextJournal = [...entries.filter((entry) => entry.revision !== input.revision), nextEntry];
+  const nextJournalFileId = await writeGoogleDriveJournalState(
+    accessToken,
+    {
+      id: input.vaultId,
+      journalFileId
+    },
+    nextJournal
+  );
+
+  if ((record.journalFileId ?? null) !== (nextJournalFileId ?? null)) {
+    const state = await readGoogleDriveManifestState(accessToken);
+
+    await writeGoogleDriveManifest(accessToken, {
+      ...state,
+      manifest: {
+        ...state.manifest,
+        updatedAt: now(),
+        vaults: state.manifest.vaults.map((entry) =>
+          entry.id === input.vaultId
+            ? {
+                ...entry,
+                journalFileId: nextJournalFileId
+              }
+            : entry
+        )
+      }
+    });
+  }
+
+  return nextJournalFileId;
 }
 
 export async function loadGoogleDriveRemoteChangeFeed(

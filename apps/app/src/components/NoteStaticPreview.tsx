@@ -49,6 +49,7 @@ interface NoteStaticPreviewProps {
   accentColor?: string;
   compact?: boolean;
   interactive?: boolean;
+  onChecklistItemToggle?: (blockId: string, checked: boolean) => Promise<void> | void;
   className?: string;
 }
 
@@ -68,9 +69,16 @@ function getBlockStyle(props: Record<string, unknown> | undefined) {
   const textColor = getColorValue(props?.textColor, DARK_TEXT_COLORS);
   const backgroundColor = getColorValue(props?.backgroundColor, DARK_BACKGROUND_COLORS);
   const textAlignment = props?.textAlignment;
+  const fontFamily = resolveEditorFontFamily(
+    typeof props?.font === "string" ? props.font : null
+  );
 
   if (textColor) {
     style.color = textColor;
+  }
+
+  if (fontFamily) {
+    style.fontFamily = fontFamily;
   }
 
   if (backgroundColor) {
@@ -276,10 +284,23 @@ type RenderContext = {
   interactive: boolean;
   emptyLabel: string;
   resolvedUrls: Record<string, string>;
+  onChecklistItemToggle?: (blockId: string, checked: boolean) => Promise<void> | void;
 };
 
 function hasInlineContent(content: unknown) {
   return extractText(content).trim().length > 0;
+}
+
+function hasVisibleBlockBackground(props: Record<string, unknown> | undefined) {
+  return Boolean(getColorValue(props?.backgroundColor, DARK_BACKGROUND_COLORS));
+}
+
+function renderEmptyInlineLine() {
+  return (
+    <span className="note-static-empty-line" aria-hidden="true">
+      &nbsp;
+    </span>
+  );
 }
 
 function hasRenderableBlockStream(blocks: StoredBlock[]) {
@@ -294,6 +315,10 @@ function hasRenderableBlock(block: StoredBlock): boolean {
       : false;
 
   if (blockType === "divider") {
+    return true;
+  }
+
+  if (hasVisibleBlockBackground(block.props)) {
     return true;
   }
 
@@ -491,12 +516,36 @@ function renderListGroup(
     >
       {orderedBlocks.map((block, index) => {
         const checked = Boolean(block.props?.checked);
+        const blockId = typeof block.id === "string" ? block.id : null;
+        const hasBackground = hasVisibleBlockBackground(block.props);
+        const canToggleChecklist =
+          isCheck &&
+          context.interactive &&
+          Boolean(blockId) &&
+          typeof context.onChecklistItemToggle === "function";
         const hasText = hasInlineContent(block.content);
         const marker =
           isCheck ? (
-            <span
-              className={`note-static-checkmark ${checked ? "is-checked" : ""}`}
-              aria-hidden="true"
+            <button
+              type="button"
+              className={`note-static-checkmark note-static-checkmark-button ${
+                checked ? "is-checked" : ""
+              }`}
+              role="checkbox"
+              aria-checked={checked}
+              aria-label="Toggle checklist item"
+              disabled={!canToggleChecklist}
+              onPointerDown={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+
+                if (!blockId || !context.onChecklistItemToggle) {
+                  return;
+                }
+
+                void context.onChecklistItemToggle(blockId, !checked);
+              }}
             >
               <span className="note-static-checkmark-box">
                 {checked ? (
@@ -512,7 +561,7 @@ function renderListGroup(
                   </svg>
                 ) : null}
               </span>
-            </span>
+            </button>
           ) : type === "toggleListItem" ? (
             <span className="note-static-toggle-marker" aria-hidden="true">
               {">"}
@@ -526,9 +575,11 @@ function renderListGroup(
           >
             {marker}
             <div className="note-static-list-body">
-              {hasText ? (
+              {hasText || hasBackground ? (
                 <div className="note-static-list-text" style={getBlockStyle(block.props)}>
-                  {renderInlineContent(block.content, `${key}-item-inline-${index}`)}
+                  {hasText
+                    ? renderInlineContent(block.content, `${key}-item-inline-${index}`)
+                    : renderEmptyInlineLine()}
                 </div>
               ) : null}
               {Array.isArray(block.children) && block.children.length > 0 ? (
@@ -607,15 +658,17 @@ function renderBlock(block: StoredBlock, context: RenderContext, key: string) {
   }
 
   if (blockType === "quote") {
-    if (!hasText && !children) {
+    const hasBackground = hasVisibleBlockBackground(block.props);
+
+    if (!hasText && !hasBackground && !children) {
       return null;
     }
 
     return (
       <Fragment key={key}>
-        {hasText ? (
+        {hasText || hasBackground ? (
           <blockquote className="note-static-quote" style={getBlockStyle(block.props)}>
-            {renderInlineContent(block.content, `${key}-quote`)}
+            {hasText ? renderInlineContent(block.content, `${key}-quote`) : renderEmptyInlineLine()}
           </blockquote>
         ) : null}
         {children}
@@ -625,21 +678,24 @@ function renderBlock(block: StoredBlock, context: RenderContext, key: string) {
 
   if (blockType === "heading") {
     const level = typeof block.props?.level === "number" ? block.props.level : 2;
+    const hasBackground = hasVisibleBlockBackground(block.props);
     const HeadingTag = (level <= 1 ? "h1" : level === 2 ? "h2" : level === 3 ? "h3" : "h4") as
       | "h1"
       | "h2"
       | "h3"
       | "h4";
 
-    if (!hasText && !children) {
+    if (!hasText && !hasBackground && !children) {
       return null;
     }
 
     return (
       <Fragment key={key}>
-        {hasText ? (
+        {hasText || hasBackground ? (
           <HeadingTag className="note-static-heading" style={getBlockStyle(block.props)}>
-            {renderInlineContent(block.content, `${key}-heading`)}
+            {hasText
+              ? renderInlineContent(block.content, `${key}-heading`)
+              : renderEmptyInlineLine()}
           </HeadingTag>
         ) : null}
         {children}
@@ -647,15 +703,17 @@ function renderBlock(block: StoredBlock, context: RenderContext, key: string) {
     );
   }
 
-  if (!hasText && !children) {
+  const hasBackground = hasVisibleBlockBackground(block.props);
+
+  if (!hasText && !hasBackground && !children) {
     return null;
   }
 
   return (
     <Fragment key={key}>
-      {hasText ? (
+      {hasText || hasBackground ? (
         <p className="note-static-paragraph" style={getBlockStyle(block.props)}>
-          {renderInlineContent(block.content, `${key}-paragraph`)}
+          {hasText ? renderInlineContent(block.content, `${key}-paragraph`) : renderEmptyInlineLine()}
         </p>
       ) : null}
       {children}
@@ -700,6 +758,7 @@ export default function NoteStaticPreview({
   accentColor,
   compact = false,
   interactive = false,
+  onChecklistItemToggle,
   className
 }: NoteStaticPreviewProps) {
   const normalizedContent = useMemo(() => normalizeNoteContent(content), [content]);
@@ -752,7 +811,8 @@ export default function NoteStaticPreview({
     compact,
     interactive,
     emptyLabel,
-    resolvedUrls
+    resolvedUrls,
+    onChecklistItemToggle
   };
   const hasVisibleContent = hasRenderableBlockStream(normalizedContent);
   const previewStyle = accentColor

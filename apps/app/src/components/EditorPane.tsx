@@ -31,7 +31,7 @@ import {
   openTextFileWithDialog,
   saveTextFileWithDialog
 } from "../lib/nativeFileIntegration";
-import type { AppLanguage, Folder, Note, NoteContent, SaveState, Tag } from "../types";
+import type { AppLanguage, Folder, Note, NoteContent, SaveState, StoredBlock, Tag } from "../types";
 
 type MarkdownStatus = "copied" | "exported" | "imported" | "error" | null;
 type EditorTypographyMode = "focus" | "reading";
@@ -41,6 +41,494 @@ type PendingMarkdownImport = {
 };
 
 const EDITOR_TYPOGRAPHY_MODE_STORAGE_KEY = "zen:editor-typography-mode";
+const EMPTY_INLINE_PASTE_TARGET_TYPES = new Set([
+  "paragraph",
+  "heading",
+  "quote",
+  "bulletListItem",
+  "numberedListItem",
+  "checkListItem",
+  "toggleListItem"
+]);
+const LIST_CONTINUATION_TARGET_TYPES = new Set([
+  "bulletListItem",
+  "numberedListItem",
+  "checkListItem",
+  "toggleListItem"
+]);
+const LIST_CONTINUATION_INLINE_STYLE_KEYS = [
+  "font",
+  "textColor",
+  "backgroundColor"
+] as const;
+const LIST_CONTINUATION_BLOCK_PROP_KEYS = [
+  "textColor",
+  "backgroundColor",
+  "textAlignment"
+] as const;
+
+type BlockNoteEditorInstance = ReturnType<typeof useCreateBlockNote>;
+type EmptyInlineBlockPasteTarget = {
+  block: StoredBlock & { id: string };
+  plainText: string;
+};
+type EmptyInlinePasteRestoreSnapshot = {
+  block: StoredBlock & { id: string };
+  path: number[];
+};
+type ListContinuationStyleSeed = {
+  sourceBlockId: string;
+  sourceBlockType: string;
+  styles: Record<string, unknown>;
+  props: Record<string, unknown>;
+};
+
+function shouldCarryStyleValue(value: unknown) {
+  return value !== undefined && value !== null && value !== "" && value !== "default";
+}
+
+function pickListContinuationInlineStyles(styles: unknown) {
+  const picked: Record<string, unknown> = {};
+
+  if (!styles || typeof styles !== "object") {
+    return picked;
+  }
+
+  const record = styles as Record<string, unknown>;
+
+  LIST_CONTINUATION_INLINE_STYLE_KEYS.forEach((key) => {
+    const value = record[key];
+
+    if (shouldCarryStyleValue(value)) {
+      picked[key] = value;
+    }
+  });
+
+  return picked;
+}
+
+function pickListContinuationBlockProps(props: unknown) {
+  const picked: Record<string, unknown> = {};
+
+  if (!props || typeof props !== "object") {
+    return picked;
+  }
+
+  const record = props as Record<string, unknown>;
+
+  LIST_CONTINUATION_BLOCK_PROP_KEYS.forEach((key) => {
+    const value = record[key];
+
+    if (shouldCarryStyleValue(value) && !(key === "textAlignment" && value === "left")) {
+      picked[key] = value;
+    }
+  });
+
+  return picked;
+}
+
+function getTrailingInlineStyles(content: unknown) {
+  let trailingStyles: Record<string, unknown> = {};
+
+  const visit = (value: unknown) => {
+    if (typeof value === "string") {
+      if (value.length > 0) {
+        trailingStyles = {};
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    if (!value || typeof value !== "object") {
+      return;
+    }
+
+    const record = value as Record<string, unknown>;
+
+    if (Array.isArray(record.content)) {
+      visit(record.content);
+    }
+
+    if (typeof record.text === "string" && record.text.length > 0) {
+      trailingStyles = pickListContinuationInlineStyles(record.styles);
+    }
+  };
+
+  visit(content);
+  return trailingStyles;
+}
+
+function isEmptyInlineEditorContent(content: unknown) {
+  if (typeof content === "string") {
+    return content.length === 0;
+  }
+
+  if (!Array.isArray(content)) {
+    return content == null;
+  }
+
+  return content.every((entry) => {
+    if (typeof entry === "string") {
+      return entry.length === 0;
+    }
+
+    if (!entry || typeof entry !== "object") {
+      return true;
+    }
+
+    const text = (entry as Record<string, unknown>).text;
+    return typeof text === "string" ? text.length === 0 : false;
+  });
+}
+
+function isInlinePasteTargetBlock(editor: BlockNoteEditorInstance, block: StoredBlock) {
+  const blockType = block.type ?? "paragraph";
+  const blockSchema = editor.schema.blockSchema as Record<string, { content?: string }>;
+
+  return (
+    typeof block.id === "string" &&
+    blockSchema[blockType]?.content === "inline" &&
+    EMPTY_INLINE_PASTE_TARGET_TYPES.has(blockType) &&
+    isEmptyInlineEditorContent(block.content)
+  );
+}
+
+function getListContinuationStyleSeed(
+  editor: BlockNoteEditorInstance
+): ListContinuationStyleSeed | null {
+  let currentBlock: StoredBlock;
+
+  try {
+    currentBlock = editor.getTextCursorPosition().block as unknown as StoredBlock;
+  } catch {
+    return null;
+  }
+
+  const blockType = currentBlock.type ?? "paragraph";
+
+  if (
+    !LIST_CONTINUATION_TARGET_TYPES.has(blockType) ||
+    typeof currentBlock.id !== "string" ||
+    isEmptyInlineEditorContent(currentBlock.content)
+  ) {
+    return null;
+  }
+
+  const styles = {
+    ...getTrailingInlineStyles(currentBlock.content),
+    ...pickListContinuationInlineStyles(editor.getActiveStyles())
+  };
+  const props = pickListContinuationBlockProps(currentBlock.props);
+
+  if (Object.keys(styles).length === 0 && Object.keys(props).length === 0) {
+    return null;
+  }
+
+  return {
+    sourceBlockId: currentBlock.id,
+    sourceBlockType: blockType,
+    styles,
+    props
+  };
+}
+
+function applyListContinuationStyleSeed(
+  editor: BlockNoteEditorInstance,
+  seed: ListContinuationStyleSeed
+) {
+  let currentBlock: StoredBlock;
+
+  try {
+    currentBlock = editor.getTextCursorPosition().block as unknown as StoredBlock;
+  } catch {
+    return false;
+  }
+
+  const blockType = currentBlock.type ?? "paragraph";
+
+  if (
+    blockType !== seed.sourceBlockType ||
+    typeof currentBlock.id !== "string" ||
+    currentBlock.id === seed.sourceBlockId ||
+    !isEmptyInlineEditorContent(currentBlock.content)
+  ) {
+    return false;
+  }
+
+  const hasProps = Object.keys(seed.props).length > 0;
+  const hasStyles = Object.keys(seed.styles).length > 0;
+
+  if (hasProps) {
+    editor.updateBlock(currentBlock.id, {
+      props: {
+        ...(currentBlock.props ?? {}),
+        ...seed.props
+      }
+    });
+    editor.setTextCursorPosition(currentBlock.id, "end");
+  }
+
+  if (hasStyles) {
+    editor.addStyles(seed.styles as any);
+  }
+
+  return hasProps || hasStyles;
+}
+
+function findBlockPath(blocks: StoredBlock[], blockId: string): number[] | null {
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+
+    if (block.id === blockId) {
+      return [index];
+    }
+
+    if (Array.isArray(block.children) && block.children.length > 0) {
+      const childPath = findBlockPath(block.children, blockId);
+
+      if (childPath) {
+        return [index, ...childPath];
+      }
+    }
+  }
+
+  return null;
+}
+
+function getEmptyInlineBlockPasteTarget(
+  editor: BlockNoteEditorInstance,
+  event: ClipboardEvent
+): EmptyInlineBlockPasteTarget | null {
+  const clipboardData = event.clipboardData;
+  const plainText = clipboardData?.getData("text/plain") ?? "";
+
+  if (!clipboardData || plainText.length === 0) {
+    return null;
+  }
+
+  const clipboardTypes = Array.from(clipboardData.types);
+
+  if (
+    clipboardTypes.includes("Files") ||
+    clipboardTypes.includes("blocknote/html") ||
+    clipboardTypes.includes("text/markdown")
+  ) {
+    return null;
+  }
+
+  let currentBlock: StoredBlock;
+
+  try {
+    currentBlock = editor.getTextCursorPosition().block as unknown as StoredBlock;
+  } catch {
+    return null;
+  }
+
+  if (
+    !isInlinePasteTargetBlock(editor, currentBlock) ||
+    typeof currentBlock.id !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    block: currentBlock as StoredBlock & { id: string },
+    plainText
+  };
+}
+
+function pasteTextIntoEmptyInlineBlock(
+  editor: BlockNoteEditorInstance,
+  event: ClipboardEvent
+) {
+  const pasteTarget = getEmptyInlineBlockPasteTarget(editor, event);
+
+  if (!pasteTarget) {
+    return false;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  const activeStyles = editor.getActiveStyles();
+  const content =
+    Object.keys(activeStyles).length > 0
+      ? [
+          {
+            type: "text" as const,
+            text: pasteTarget.plainText,
+            styles: activeStyles
+          }
+        ]
+      : pasteTarget.plainText;
+
+  editor.updateBlock(pasteTarget.block.id, {
+    content
+  });
+  editor.setTextCursorPosition(pasteTarget.block.id, "end");
+  return true;
+}
+
+function getCurrentEmptyInlinePasteRestoreSnapshot(
+  editor: BlockNoteEditorInstance
+): EmptyInlinePasteRestoreSnapshot | null {
+  let currentBlock: StoredBlock;
+
+  try {
+    currentBlock = editor.getTextCursorPosition().block as unknown as StoredBlock;
+  } catch {
+    return null;
+  }
+
+  if (
+    !isInlinePasteTargetBlock(editor, currentBlock) ||
+    typeof currentBlock.id !== "string" ||
+    (currentBlock.type ?? "paragraph") === "paragraph"
+  ) {
+    return null;
+  }
+
+  const path = findBlockPath(editor.document as unknown as StoredBlock[], currentBlock.id);
+
+  if (!path) {
+    return null;
+  }
+
+  return {
+    block: currentBlock as StoredBlock & { id: string },
+    path
+  };
+}
+
+function getBlockAtPath(blocks: StoredBlock[], path: number[]) {
+  let currentBlocks = blocks;
+  let currentBlock: StoredBlock | null = null;
+
+  for (const index of path) {
+    currentBlock = currentBlocks[index] ?? null;
+
+    if (!currentBlock) {
+      return null;
+    }
+
+    currentBlocks = Array.isArray(currentBlock.children) ? currentBlock.children : [];
+  }
+
+  return currentBlock;
+}
+
+function restorePastedEmptyInlineBlockType(
+  blocks: NoteContent,
+  snapshot: EmptyInlinePasteRestoreSnapshot | null
+) {
+  if (!snapshot) {
+    return {
+      blocks,
+      changed: false
+    };
+  }
+
+  const restoreBlock = (block: StoredBlock): StoredBlock | null => {
+    const targetType = snapshot.block.type ?? "paragraph";
+    const sourceProps = snapshot.block.props ?? {};
+    const currentProps = block.props ?? {};
+    const typeMatches = (block.type ?? "paragraph") === targetType;
+    const propsMatch = Object.entries(sourceProps).every(
+      ([key, value]) => currentProps[key as keyof typeof currentProps] === value
+    );
+
+    if (typeMatches && propsMatch) {
+      return null;
+    }
+
+    return {
+      ...block,
+      type: targetType,
+      props: {
+        ...currentProps,
+        ...sourceProps
+      }
+    };
+  };
+
+  const restoreById = (entries: StoredBlock[]): StoredBlock[] | null => {
+    let changed = false;
+    const nextEntries = entries.map((block) => {
+      if (block.id === snapshot.block.id) {
+        const restoredBlock = restoreBlock(block);
+
+        if (restoredBlock) {
+          changed = true;
+          return restoredBlock;
+        }
+      }
+
+      if (Array.isArray(block.children) && block.children.length > 0) {
+        const restoredChildren = restoreById(block.children);
+
+        if (restoredChildren) {
+          changed = true;
+          return {
+            ...block,
+            children: restoredChildren
+          };
+        }
+      }
+
+      return block;
+    });
+
+    return changed ? nextEntries : null;
+  };
+
+  const restoredById = restoreById(blocks);
+
+  if (restoredById) {
+    return {
+      blocks: restoredById,
+      changed: true
+    };
+  }
+
+  const blockAtOriginalPath = getBlockAtPath(blocks, snapshot.path);
+  const restoredBlockAtPath = blockAtOriginalPath ? restoreBlock(blockAtOriginalPath) : null;
+
+  if (!restoredBlockAtPath) {
+    return {
+      blocks,
+      changed: false
+    };
+  }
+
+  const restoreByPath = (entries: StoredBlock[], path: number[]): StoredBlock[] => {
+    const [index, ...restPath] = path;
+
+    return entries.map((block, currentIndex) => {
+      if (currentIndex !== index) {
+        return block;
+      }
+
+      if (restPath.length === 0) {
+        return restoredBlockAtPath;
+      }
+
+      return {
+        ...block,
+        children: restoreByPath(Array.isArray(block.children) ? block.children : [], restPath)
+      };
+    });
+  };
+
+  return {
+    blocks: restoreByPath(blocks, snapshot.path),
+    changed: true
+  };
+}
 
 interface EditorPaneProps {
   note: Note;
@@ -95,6 +583,8 @@ export default function EditorPane({
   const contentTimeoutRef = useRef<number | null>(null);
   const markdownStatusTimeoutRef = useRef<number | null>(null);
   const isApplyingChecklistTransformRef = useRef(false);
+  const pendingEmptyInlinePasteRestoreRef =
+    useRef<EmptyInlinePasteRestoreSnapshot | null>(null);
   const checklistStableOrderRef = useRef(new Map<string, number>());
   const latestTitleDraftRef = useRef(titleDraft);
   const latestStoredTitleRef = useRef(note.title);
@@ -148,6 +638,13 @@ export default function EditorPane({
       tabBehavior: "prefer-indent",
       uploadFile: onUploadFile,
       resolveFileUrl: onResolveFileUrl,
+      pasteHandler: ({ event, editor, defaultPasteHandler }) => {
+        if (pasteTextIntoEmptyInlineBlock(editor, event)) {
+          return true;
+        }
+
+        return defaultPasteHandler();
+      },
       domAttributes: {
         editor: {
           class: "zen-editor-surface"
@@ -160,6 +657,104 @@ export default function EditorPane({
   useEffect(() => {
     latestTitleDraftRef.current = titleDraft;
   }, [titleDraft]);
+
+  useEffect(() => {
+    return editor.onBeforeChange(({ getChanges }) => {
+      if (!getChanges().some((change) => change.source.type === "paste")) {
+        return;
+      }
+
+      pendingEmptyInlinePasteRestoreRef.current =
+        getCurrentEmptyInlinePasteRestoreSnapshot(editor);
+    });
+  }, [editor]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let removeEditorDomListeners: (() => void) | null = null;
+    let animationFrameId: number | null = null;
+    let styleContinuationFrameId: number | null = null;
+
+    const handlePasteCapture = (event: ClipboardEvent) => {
+      pasteTextIntoEmptyInlineBlock(editor, event);
+    };
+
+    const handleKeyDownCapture = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.key !== "Enter" ||
+        event.shiftKey ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      ) {
+        return;
+      }
+
+      const styleSeed = getListContinuationStyleSeed(editor);
+
+      if (!styleSeed) {
+        return;
+      }
+
+      if (styleContinuationFrameId !== null) {
+        window.cancelAnimationFrame(styleContinuationFrameId);
+      }
+
+      styleContinuationFrameId = window.requestAnimationFrame(() => {
+        styleContinuationFrameId = null;
+
+        if (!cancelled) {
+          applyListContinuationStyleSeed(editor, styleSeed);
+        }
+      });
+    };
+
+    const attachPasteCaptureListener = () => {
+      if (cancelled || removeEditorDomListeners) {
+        return;
+      }
+
+      const editorElement = editor.domElement;
+
+      if (!editorElement) {
+        animationFrameId = window.requestAnimationFrame(attachPasteCaptureListener);
+        return;
+      }
+
+      editorElement.addEventListener("paste", handlePasteCapture, {
+        capture: true
+      });
+      editorElement.addEventListener("keydown", handleKeyDownCapture, {
+        capture: true
+      });
+      removeEditorDomListeners = () => {
+        editorElement.removeEventListener("paste", handlePasteCapture, {
+          capture: true
+        });
+        editorElement.removeEventListener("keydown", handleKeyDownCapture, {
+          capture: true
+        });
+      };
+    };
+
+    attachPasteCaptureListener();
+
+    return () => {
+      cancelled = true;
+
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+
+      if (styleContinuationFrameId !== null) {
+        window.cancelAnimationFrame(styleContinuationFrameId);
+      }
+
+      removeEditorDomListeners?.();
+    };
+  }, [editor]);
 
   useEffect(() => {
     latestStoredTitleRef.current = note.title;
@@ -183,7 +778,14 @@ export default function EditorPane({
       return;
     }
 
-    const nextDocument = editor.document as unknown as NoteContent;
+    const pasteRestore = restorePastedEmptyInlineBlockType(
+      editor.document as unknown as NoteContent,
+      pendingEmptyInlinePasteRestoreRef.current
+    );
+    pendingEmptyInlinePasteRestoreRef.current = null;
+    const nextDocument = pasteRestore.changed
+      ? pasteRestore.blocks
+      : (editor.document as unknown as NoteContent);
     seedChecklistStableOrderMap(nextDocument, checklistStableOrderRef.current);
     const checklistNormalization = normalizeChecklistOrdering(nextDocument, (block, fallbackIndex) => {
       const blockId = typeof block.id === "string" ? block.id : null;
@@ -210,9 +812,9 @@ export default function EditorPane({
       window.clearTimeout(contentTimeoutRef.current);
     }
 
-    if (checklistNormalization.changed) {
+    if (pasteRestore.changed || checklistNormalization.changed) {
       isApplyingChecklistTransformRef.current = true;
-      editor.replaceBlocks(editor.document as any, checklistNormalization.blocks as any);
+      editor.replaceBlocks(editor.document as any, contentToPersist as any);
     }
 
     onContentChange(contentToPersist, "saving");

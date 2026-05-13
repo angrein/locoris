@@ -24,7 +24,7 @@
   padding: 12px 14px 14px;
   background:
     radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--editor-accent) 12%, transparent), transparent 32%),
-    radial-gradient(circle at 88% 14%, rgba(115, 247, 255, 0.035), transparent 30%);
+    radial-gradient(circle at 88% 14%, rgb(var(--cyan-rgb) / 0.035), transparent 30%);
 }
 
 .editor-pane.is-reading {
@@ -49,11 +49,11 @@
   min-width: 0;
   padding: 8px;
   border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--editor-accent) 20%, rgba(147, 173, 255, 0.1));
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 20%, rgb(var(--line-rgb) / 0.1));
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 8%, transparent), transparent 42%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
-    rgba(8, 10, 22, 0.72);
+    rgb(var(--surface-deep-rgb) / 0.72);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.035),
     0 16px 38px rgba(0, 0, 0, 0.18);
@@ -85,7 +85,7 @@
   min-height: 36px;
   padding: 0 12px;
   border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgba(147, 173, 255, 0.11));
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgb(var(--line-rgb) / 0.11));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.018)),
     rgba(7, 9, 20, 0.78);
@@ -101,7 +101,7 @@
 }
 
 .editor-pane-title-field:focus {
-  border-color: color-mix(in srgb, var(--editor-accent) 44%, rgba(115, 247, 255, 0.2));
+  border-color: color-mix(in srgb, var(--editor-accent) 44%, rgb(var(--cyan-rgb) / 0.2));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.02)),
     rgba(8, 11, 24, 0.9);
@@ -125,7 +125,7 @@
   gap: 3px;
   padding: 3px;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -167,7 +167,7 @@
   align-items: center;
   border-radius: 999px;
   padding: 3px 8px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.035);
   color: color-mix(in srgb, var(--text) 82%, var(--text-dim) 18%);
   font-size: 0.62rem;
@@ -185,18 +185,18 @@
 
 .editor-pane-chip.is-warm,
 .editor-pane-save-pill.is-saved {
-  border-color: color-mix(in srgb, var(--editor-accent) 30%, rgba(255, 224, 138, 0.14));
+  border-color: color-mix(in srgb, var(--editor-accent) 30%, rgb(var(--gold-rgb) / 0.14));
   background: color-mix(in srgb, var(--editor-accent) 13%, rgba(255, 255, 255, 0.03));
   color: color-mix(in srgb, var(--text) 88%, var(--editor-accent) 12%);
 }
 
 .editor-pane-save-pill.is-saving {
-  border-color: rgba(115, 247, 255, 0.22);
-  background: rgba(115, 247, 255, 0.08);
+  border-color: rgb(var(--cyan-rgb) / 0.22);
+  background: rgb(var(--cyan-rgb) / 0.08);
 }
 
 .editor-pane-save-pill.is-idle {
-  border-color: rgba(147, 173, 255, 0.1);
+  border-color: rgb(var(--line-rgb) / 0.1);
   background: rgba(255, 255, 255, 0.025);
   color: var(--text-dim);
 }
@@ -226,7 +226,7 @@
   flex: 0 0 auto;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
     rgba(255, 255, 255, 0.025);
@@ -240,7 +240,7 @@
 
 .editor-pane-ghost-action:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--editor-accent) 28%, rgba(147, 173, 255, 0.18));
+  border-color: color-mix(in srgb, var(--editor-accent) 28%, rgb(var(--line-rgb) / 0.18));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
     color-mix(in srgb, var(--editor-accent) 9%, rgba(255, 255, 255, 0.026));
@@ -260,8 +260,8 @@
 
 .editor-pane-markdown-status {
   flex: 0 0 auto;
-  border-color: rgba(115, 247, 255, 0.18);
-  background: rgba(115, 247, 255, 0.07);
+  border-color: rgb(var(--cyan-rgb) / 0.18);
+  background: rgb(var(--cyan-rgb) / 0.07);
   color: color-mix(in srgb, var(--text) 86%, #73f7ff 14%);
 }
 
@@ -302,10 +302,10 @@
   overflow: auto;
   overflow-x: hidden;
   border-radius: 28px;
-  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgba(147, 173, 255, 0.1));
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgb(var(--line-rgb) / 0.1));
   background:
     radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--editor-accent) 12%, transparent), transparent 30%),
-    radial-gradient(circle at 100% 8%, rgba(115, 247, 255, 0.045), transparent 28%),
+    radial-gradient(circle at 100% 8%, rgb(var(--cyan-rgb) / 0.045), transparent 28%),
     linear-gradient(180deg, rgba(10, 12, 28, 0.92), rgba(5, 7, 16, 0.98));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.035),
@@ -322,7 +322,7 @@
   --bn-colors-menu-text: var(--text);
   --bn-colors-tooltip-text: var(--text);
   --bn-colors-hovered-text: var(--text);
-  --bn-colors-side-menu: color-mix(in srgb, var(--editor-accent) 38%, rgba(147, 173, 255, 0.18));
+  --bn-colors-side-menu: color-mix(in srgb, var(--editor-accent) 38%, rgb(var(--line-rgb) / 0.18));
   height: auto;
   min-height: 100%;
   background: transparent;
@@ -416,16 +416,16 @@
 .editor-stage-shell .bn-editor .bn-inline-content code {
   padding: 0.12em 0.34em;
   border-radius: 0.55rem;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.045);
-  color: color-mix(in srgb, var(--text) 90%, rgba(141, 183, 255, 0.14));
+  color: color-mix(in srgb, var(--text) 90%, rgb(var(--blue-rgb) / 0.14));
   font-family: var(--font-ui-mono);
   font-size: 0.92em;
 }
 
 .editor-stage-shell .bn-editor .bn-block-content[data-content-type="codeBlock"] {
   border-radius: 18px;
-  border: 1px solid rgba(147, 173, 255, 0.14);
+  border: 1px solid rgb(var(--line-rgb) / 0.14);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
     rgba(6, 8, 18, 0.88);
@@ -440,14 +440,14 @@
 
 .editor-stage-shell .bn-editor .bn-block-content[data-content-type="quote"] blockquote {
   padding-left: 0.9rem;
-  border-left-color: color-mix(in srgb, var(--editor-accent) 38%, rgba(147, 173, 255, 0.2));
+  border-left-color: color-mix(in srgb, var(--editor-accent) 38%, rgb(var(--line-rgb) / 0.2));
   color: color-mix(in srgb, var(--text) 86%, rgba(255, 255, 255, 0.14));
 }
 
 .editor-stage-shell .bn-editor table,
 .editor-stage-shell .bn-editor td,
 .editor-stage-shell .bn-editor th {
-  border-color: rgba(147, 173, 255, 0.14);
+  border-color: rgb(var(--line-rgb) / 0.14);
 }
 
 .editor-stage-shell .bn-editor img,
@@ -459,7 +459,7 @@
 
 .editor-stage-shell .bn-editor [data-file-block],
 .editor-stage-shell .bn-editor blockquote {
-  border-color: rgba(147, 173, 255, 0.14);
+  border-color: rgb(var(--line-rgb) / 0.14);
 }
 
 .editor-stage-shell .bn-side-menu {
@@ -481,8 +481,8 @@
 .editor-stage-shell .bn-suggestion-menu,
 .editor-stage-shell .bn-link-toolbar,
 .editor-stage-shell .bn-table-handle-menu {
-  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgba(147, 173, 255, 0.12));
-  background: rgba(8, 10, 22, 0.9);
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgb(var(--line-rgb) / 0.12));
+  background: rgb(var(--surface-deep-rgb) / 0.9);
   box-shadow:
     0 14px 42px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -506,11 +506,11 @@
   gap: 11px;
   padding: 11px;
   border-radius: 22px;
-  border: 1px solid color-mix(in srgb, var(--editor-accent) 15%, rgba(147, 173, 255, 0.1));
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 15%, rgb(var(--line-rgb) / 0.1));
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 7%, transparent), transparent 48%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.014)),
-    rgba(8, 10, 22, 0.7);
+    rgb(var(--surface-deep-rgb) / 0.7);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 

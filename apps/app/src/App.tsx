@@ -46,6 +46,14 @@ import {
 } from "./data/db";
 import { createEncryptionDescriptor, verifyEncryptionPassphrase } from "./lib/e2ee";
 import {
+  APP_ACCENT_THEME_STORAGE_KEY,
+  applyAppAccentThemeToRoot,
+  readStoredAppAccentThemeId,
+  resolveAppAccentThemeId,
+  writeStoredAppAccentThemeId,
+  type AppAccentThemeId
+} from "./lib/accentThemes";
+import {
   hasVaultEncryptionSession,
   getVaultEncryptionSessionPassphrase,
   lockVaultEncryptionSession,
@@ -55,7 +63,9 @@ import {
   buildFolderPathMap,
   getDescendantFolderIds,
   getFolderCascade,
-  matchSearch
+  matchSearch,
+  normalizeChecklistOrdering,
+  updateChecklistItemChecked
 } from "./lib/notes";
 import {
   createLocalVaultProfile,
@@ -176,6 +186,9 @@ export default function App() {
   const [activeLocalVaultId, setActiveLocalVaultId] = useState(() => getStoredActiveLocalVaultId());
   const [localVaults, setLocalVaults] = useState(() => listLocalVaultProfiles());
   const [selectedSyncVaultId, setSelectedSyncVaultId] = useState(() => getStoredActiveLocalVaultId());
+  const [accentThemeId, setAccentThemeId] = useState<AppAccentThemeId>(() =>
+    readStoredAppAccentThemeId()
+  );
   const [syncConnections, setSyncConnections] = useState(() => listSyncConnections());
   const [syncBindings, setSyncBindings] = useState(() => listSyncBindings());
   const [vaultEncryptionById, setVaultEncryptionById] = useState<Record<string, VaultEncryptionSummary>>({});
@@ -483,6 +496,26 @@ export default function App() {
       cancelled = true;
     };
   }, [activeLocalVaultId, buildVaultEncryptionSummary, settings]);
+
+  useEffect(() => {
+    applyAppAccentThemeToRoot(accentThemeId);
+  }, [accentThemeId]);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== APP_ACCENT_THEME_STORAGE_KEY) {
+        return;
+      }
+
+      setAccentThemeId(resolveAppAccentThemeId(event.newValue));
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
 
   useEffect(() => {
     if (!settings) {
@@ -1828,6 +1861,12 @@ export default function App() {
     });
   };
 
+  const handleChangeAccentTheme = (themeId: AppAccentThemeId) => {
+    const nextThemeId = resolveAppAccentThemeId(themeId);
+    writeStoredAppAccentThemeId(nextThemeId);
+    setAccentThemeId(nextThemeId);
+  };
+
   const getVaultDescriptor = (localVaultId: string) => {
     const vault =
       localVaults.find((entry) => entry.id === localVaultId) ??
@@ -2849,6 +2888,27 @@ export default function App() {
     await handleContentChangeForNote(activeNote.id, content, state);
   };
 
+  const handleToggleChecklistItemForNote = async (
+    noteId: string,
+    blockId: string,
+    checked: boolean
+  ) => {
+    const note = notes.find((currentNote) => currentNote.id === noteId);
+
+    if (!note || note.contentType !== "note") {
+      return;
+    }
+
+    const checklistUpdate = updateChecklistItemChecked(note.content, blockId, checked);
+
+    if (!checklistUpdate.changed) {
+      return;
+    }
+
+    const checklistOrdering = normalizeChecklistOrdering(checklistUpdate.blocks);
+    await handleContentChangeForNote(noteId, checklistOrdering.blocks, "saved");
+  };
+
   const handleOpenOrbital = () => {
     setOrbitalOpen(true);
   };
@@ -3047,6 +3107,7 @@ export default function App() {
         settingsModalSlot={
           <SettingsPanel
             settings={settings}
+            accentThemeId={accentThemeId}
             online={online}
             localVaults={localVaults}
             activeLocalVaultId={activeLocalVaultId}
@@ -3055,6 +3116,7 @@ export default function App() {
             syncBindings={syncBindings}
             vaultEncryptionById={vaultEncryptionById}
             syncFeedback={syncFeedback}
+            onAccentThemeChange={handleChangeAccentTheme}
             onLanguageChange={(language) => void handleChangeLanguage(language)}
             onSelectLocalVault={(localVaultId) => setSelectedSyncVaultId(localVaultId)}
             onCreateLocalVault={(input) => handleCreateLocalVault(input)}
@@ -3160,6 +3222,7 @@ export default function App() {
           return canvas;
         }}
         onOpenNote={(noteId) => void handleOpenOrbitalNote(noteId)}
+        onToggleNoteChecklistItem={handleToggleChecklistItemForNote}
         onResolveFileUrl={resolveAssetUrl}
         labels={{
           title: t("orbit.title"),

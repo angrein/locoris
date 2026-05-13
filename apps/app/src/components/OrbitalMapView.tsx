@@ -8,8 +8,7 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-  type WheelEvent as ReactWheelEvent
+  type ReactNode
 } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -117,6 +116,11 @@ interface OrbitalMapViewProps {
   onCreateNote: (folderId: string | null, projectId?: string) => Promise<Note>;
   onCreateCanvas: (folderId: string | null, projectId?: string) => Promise<Note>;
   onOpenNote: (noteId: string) => void;
+  onToggleNoteChecklistItem?: (
+    noteId: string,
+    blockId: string,
+    checked: boolean
+  ) => Promise<void> | void;
   onResolveFileUrl?: (url: string) => Promise<string>;
   labels: {
     title: string;
@@ -421,9 +425,9 @@ const CAMERA_MAX_SCALE = 2.2;
 const ORBITAL_SCENE_BODY_BUDGET = 70;
 const PROJECT_MIN_DISTANCE = 430;
 const ORBIT_INTERACTION_WINDOW_MS = 1800;
-const ORBIT_ACTIVE_FRAME_MS = 1000 / 18;
+const ORBIT_ACTIVE_FRAME_MS = 1000 / 25;
 const ORBIT_IDLE_FRAME_MS = 1000 / 10;
-const ORBIT_ACTIVE_FRAME_MS_LARGE = 1000 / 14;
+const ORBIT_ACTIVE_FRAME_MS_LARGE = 1000 / 15;
 const ORBIT_IDLE_FRAME_MS_LARGE = 1000 / 7;
 const INSPECTOR_LONG_PRESS_MS = 460;
 const INSPECTOR_LONG_PRESS_MOVE_TOLERANCE = 12;
@@ -1995,6 +1999,7 @@ export default function OrbitalMapView({
   onCreateNote,
   onCreateCanvas,
   onOpenNote,
+  onToggleNoteChecklistItem,
   onResolveFileUrl,
   labels
 }: OrbitalMapViewProps) {
@@ -2106,6 +2111,7 @@ export default function OrbitalMapView({
   const cameraAnimationFrameRef = useRef<number | null>(null);
   const sceneAnimationFrameRef = useRef<number | null>(null);
   const sceneAnimationLastTimeRef = useRef<number | null>(null);
+  const sceneWrapRef = useRef<HTMLDivElement | null>(null);
   const animatedNodePositionsRef = useRef(new Map<string, OrbitalScenePosition>());
   const targetNodePositionsRef = useRef(new Map<string, OrbitalScenePosition>());
   const projectPositionDraftsRef = useRef<Record<string, { x: number; y: number }>>({});
@@ -3248,27 +3254,6 @@ export default function OrbitalMapView({
     () => currentProjectNotes.filter((note) => isEntryFavorite(note)).length,
     [currentProjectNotes]
   );
-  const stars = useMemo(
-    () =>
-      Array.from({ length: 56 }, (_, index) => {
-        const seed = hashString(`star-${index}`);
-        const tint = seed % 9;
-        return {
-          id: `star-${index}`,
-          x: (seed % VIEWBOX.width) + VIEWBOX.minX,
-          y: ((seed * 13) % VIEWBOX.height) + VIEWBOX.minY,
-          r: 0.8 + ((seed % 10) / 10) * 2.2,
-          opacity: 0.1 + ((seed % 100) / 100) * 0.56,
-          color:
-            tint === 0
-              ? "rgba(255, 224, 168, 0.92)"
-              : tint <= 2
-                ? "rgba(132, 230, 255, 0.9)"
-                : "rgba(241, 236, 255, 0.88)"
-        };
-      }),
-    []
-  );
   const autoFocusEnabled = isSceneBudgetConstrained && !isPriorityFocusMode;
   const isSceneFocusActive = isSceneBudgetConstrained && isPriorityFocusMode;
   const isDenseOrbitalScene = orbitalData.totalEntities > 80;
@@ -3834,29 +3819,48 @@ export default function OrbitalMapView({
     openInspectorMenu("overview");
   };
 
-  const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
-    markOrbitInteraction();
+  useEffect(() => {
+    const sceneWrap = sceneWrapRef.current;
 
-    if (
-      hoverPreviewAnchorSource === "scene" &&
-      hoveredSelectionNoteId &&
-      noteHoverPreviewScrollRef.current
-    ) {
-      event.preventDefault();
-      event.stopPropagation();
-      noteHoverPreviewScrollRef.current.scrollTop += event.deltaY;
+    if (!sceneWrap) {
       return;
     }
 
-    event.preventDefault();
-    stopCameraAnimation();
-    const multiplier = event.deltaY > 0 ? 0.92 : 1.08;
+    const handleWheel = (event: WheelEvent) => {
+      markOrbitInteraction();
 
-    setCamera((current) => ({
-      ...current,
-      scale: clamp(current.scale * multiplier, CAMERA_MIN_SCALE, CAMERA_MAX_SCALE)
-    }));
-  };
+      if (
+        hoverPreviewAnchorSource === "scene" &&
+        hoveredSelectionNoteId &&
+        noteHoverPreviewScrollRef.current
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        noteHoverPreviewScrollRef.current.scrollTop += event.deltaY;
+        return;
+      }
+
+      event.preventDefault();
+      stopCameraAnimation();
+      const multiplier = event.deltaY > 0 ? 0.92 : 1.08;
+
+      setCamera((current) => ({
+        ...current,
+        scale: clamp(current.scale * multiplier, CAMERA_MIN_SCALE, CAMERA_MAX_SCALE)
+      }));
+    };
+
+    sceneWrap.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      sceneWrap.removeEventListener("wheel", handleWheel);
+    };
+  }, [
+    hoveredSelectionNoteId,
+    hoverPreviewAnchorSource,
+    markOrbitInteraction,
+    stopCameraAnimation
+  ]);
 
   const handleCreateFolder = async () => {
     const name = folderDraft.trim();
@@ -7142,8 +7146,8 @@ export default function OrbitalMapView({
       <header className="orbital-command-bar">
         <div className="orbital-command-content">
           <div className="orbital-command-title">
-            <p className="orbital-command-kicker">{labels.title}</p>
-            <h2 className="orbital-command-heading">{labels.subtitle}</h2>
+            <h1 className="orbital-command-brand">{labels.title}</h1>
+            <p className="orbital-command-subtitle">{labels.subtitle}</p>
           </div>
 
           <div className="orbital-command-status">
@@ -7588,9 +7592,9 @@ export default function OrbitalMapView({
         </aside>
 
         <div
+          ref={sceneWrapRef}
           className="orbital-scene-wrap"
           style={{ "--orbital-scene-accent": currentProject?.color ?? DEFAULT_PROJECT_COLOR } as CSSProperties}
-          onWheel={handleWheel}
         >
           <div className="orbital-filter-dock">
             <div className="orbital-filter-shell">
@@ -7645,19 +7649,6 @@ export default function OrbitalMapView({
             onClick={handleSceneClick}
             onPointerCancel={(event) => releaseDrag(event.pointerId)}
           >
-            <g className="orbital-starfield">
-              {stars.map((star) => (
-                <circle
-                  key={star.id}
-                  cx={star.x}
-                  cy={star.y}
-                  r={star.r}
-                  opacity={star.opacity}
-                  fill={star.color}
-                />
-              ))}
-            </g>
-
             <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
               {renderedScene.links.map((link) => {
                 const linkTone = getSceneTone(link.entityId);
@@ -8060,6 +8051,9 @@ export default function OrbitalMapView({
               emptyLabel={labels.empty}
               resolveFileUrl={onResolveFileUrl}
               interactive
+              onChecklistItemToggle={(blockId, checked) =>
+                onToggleNoteChecklistItem?.(hoverPreviewNote.id, blockId, checked)
+              }
               className="orbital-note-hovercard-copy"
               labels={{
                 canvas: labels.canvas,

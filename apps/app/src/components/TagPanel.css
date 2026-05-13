@@ -57,17 +57,17 @@
   gap: 8px;
   padding: 10px;
   border-radius: 16px;
-  border: 1px solid rgba(147, 173, 255, 0.08);
+  border: 1px solid rgb(var(--line-rgb) / 0.08);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.014)),
-    rgba(10, 12, 24, 0.54);
+    rgb(var(--surface-deep-rgb) / 0.54);
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
 .tag-manager-row:hover,
 .tag-manager-row:focus-within,
 .tag-manager-row.is-selected {
-  border-color: rgba(147, 173, 255, 0.14);
+  border-color: rgb(var(--line-rgb) / 0.14);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.018)),
     rgba(11, 13, 26, 0.72);
@@ -123,7 +123,7 @@
   gap: 6px;
   padding: 16px;
   border-radius: 18px;
-  border: 1px dashed rgba(147, 173, 255, 0.12);
+  border: 1px dashed rgb(var(--line-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.018);
 }
 

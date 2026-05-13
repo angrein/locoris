@@ -1,5 +1,11 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 
+import {
+  isDesktopPersistentStorageActive,
+  readPersistentString,
+  removePersistentString,
+  writePersistentString
+} from "./persistentClientStorage";
 import type {
   AppSettings,
   SyncConnection,
@@ -9,6 +15,7 @@ import type {
 const secureSecretCache = new Map<string, string>();
 const loadedSecureSecretKeys = new Set<string>();
 const secureSecretListeners = new Set<() => void>();
+const SECURE_SECRET_FALLBACK_PREFIX = "zen-notes.secure-secret-fallback:";
 
 export const APP_SETTINGS_SECRET_FIELDS = [
   "selfHostedToken",
@@ -36,6 +43,37 @@ function isDesktopSecureRuntime() {
 
 function normalizeSecretValue(value: string | null | undefined) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function buildSecureSecretFallbackKey(key: string) {
+  return `${SECURE_SECRET_FALLBACK_PREFIX}${key.trim()}`;
+}
+
+function canUseDesktopSecretFallback() {
+  return isDesktopPersistentStorageActive();
+}
+
+function readDesktopSecretFallback(key: string) {
+  if (!canUseDesktopSecretFallback()) {
+    return "";
+  }
+
+  return normalizeSecretValue(readPersistentString(buildSecureSecretFallbackKey(key)));
+}
+
+function writeDesktopSecretFallback(key: string, value: string) {
+  if (!canUseDesktopSecretFallback()) {
+    return;
+  }
+
+  const storageKey = buildSecureSecretFallbackKey(key);
+
+  if (value) {
+    writePersistentString(storageKey, value);
+    return;
+  }
+
+  removePersistentString(storageKey);
 }
 
 function notifySecureSecretListeners() {
@@ -82,15 +120,27 @@ async function ensureSecureSecretLoaded(key: string) {
   }
 
   const nativeValue = normalizeSecretValue(await readNativeSecureSecret(normalizedKey));
+  const fallbackValue = readDesktopSecretFallback(normalizedKey);
+  const resolvedValue = nativeValue || fallbackValue;
   loadedSecureSecretKeys.add(normalizedKey);
 
-  if (nativeValue) {
-    secureSecretCache.set(normalizedKey, nativeValue);
+  if (resolvedValue) {
+    secureSecretCache.set(normalizedKey, resolvedValue);
   } else {
     secureSecretCache.delete(normalizedKey);
   }
 
-  return nativeValue;
+  if (nativeValue && !fallbackValue) {
+    writeDesktopSecretFallback(normalizedKey, nativeValue);
+  }
+
+  if (!nativeValue && fallbackValue && isDesktopSecureRuntime()) {
+    void writeNativeSecureSecret(normalizedKey, fallbackValue).catch(() => {
+      // Keep the fallback copy in the desktop store even if the native secure backend is unavailable.
+    });
+  }
+
+  return resolvedValue;
 }
 
 function setCachedSecureSecret(key: string, value: string) {
@@ -141,7 +191,19 @@ export async function writeSecureSecret(key: string, value: string) {
   }
 
   setCachedSecureSecret(normalizedKey, normalizedValue);
-  await writeNativeSecureSecret(normalizedKey, normalizedValue);
+  writeDesktopSecretFallback(normalizedKey, normalizedValue);
+
+  if (!isDesktopSecureRuntime()) {
+    return;
+  }
+
+  try {
+    await writeNativeSecureSecret(normalizedKey, normalizedValue);
+  } catch (error) {
+    if (!canUseDesktopSecretFallback()) {
+      throw error;
+    }
+  }
 }
 
 export async function deleteSecureSecret(key: string) {
@@ -152,7 +214,19 @@ export async function deleteSecureSecret(key: string) {
   }
 
   setCachedSecureSecret(normalizedKey, "");
-  await writeNativeSecureSecret(normalizedKey, "");
+  writeDesktopSecretFallback(normalizedKey, "");
+
+  if (!isDesktopSecureRuntime()) {
+    return;
+  }
+
+  try {
+    await writeNativeSecureSecret(normalizedKey, "");
+  } catch (error) {
+    if (!canUseDesktopSecretFallback()) {
+      throw error;
+    }
+  }
 }
 
 export function buildAppSettingsSecretKey(

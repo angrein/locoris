@@ -516,6 +516,39 @@ function buildSyncDirtyEntriesFromState(input: {
   return entries.sort((left, right) => left.key.localeCompare(right.key));
 }
 
+export async function rebuildSyncDirtyEntriesFromCurrentState(
+  database: ZenNotesDatabase = db
+) {
+  const [projects, folders, tags, notes, assets, shadows, tombstones] = await Promise.all([
+    database.projects.toArray(),
+    database.folders.toArray(),
+    database.tags.toArray(),
+    database.notes.toArray(),
+    database.assets.toArray(),
+    database.syncShadows.toArray(),
+    database.syncTombstones.toArray()
+  ]);
+  const dirtyEntries = buildSyncDirtyEntriesFromState({
+    projects,
+    folders,
+    tags,
+    notes,
+    assets,
+    shadows,
+    tombstones
+  });
+
+  await database.transaction("rw", database.syncDirtyEntries, async () => {
+    await database.syncDirtyEntries.clear();
+
+    if (dirtyEntries.length > 0) {
+      await database.syncDirtyEntries.bulkAdd(dirtyEntries);
+    }
+  });
+
+  return dirtyEntries;
+}
+
 export class ZenNotesDatabase extends Dexie {
   projects!: EntityTable<Project, "id">;
   folders!: EntityTable<Folder, "id">;

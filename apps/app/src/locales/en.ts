@@ -390,7 +390,7 @@ const en = {
   settings: {
     kicker: "Preferences",
     title: "Settings",
-    caption: "Interface language, app updates, and vault synchronization.",
+    caption: "Interface language, color accents, app updates, and vault synchronization.",
     networkOnline: "NET",
     networkOffline: "OFF",
     general: "General",
@@ -401,6 +401,17 @@ const en = {
       "Detected automatically on first launch, but you can switch it manually whenever you want.",
     languageEnglish: "English",
     languageRussian: "Russian",
+    accentTheme: "Interface accents",
+    accentThemeDescription:
+      "A local client theme: changes the app's system colors without touching project colors, note colors, or document text.",
+    accentThemeAriaLabel: "App color accents",
+    accentThemePanelCaption:
+      "Choose one of the built-in dark presets. Each one changes surfaces, borders, highlights, and system accents.",
+    accentThemeChoose: "Palette",
+    accentThemeClassic: "Locris",
+    accentThemeGraphite: "Graphite",
+    accentThemeVerdant: "Verdant",
+    accentThemeEmber: "Ember",
     syncTitle: "Synchronization",
     syncDescription: "{{vaultCount}} vaults on this device, {{connectionCount}} sync methods connected.",
     desktopUpdateTitle: "App updates",

@@ -20,6 +20,7 @@ import {
 } from "./e2ee";
 import { getVaultEncryptionSessionPassphrase } from "./e2eeSession";
 import {
+  appendGoogleDriveJournalEntry,
   buildGoogleDriveBindingToken,
   buildGoogleDriveConnectionLabel,
   connectGoogleDriveAccount as connectGoogleDriveAccountViaOAuth,
@@ -43,6 +44,7 @@ import { getLocalVaultProfile, type LocalVaultProfile, updateLocalVaultProfile }
 import {
   db,
   persistLocalVaultStorage,
+  rebuildSyncDirtyEntriesFromCurrentState,
   resetResolvedAssetCache,
   withLocalVaultDatabase,
   writeImportedVaultSnapshot,
@@ -2130,7 +2132,7 @@ export async function migrateRemoteVaultEncryption(
 
     await replaceLocalDataFromSnapshot(merged.snapshot, settings, database);
     await persistSyncShadows(merged.snapshot, pushed.envelope.revision, database);
-    await database.syncDirtyEntries.clear();
+    await rebuildSyncDirtyEntriesFromCurrentState(database);
     await database.settings.update("app", {
       syncStatus: "idle",
       lastSyncAt: Date.now(),
@@ -3023,7 +3025,7 @@ async function runSnapshotSyncCycle(
 
   await replaceLocalDataFromSnapshot(merged.snapshot, settings, database);
   await persistSyncShadows(merged.snapshot, pushed.envelope.revision, database);
-  await database.syncDirtyEntries.clear();
+  await rebuildSyncDirtyEntriesFromCurrentState(database);
   await database.settings.update("app", {
     syncStatus: "idle",
     lastSyncAt: Date.now(),
@@ -3082,6 +3084,10 @@ async function runGoogleDriveSyncCycle(
     },
     settings
   );
+  const snapshotJournalChanges = buildChangeSetBetweenSnapshots(
+    remoteEnvelope.snapshot,
+    merged.snapshot
+  );
 
   await saveGoogleDriveRemoteEnvelope(token, {
     vaultId,
@@ -3091,10 +3097,34 @@ async function runGoogleDriveSyncCycle(
       vaultId,
     envelope: nextEnvelope
   });
+  if (nextEnvelope.revision) {
+    if (nextEnvelope.metadata?.payloadMode === "encrypted") {
+      const { encryptedChanges } = await encryptChangeSetBatch(
+        snapshotJournalChanges,
+        remoteConfig,
+        settings
+      );
+
+      await appendGoogleDriveJournalEntry(token, {
+        vaultId,
+        revision: nextEnvelope.revision,
+        baseRevision: remoteEnvelope.revision,
+        encryptedChanges
+      });
+    } else {
+      await appendGoogleDriveJournalEntry(token, {
+        vaultId,
+        revision: nextEnvelope.revision,
+        baseRevision: remoteEnvelope.revision,
+        changes: snapshotJournalChanges,
+        fallbackDeviceId: merged.snapshot.deviceId
+      });
+    }
+  }
 
   await replaceLocalDataFromSnapshot(merged.snapshot, settings, database);
   await persistSyncShadows(merged.snapshot, nextEnvelope.revision, database);
-  await database.syncDirtyEntries.clear();
+  await rebuildSyncDirtyEntriesFromCurrentState(database);
   await database.settings.update("app", {
     syncStatus: "idle",
     lastSyncAt: Date.now(),
@@ -3162,6 +3192,23 @@ async function runGoogleDriveDeltaSyncCycle(
 
   reconcileLocalVaultProfileName(remoteConfig, remoteFeed.metadata?.vault?.name ?? null);
 
+  if (
+    remoteFeed.mode === "snapshot" &&
+    remoteFeed.snapshot &&
+    settings.syncCursor &&
+    shadows.length > 0
+  ) {
+    remoteFeed = {
+      mode: "delta",
+      revision: remoteFeed.revision,
+      baseRevision: settings.syncCursor,
+      changes: buildRecordChangeSetFromSnapshot(remoteFeed.snapshot, shadows),
+      encryptedChanges: null,
+      snapshot: null,
+      metadata: remoteFeed.metadata ?? null
+    } satisfies SyncChangeFeed;
+  }
+
   if (remoteFeed.mode === "snapshot") {
     if (remoteFeed.snapshot) {
       return runGoogleDriveSyncCycle(
@@ -3206,9 +3253,9 @@ async function runGoogleDriveDeltaSyncCycle(
     if (!isChangeSetEmpty(remoteChanges)) {
       await applySyncChangeSetToLocalData(remoteChanges, database);
       await persistSyncShadowChanges(remoteChanges, finalRevision, database);
-      await clearSyncDirtyEntriesByKeys(collectChangeSetKeys(remoteChanges), database);
     }
 
+    await rebuildSyncDirtyEntriesFromCurrentState(database);
     await database.settings.update("app", {
       syncStatus: "idle",
       lastSyncAt: Date.now(),
@@ -3311,7 +3358,7 @@ async function runGoogleDriveDeltaSyncCycle(
   }
 
   await persistSyncShadowChanges(shadowChanges, finalRevision, database);
-  await clearSyncDirtyEntriesByKeys(collectChangeSetKeys(shadowChanges), database);
+  await rebuildSyncDirtyEntriesFromCurrentState(database);
   await database.settings.update("app", {
     syncStatus: "idle",
     lastSyncAt: Date.now(),
@@ -3378,6 +3425,23 @@ async function runDeltaSyncCycle(
 
   reconcileLocalVaultProfileName(remoteConfig, remoteFeed.metadata?.vault?.name ?? null);
 
+  if (
+    remoteFeed.mode === "snapshot" &&
+    remoteFeed.snapshot &&
+    settings.syncCursor &&
+    shadows.length > 0
+  ) {
+    remoteFeed = {
+      mode: "delta",
+      revision: remoteFeed.revision,
+      baseRevision: settings.syncCursor,
+      changes: buildRecordChangeSetFromSnapshot(remoteFeed.snapshot, shadows),
+      encryptedChanges: null,
+      snapshot: null,
+      metadata: remoteFeed.metadata ?? null
+    } satisfies SyncChangeFeed;
+  }
+
   if (remoteFeed.mode === "snapshot") {
     if (remoteFeed.snapshot) {
       return runSnapshotSyncCycle(
@@ -3424,9 +3488,9 @@ async function runDeltaSyncCycle(
     if (!isChangeSetEmpty(remoteChanges)) {
       await applySyncChangeSetToLocalData(remoteChanges, database);
       await persistSyncShadowChanges(remoteChanges, finalRevision, database);
-      await clearSyncDirtyEntriesByKeys(collectChangeSetKeys(remoteChanges), database);
     }
 
+    await rebuildSyncDirtyEntriesFromCurrentState(database);
     await database.settings.update("app", {
       syncStatus: "idle",
       lastSyncAt: Date.now(),
@@ -3500,7 +3564,7 @@ async function runDeltaSyncCycle(
   }
 
   await persistSyncShadowChanges(shadowChanges, finalRevision, database);
-  await clearSyncDirtyEntriesByKeys(collectChangeSetKeys(shadowChanges), database);
+  await rebuildSyncDirtyEntriesFromCurrentState(database);
   await database.settings.update("app", {
     syncStatus: "idle",
     lastSyncAt: Date.now(),

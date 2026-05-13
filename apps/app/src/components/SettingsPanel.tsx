@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
+import {
+  APP_ACCENT_THEMES,
+  getAppAccentTheme,
+  resolveAppAccentThemeId,
+  type AppAccentThemeId
+} from "../lib/accentThemes";
 import type { LocalVaultKind, LocalVaultProfile } from "../lib/localVaults";
 import {
   checkForDesktopUpdate,
@@ -30,6 +36,7 @@ type SyncFeedbackState = {
 
 interface SettingsPanelProps {
   settings: AppSettings;
+  accentThemeId: AppAccentThemeId;
   online: boolean;
   localVaults: LocalVaultProfile[];
   activeLocalVaultId: string;
@@ -38,6 +45,7 @@ interface SettingsPanelProps {
   syncBindings: SyncVaultBinding[];
   vaultEncryptionById: Record<string, VaultEncryptionSummary>;
   syncFeedback?: SyncFeedbackState;
+  onAccentThemeChange: (themeId: AppAccentThemeId) => void;
   onLanguageChange: (language: AppLanguage) => void;
   onSelectLocalVault: (localVaultId: string) => void;
   onCreateLocalVault: (input: {
@@ -133,6 +141,29 @@ function SyncGlyph() {
   );
 }
 
+function AccentGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M10 3.2a6.8 6.8 0 0 0 0 13.6h1.2a1.5 1.5 0 0 0 1.1-2.5 1.4 1.4 0 0 1 1-2.4h.8A2.9 2.9 0 0 0 17 9a5.8 5.8 0 0 0-1.8-4.1A7.1 7.1 0 0 0 10 3.2Z" />
+      <circle cx="7" cy="8" r=".7" className="settings-row-icon-accent" />
+      <circle cx="10" cy="6.8" r=".7" className="settings-row-icon-core" />
+      <circle cx="12.9" cy="8.2" r=".7" className="settings-row-icon-accent" />
+    </svg>
+  );
+}
+
+function BackGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M12.6 4.8 7.4 10l5.2 5.2" className="settings-row-icon-accent" />
+    </svg>
+  );
+}
+
+function CloseGlyph() {
+  return <span aria-hidden="true">×</span>;
+}
+
 function ChevronGlyph({ expanded = false }: { expanded?: boolean }) {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -144,7 +175,7 @@ function ChevronGlyph({ expanded = false }: { expanded?: boolean }) {
   );
 }
 
-type SettingsView = "root" | "sync";
+type SettingsView = "root" | "sync" | "accent";
 
 function UpdateGlyph() {
   return (
@@ -159,6 +190,7 @@ function UpdateGlyph() {
 
 export default function SettingsPanel({
   settings,
+  accentThemeId,
   online,
   localVaults,
   activeLocalVaultId,
@@ -167,6 +199,7 @@ export default function SettingsPanel({
   syncBindings,
   vaultEncryptionById,
   syncFeedback = null,
+  onAccentThemeChange,
   onLanguageChange,
   onSelectLocalVault,
   onCreateLocalVault,
@@ -327,6 +360,44 @@ export default function SettingsPanel({
   const shouldShowOpenReleaseAction =
     desktopUpdateState.canOpenReleasePage &&
     (desktopUpdateState.phase === "available" || desktopUpdateState.phase === "failed");
+  const currentAccentThemeId = resolveAppAccentThemeId(accentThemeId);
+  const currentAccentTheme = getAppAccentTheme(currentAccentThemeId);
+  const renderAccentThemeOptions = (panel = false) => (
+    <div
+      className={`settings-accent-grid ${panel ? "settings-accent-grid-panel" : ""}`}
+      role="radiogroup"
+      aria-label={t("settings.accentThemeAriaLabel")}
+    >
+      {APP_ACCENT_THEMES.map((theme) => {
+        const active = currentAccentThemeId === theme.id;
+        const style = {
+          "--accent-theme-one": theme.preview[0],
+          "--accent-theme-two": theme.preview[1],
+          "--accent-theme-three": theme.preview[2]
+        } as CSSProperties;
+
+        return (
+          <button
+            key={theme.id}
+            type="button"
+            className={`settings-accent-option ${active ? "is-active" : ""}`}
+            style={style}
+            onClick={() => onAccentThemeChange(theme.id)}
+            role="radio"
+            aria-checked={active}
+            title={t(theme.labelKey)}
+          >
+            <span className="settings-accent-swatches" aria-hidden="true">
+              <span className="settings-accent-swatch is-one" />
+              <span className="settings-accent-swatch is-two" />
+              <span className="settings-accent-swatch is-three" />
+            </span>
+            <span>{t(theme.labelKey)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 
   if (view === "sync") {
     return (
@@ -363,6 +434,55 @@ export default function SettingsPanel({
     );
   }
 
+  if (view === "accent") {
+    return (
+      <section className="settings-panel-shell">
+        <div className="settings-panel-controls">
+          <button
+            type="button"
+            className="settings-panel-nav-button"
+            onClick={() => setView("root")}
+            aria-label={t("settings.back")}
+            title={t("settings.back")}
+          >
+            <span className="settings-row-action-icon" aria-hidden="true">
+              <BackGlyph />
+            </span>
+          </button>
+          <div className="settings-panel-controls-spacer" />
+          <button
+            type="button"
+            className="settings-panel-nav-button"
+            onClick={onClose}
+            aria-label={t("orbit.closeModal")}
+            title={t("orbit.closeModal")}
+          >
+            <span className="settings-panel-close-icon" aria-hidden="true">
+              <CloseGlyph />
+            </span>
+          </button>
+        </div>
+
+        <header className="settings-panel-header">
+          <div className="settings-panel-heading">
+            <h2 className="panel-title settings-panel-title">{t("settings.accentTheme")}</h2>
+            <p className="settings-panel-caption">{t("settings.accentThemePanelCaption")}</p>
+          </div>
+        </header>
+
+        <div className="settings-panel-grid">
+          <section className="settings-panel-block settings-panel-block-primary">
+            <div className="settings-panel-block-head">
+              <p className="panel-kicker settings-panel-block-kicker">{t("settings.accentThemeChoose")}</p>
+            </div>
+
+            {renderAccentThemeOptions(true)}
+          </section>
+        </div>
+      </section>
+    );
+  }
+
   const currentLanguageLabel =
     settings.language === "ru" ? t("settings.languageRussian") : t("settings.languageEnglish");
 
@@ -370,7 +490,6 @@ export default function SettingsPanel({
     <section className="settings-panel-shell">
       <header className="settings-panel-header">
         <div className="settings-panel-heading">
-          <p className="panel-kicker settings-panel-kicker">{t("settings.kicker")}</p>
           <h2 className="panel-title settings-panel-title">{t("settings.title")}</h2>
           <p className="settings-panel-caption">{t("settings.caption")}</p>
         </div>
@@ -441,6 +560,26 @@ export default function SettingsPanel({
                 ) : null}
               </div>
             </div>
+
+            <button
+              type="button"
+              className="settings-row settings-row-destination is-accent"
+              onClick={() => setView("accent")}
+            >
+              <span className="settings-row-icon settings-destination-icon" aria-hidden="true">
+                <AccentGlyph />
+              </span>
+              <div className="settings-row-copy">
+                <strong>{t("settings.accentTheme")}</strong>
+                <span>{t("settings.accentThemeDescription")}</span>
+              </div>
+              <span className="settings-row-side">
+                <span className="settings-row-count">{t(currentAccentTheme.labelKey)}</span>
+                <span className="settings-row-action-icon" aria-hidden="true">
+                  <ChevronGlyph />
+                </span>
+              </span>
+            </button>
 
             <button
               type="button"

@@ -15,7 +15,7 @@
   align-items: center;
   padding: 0.82rem 0.9rem;
   border-radius: 1rem;
-  border: 1px solid rgba(141, 183, 255, 0.12);
+  border: 1px solid rgb(var(--blue-rgb) / 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.016)),
     rgba(8, 12, 24, 0.68);
@@ -34,7 +34,7 @@
   width: 1.7rem;
   height: 1.7rem;
   border-radius: 999px;
-  color: color-mix(in srgb, var(--text) 84%, rgba(141, 183, 255, 0.38));
+  color: color-mix(in srgb, var(--text) 84%, rgb(var(--blue-rgb) / 0.38));
   background: rgba(255, 255, 255, 0.045);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -51,7 +51,7 @@
 
 .canvas-static-notice-text {
   min-width: 0;
-  color: color-mix(in srgb, var(--text) 90%, rgba(141, 183, 255, 0.08));
+  color: color-mix(in srgb, var(--text) 90%, rgb(var(--blue-rgb) / 0.08));
   font-size: 0.82rem;
   line-height: 1.5;
   word-break: break-word;
@@ -76,7 +76,7 @@
   min-height: 26px;
   padding: 4px 9px;
   border-radius: 999px;
-  border: 1px solid rgba(141, 183, 255, 0.12);
+  border: 1px solid rgb(var(--blue-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-dim);
   font-size: 0.7rem;
@@ -86,8 +86,8 @@
 
 .canvas-static-kind {
   color: var(--text);
-  border-color: rgba(255, 224, 138, 0.18);
-  background: rgba(255, 224, 138, 0.08);
+  border-color: rgb(var(--gold-rgb) / 0.18);
+  background: rgb(var(--gold-rgb) / 0.08);
 }
 
 .canvas-static-metrics {

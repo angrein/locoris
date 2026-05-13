@@ -14,13 +14,13 @@
 }
 
 .orbital-context-menu-backdrop.is-sheet {
-  background: rgba(8, 10, 22, 0.2);
+  background: rgb(var(--surface-deep-rgb) / 0.2);
   backdrop-filter: blur(14px);
 }
 
 .orbital-context-menu-card {
   width: min(300px, calc(100vw - 24px));
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
     rgba(12, 15, 34, 0.95);
@@ -90,7 +90,7 @@
   min-width: 28px;
   height: 28px;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
   background: rgba(255, 255, 255, 0.024);
   color: rgba(228, 232, 255, 0.82);
   font-size: 1rem;
@@ -98,8 +98,8 @@
 }
 
 .orbital-context-menu-close:hover {
-  border-color: rgba(255, 224, 138, 0.16);
-  background: rgba(255, 224, 138, 0.05);
+  border-color: rgb(var(--gold-rgb) / 0.16);
+  background: rgb(var(--gold-rgb) / 0.05);
   color: rgba(255, 240, 196, 0.92);
 }
 
@@ -117,7 +117,7 @@
   gap: 10px;
   padding: 11px 12px;
   border-radius: 16px;
-  border: 1px solid rgba(147, 173, 255, 0.08);
+  border: 1px solid rgb(var(--line-rgb) / 0.08);
   background: rgba(255, 255, 255, 0.02);
   text-align: left;
   color: inherit;
@@ -129,9 +129,9 @@
 }
 
 .orbital-context-menu-action:hover {
-  border-color: rgba(255, 224, 138, 0.16);
+  border-color: rgb(var(--gold-rgb) / 0.16);
   background:
-    linear-gradient(180deg, rgba(255, 224, 138, 0.05), rgba(255, 255, 255, 0.012)),
+    linear-gradient(180deg, rgb(var(--gold-rgb) / 0.05), rgba(255, 255, 255, 0.012)),
     rgba(255, 255, 255, 0.026);
 }
 
@@ -141,7 +141,7 @@
 }
 
 .orbital-context-menu-action.is-accent {
-  border-color: color-mix(in srgb, var(--menu-accent) 28%, rgba(147, 173, 255, 0.08));
+  border-color: color-mix(in srgb, var(--menu-accent) 28%, rgb(var(--line-rgb) / 0.08));
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--menu-accent) 10%, transparent), rgba(255, 255, 255, 0.012)),
     rgba(255, 255, 255, 0.024);
@@ -219,7 +219,7 @@
   gap: 10px;
   padding: 10px 12px 4px;
   border-radius: 18px;
-  border: 1px solid rgba(147, 173, 255, 0.07);
+  border: 1px solid rgb(var(--line-rgb) / 0.07);
   background: rgba(255, 255, 255, 0.018);
 }
 
@@ -266,7 +266,7 @@
   min-width: 0;
   padding: 4px;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.08);
+  border: 1px solid rgb(var(--line-rgb) / 0.08);
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -280,8 +280,8 @@
 }
 
 .orbital-context-menu-swatch.is-active {
-  border-color: rgba(255, 224, 138, 0.26);
-  box-shadow: 0 0 0 1px rgba(255, 224, 138, 0.16);
+  border-color: rgb(var(--gold-rgb) / 0.26);
+  box-shadow: 0 0 0 1px rgb(var(--gold-rgb) / 0.16);
 }
 
 .orbital-context-menu-customcolor {

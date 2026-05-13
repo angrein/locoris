@@ -78,18 +78,24 @@ function isDesktopRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-async function resetDesktopServiceWorkerState() {
-  if (!isDesktopRuntime()) {
+const LEGACY_PWA_RETIREMENT_STORAGE_KEY = "locoris:legacy-pwa-retired:v1";
+
+async function resetLegacyServiceWorkerState() {
+  const alreadyRetired =
+    typeof window !== "undefined" &&
+    window.localStorage.getItem(LEGACY_PWA_RETIREMENT_STORAGE_KEY) === "1";
+
+  if (alreadyRetired) {
     return;
   }
 
-  let foundDesktopPwaState = false;
+  let foundLegacyPwaState = false;
 
   if ("serviceWorker" in navigator) {
     const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);
 
     if (registrations.length > 0) {
-      foundDesktopPwaState = true;
+      foundLegacyPwaState = true;
     }
 
     await Promise.all(registrations.map((registration) => registration.unregister().catch(() => false)));
@@ -99,23 +105,18 @@ async function resetDesktopServiceWorkerState() {
     const cacheKeys = await caches.keys().catch(() => []);
 
     if (cacheKeys.length > 0) {
-      foundDesktopPwaState = true;
+      foundLegacyPwaState = true;
     }
 
     await Promise.all(cacheKeys.map((cacheKey) => caches.delete(cacheKey).catch(() => false)));
   }
 
-  if (!foundDesktopPwaState) {
-    sessionStorage.removeItem("locoris:desktop-pwa-reset");
+  if (!foundLegacyPwaState) {
+    window.localStorage.setItem(LEGACY_PWA_RETIREMENT_STORAGE_KEY, "1");
     return;
   }
 
-  if (sessionStorage.getItem("locoris:desktop-pwa-reset") === "1") {
-    sessionStorage.removeItem("locoris:desktop-pwa-reset");
-    return;
-  }
-
-  sessionStorage.setItem("locoris:desktop-pwa-reset", "1");
+  window.localStorage.setItem(LEGACY_PWA_RETIREMENT_STORAGE_KEY, "1");
   window.location.reload();
   await new Promise(() => undefined);
 }
@@ -128,7 +129,7 @@ async function bootstrap() {
   await initializeSecureSyncRegistryState();
   await preloadSecureSecrets(localVaultIds.flatMap((localVaultId) => listAppSettingsSecretKeys(localVaultId)));
   await initializeVaultEncryptionSessions(localVaultIds);
-  await resetDesktopServiceWorkerState();
+  await resetLegacyServiceWorkerState();
   await initializeDesktopWindowStatePersistence();
 
   let desktopPersistenceFlush: Promise<void> | null = null;

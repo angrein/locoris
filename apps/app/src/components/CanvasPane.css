@@ -8,7 +8,7 @@
   padding: 8px 10px 10px;
   background:
     radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--canvas-accent) 12%, transparent), transparent 30%),
-    radial-gradient(circle at 88% 14%, rgba(115, 247, 255, 0.038), transparent 28%);
+    radial-gradient(circle at 88% 14%, rgb(var(--cyan-rgb) / 0.038), transparent 28%);
 }
 
 .canvas-pane.is-immersive {
@@ -24,11 +24,11 @@
   justify-content: space-between;
   padding: 8px;
   border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--canvas-accent) 20%, rgba(147, 173, 255, 0.1));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent) 20%, rgb(var(--line-rgb) / 0.1));
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--canvas-accent) 8%, transparent), transparent 42%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
-    rgba(8, 10, 22, 0.72);
+    rgb(var(--surface-deep-rgb) / 0.72);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.035),
     0 16px 38px rgba(0, 0, 0, 0.18);
@@ -71,7 +71,7 @@
   min-height: 40px;
   padding: 0 14px;
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--canvas-accent) 18%, rgba(147, 173, 255, 0.11));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent) 18%, rgb(var(--line-rgb) / 0.11));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.018)),
     rgba(7, 9, 20, 0.78);
@@ -84,7 +84,7 @@
 }
 
 .canvas-title-field:focus {
-  border-color: color-mix(in srgb, var(--canvas-accent) 44%, rgba(115, 247, 255, 0.2));
+  border-color: color-mix(in srgb, var(--canvas-accent) 44%, rgb(var(--cyan-rgb) / 0.2));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.02)),
     rgba(8, 11, 24, 0.9);
@@ -119,7 +119,7 @@
 }
 
 .canvas-pane-toolbar .editor-save-pill.is-saved {
-  border-color: color-mix(in srgb, var(--canvas-accent) 30%, rgba(255, 224, 138, 0.14));
+  border-color: color-mix(in srgb, var(--canvas-accent) 30%, rgb(var(--gold-rgb) / 0.14));
   background: color-mix(in srgb, var(--canvas-accent) 13%, rgba(255, 255, 255, 0.03));
   color: color-mix(in srgb, var(--text) 88%, var(--canvas-accent) 12%);
 }
@@ -128,7 +128,7 @@
   min-height: 24px;
   padding: 3px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.035);
   color: color-mix(in srgb, var(--text) 82%, var(--text-dim) 18%);
   font-size: 0.64rem;
@@ -141,7 +141,7 @@
 .canvas-pane-file-status.is-svg,
 .canvas-pane-file-status.is-json,
 .canvas-pane-file-status.is-imported {
-  border-color: color-mix(in srgb, var(--canvas-accent) 30%, rgba(255, 224, 138, 0.14));
+  border-color: color-mix(in srgb, var(--canvas-accent) 30%, rgb(var(--gold-rgb) / 0.14));
   background: color-mix(in srgb, var(--canvas-accent) 13%, rgba(255, 255, 255, 0.03));
   color: color-mix(in srgb, var(--text) 88%, var(--canvas-accent) 12%);
 }
@@ -179,7 +179,7 @@
   flex: 0 0 auto;
   padding: 3px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--canvas-accent) 16%, rgba(147, 173, 255, 0.1));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent) 16%, rgb(var(--line-rgb) / 0.1));
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -252,10 +252,10 @@
   min-height: 0;
   overflow: hidden;
   border-radius: 28px;
-  border: 1px solid color-mix(in srgb, var(--canvas-accent) 18%, rgba(147, 173, 255, 0.12));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent) 18%, rgb(var(--line-rgb) / 0.12));
   background:
     radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--canvas-accent) 12%, transparent), transparent 34%),
-    radial-gradient(circle at 88% 14%, rgba(115, 247, 255, 0.045), transparent 24%),
+    radial-gradient(circle at 88% 14%, rgb(var(--cyan-rgb) / 0.045), transparent 24%),
     linear-gradient(180deg, rgba(12, 14, 30, 0.96), rgba(6, 8, 18, 0.98));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
@@ -278,14 +278,14 @@
   --text-primary-color: var(--text);
   --icon-fill-color: var(--text);
   --input-label-color: color-mix(in srgb, var(--text) 82%, var(--canvas-accent) 18%);
-  --default-bg-color: rgba(8, 10, 22, 0.96);
+  --default-bg-color: rgb(var(--surface-deep-rgb) / 0.96);
   --input-bg-color: rgba(7, 9, 20, 0.92);
-  --input-hover-bg-color: rgba(10, 12, 24, 0.98);
-  --island-bg-color: rgba(8, 10, 22, 0.92);
-  --popup-bg-color: rgba(10, 12, 24, 0.98);
+  --input-hover-bg-color: rgb(var(--surface-deep-rgb) / 0.98);
+  --island-bg-color: rgb(var(--surface-deep-rgb) / 0.92);
+  --popup-bg-color: rgb(var(--surface-deep-rgb) / 0.98);
   --popup-secondary-bg-color: rgba(16, 18, 34, 0.98);
   --popup-text-color: var(--text);
-  --default-border-color: color-mix(in srgb, var(--canvas-accent) 16%, rgba(147, 173, 255, 0.14));
+  --default-border-color: color-mix(in srgb, var(--canvas-accent) 16%, rgb(var(--line-rgb) / 0.14));
   --color-surface-low: rgba(255, 255, 255, 0.05);
   --color-surface-mid: rgba(255, 255, 255, 0.07);
   --color-surface-high: rgba(255, 255, 255, 0.09);
@@ -297,8 +297,8 @@
   --link-color: color-mix(in srgb, var(--canvas-accent) 68%, #73f7ff 32%);
   --select-highlight-color: color-mix(in srgb, var(--canvas-accent) 72%, #73f7ff 28%);
   --overlay-bg-color: rgba(255, 255, 255, 0.04);
-  --scrollbar-thumb: rgba(147, 173, 255, 0.22);
-  --scrollbar-thumb-hover: rgba(147, 173, 255, 0.34);
+  --scrollbar-thumb: rgb(var(--line-rgb) / 0.22);
+  --scrollbar-thumb-hover: rgb(var(--line-rgb) / 0.34);
   --color-disabled: rgba(255, 255, 255, 0.34);
   height: 100%;
 }
@@ -310,7 +310,7 @@
 }
 
 .canvas-stage-shell .excalidraw .Island {
-  border: 1px solid color-mix(in srgb, var(--canvas-accent) 14%, rgba(147, 173, 255, 0.12));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent) 14%, rgb(var(--line-rgb) / 0.12));
   box-shadow:
     0 14px 42px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -332,11 +332,11 @@
   gap: 12px;
   padding: 12px;
   border-radius: 20px;
-  border: 1px solid color-mix(in srgb, var(--canvas-accent) 18%, rgba(147, 173, 255, 0.1));
+  border: 1px solid color-mix(in srgb, var(--canvas-accent) 18%, rgb(var(--line-rgb) / 0.1));
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--canvas-accent) 7%, transparent), transparent 48%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
-    rgba(10, 12, 24, 0.78);
+    rgb(var(--surface-deep-rgb) / 0.78);
 }
 
 .canvas-detail-card-actions {

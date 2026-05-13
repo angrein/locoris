@@ -46,7 +46,7 @@
 }
 
 .note-static-paragraph {
-  color: color-mix(in srgb, var(--text) 96%, rgba(141, 183, 255, 0.04));
+  color: color-mix(in srgb, var(--text) 96%, rgb(var(--blue-rgb) / 0.04));
   word-break: break-word;
 }
 
@@ -67,7 +67,7 @@
 
 .note-static-quote {
   padding: 0.78rem 0.9rem;
-  border-left: 2px solid rgba(141, 183, 255, 0.3);
+  border-left: 2px solid rgb(var(--blue-rgb) / 0.3);
   border-radius: 0 0.9rem 0.9rem 0;
   background: rgba(255, 255, 255, 0.035);
   color: color-mix(in srgb, var(--text) 88%, rgba(255, 255, 255, 0.16));
@@ -78,7 +78,7 @@
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(5, 8, 18, 0.82);
-  color: color-mix(in srgb, var(--text) 92%, rgba(141, 183, 255, 0.12));
+  color: color-mix(in srgb, var(--text) 92%, rgb(var(--blue-rgb) / 0.12));
   overflow: auto;
   font-family: var(--font-ui-mono);
   font-size: 0.81rem;
@@ -118,10 +118,24 @@
 }
 
 .note-static-checkmark {
-  padding-top: 0.14rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  appearance: none;
+  padding: 0.14rem 0 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.note-static-checkmark-button {
+  width: 1rem;
+  min-height: 1rem;
+  cursor: pointer;
+}
+
+.note-static-checkmark-button:disabled {
+  cursor: default;
 }
 
 .note-static-checkmark-box {
@@ -136,6 +150,10 @@
   background: rgba(255, 255, 255, 0.028);
   color: rgba(8, 12, 24, 0.92);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .note-static-checkmark.is-checked .note-static-checkmark-box {
@@ -151,6 +169,18 @@
   );
 }
 
+.note-static-checkmark-button:not(:disabled):hover .note-static-checkmark-box,
+.note-static-checkmark-button:not(:disabled):focus-visible .note-static-checkmark-box {
+  border-color: color-mix(
+    in srgb,
+    var(--selection-accent, var(--note-accent, #8db7ff)) 88%,
+    rgba(255, 255, 255, 0.24)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 3px color-mix(in srgb, var(--selection-accent, var(--note-accent, #8db7ff)) 18%, transparent);
+}
+
 .note-static-checkmark-box svg {
   width: 0.72rem;
   height: 0.72rem;
@@ -162,6 +192,9 @@
     var(--text) 72%,
     var(--selection-accent, var(--note-accent, #8db7ff)) 28%
   );
+  text-decoration: line-through;
+  text-decoration-thickness: 0.08em;
+  text-decoration-color: color-mix(in srgb, currentColor 72%, transparent);
 }
 
 .note-static-toggle-marker {
@@ -187,6 +220,11 @@
   word-break: break-word;
 }
 
+.note-static-empty-line {
+  display: inline-block;
+  min-height: 1em;
+}
+
 .note-static-children {
   display: grid;
   gap: 0.62rem;
@@ -199,7 +237,7 @@
   overflow: auto;
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 12, 24, 0.56);
+  background: rgb(var(--surface-deep-rgb) / 0.56);
 }
 
 .note-static-table {
@@ -272,7 +310,7 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
-    rgba(10, 12, 24, 0.62);
+    rgb(var(--surface-deep-rgb) / 0.62);
   color: inherit;
   text-decoration: none;
 }

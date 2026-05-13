@@ -8,6 +8,7 @@ interface EntryStaticPreviewProps {
   resolveFileUrl?: (url: string) => Promise<string>;
   compact?: boolean;
   interactive?: boolean;
+  onChecklistItemToggle?: (blockId: string, checked: boolean) => Promise<void> | void;
   className?: string;
   labels: {
     canvas: string;
@@ -24,6 +25,7 @@ export default function EntryStaticPreview({
   resolveFileUrl,
   compact,
   interactive,
+  onChecklistItemToggle,
   className,
   labels
 }: EntryStaticPreviewProps) {
@@ -47,6 +49,7 @@ export default function EntryStaticPreview({
       accentColor={note.color}
       compact={compact}
       interactive={interactive}
+      onChecklistItemToggle={onChecklistItemToggle}
       className={className}
     />
   );

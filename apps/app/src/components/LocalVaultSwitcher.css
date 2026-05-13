@@ -21,7 +21,7 @@
   gap: 9px;
   padding: 7px 10px;
   border-radius: 16px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.012)),
     rgba(255, 255, 255, 0.02);
@@ -33,7 +33,7 @@
 .vault-switcher-inline-action,
 .vault-switcher-create-submit,
 .vault-switcher-kind-card {
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   color: var(--text);
 }
 
@@ -53,9 +53,9 @@
 .vault-switcher.is-open .vault-switcher-trigger,
 .vault-switcher-create-trigger:hover,
 .vault-switcher-create-trigger:focus-visible {
-  border-color: rgba(255, 224, 138, 0.18);
+  border-color: rgb(var(--gold-rgb) / 0.18);
   background:
-    linear-gradient(180deg, rgba(255, 224, 138, 0.045), rgba(255, 255, 255, 0.016)),
+    linear-gradient(180deg, rgb(var(--gold-rgb) / 0.045), rgba(255, 255, 255, 0.016)),
     rgba(255, 255, 255, 0.028);
 }
 
@@ -90,7 +90,7 @@
 
 .vault-switcher-icon-accent {
   fill: none;
-  stroke: rgba(255, 224, 138, 0.9);
+  stroke: rgb(var(--gold-rgb) / 0.9);
 }
 
 .vault-switcher-trigger-copy {
@@ -110,7 +110,7 @@
 
 .vault-switcher-trigger-label,
 .vault-switcher-menu-title {
-  color: rgba(255, 224, 138, 0.78);
+  color: rgb(var(--gold-rgb) / 0.78);
   font-size: 0.54rem;
   line-height: 1;
   letter-spacing: 0.18em;
@@ -150,9 +150,9 @@
   gap: 8px;
   padding: 10px;
   border-radius: 20px;
-  border: 1px solid rgba(147, 173, 255, 0.14);
+  border: 1px solid rgb(var(--line-rgb) / 0.14);
   background:
-    radial-gradient(circle at top right, rgba(255, 224, 138, 0.05), transparent 28%),
+    radial-gradient(circle at top right, rgb(var(--gold-rgb) / 0.05), transparent 28%),
     linear-gradient(180deg, rgba(18, 20, 38, 0.96), rgba(8, 10, 21, 0.98)),
     rgba(8, 10, 21, 0.96);
   box-shadow:
@@ -172,9 +172,9 @@
   gap: 10px;
   padding: 10px;
   border-radius: 20px;
-  border: 1px solid rgba(147, 173, 255, 0.14);
+  border: 1px solid rgb(var(--line-rgb) / 0.14);
   background:
-    radial-gradient(circle at top right, rgba(115, 247, 255, 0.06), transparent 30%),
+    radial-gradient(circle at top right, rgb(var(--cyan-rgb) / 0.06), transparent 30%),
     linear-gradient(180deg, rgba(18, 20, 38, 0.97), rgba(8, 10, 21, 0.99)),
     rgba(8, 10, 21, 0.96);
   box-shadow:
@@ -198,7 +198,7 @@
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
   color: rgba(188, 195, 228, 0.76);
   font-size: 0.68rem;
 }
@@ -248,9 +248,9 @@
 }
 
 .vault-switcher-kind-card.is-selected {
-  border-color: rgba(255, 224, 138, 0.18);
+  border-color: rgb(var(--gold-rgb) / 0.18);
   background:
-    linear-gradient(180deg, rgba(255, 224, 138, 0.04), rgba(255, 255, 255, 0.014)),
+    linear-gradient(180deg, rgb(var(--gold-rgb) / 0.04), rgba(255, 255, 255, 0.014)),
     rgba(255, 255, 255, 0.032);
 }
 
@@ -260,7 +260,7 @@
   min-height: 38px;
   padding: 0 12px;
   border-radius: 14px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.025);
   color: rgba(244, 247, 255, 0.96);
 }
@@ -289,7 +289,7 @@
   min-height: 30px;
   padding: 0 12px;
   border-radius: 999px;
-  background: rgba(115, 247, 255, 0.08);
+  background: rgb(var(--cyan-rgb) / 0.08);
   color: #ccfbff;
 }
 
@@ -302,7 +302,7 @@
   gap: 10px;
   padding: 10px 11px;
   border-radius: 16px;
-  border: 1px solid rgba(147, 173, 255, 0.08);
+  border: 1px solid rgb(var(--line-rgb) / 0.08);
   background: rgba(255, 255, 255, 0.016);
   color: inherit;
   text-align: left;
@@ -314,14 +314,14 @@
 
 .vault-switcher-item:hover,
 .vault-switcher-item.is-active {
-  border-color: rgba(255, 224, 138, 0.16);
+  border-color: rgb(var(--gold-rgb) / 0.16);
   background:
-    linear-gradient(180deg, rgba(255, 224, 138, 0.04), rgba(255, 255, 255, 0.014)),
+    linear-gradient(180deg, rgb(var(--gold-rgb) / 0.04), rgba(255, 255, 255, 0.014)),
     rgba(255, 255, 255, 0.03);
 }
 
 .vault-switcher-item.is-active {
-  box-shadow: 0 0 0 1px rgba(115, 247, 255, 0.06);
+  box-shadow: 0 0 0 1px rgb(var(--cyan-rgb) / 0.06);
 }
 
 .vault-switcher-item-copy {
@@ -346,7 +346,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.12);
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.025);
 }
 
@@ -372,8 +372,8 @@
 }
 
 .vault-switcher-lock-badge.is-locked {
-  border-color: rgba(255, 224, 138, 0.2);
-  background: rgba(255, 224, 138, 0.08);
+  border-color: rgb(var(--gold-rgb) / 0.2);
+  background: rgb(var(--gold-rgb) / 0.08);
 }
 
 .vault-switcher-lock-badge.is-locked svg path {
@@ -396,7 +396,7 @@
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  border: 1px solid rgba(147, 173, 255, 0.1);
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
   font-size: 0.64rem;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -405,20 +405,20 @@
 
 .vault-switcher-chip.is-default,
 .vault-switcher-chip.is-provider-local {
-  border-color: rgba(147, 173, 255, 0.12);
+  border-color: rgb(var(--line-rgb) / 0.12);
   background: rgba(255, 255, 255, 0.04);
   color: rgba(210, 216, 245, 0.8);
 }
 
 .vault-switcher-chip.is-success {
-  border-color: rgba(116, 241, 182, 0.24);
+  border-color: rgb(var(--green-rgb) / 0.24);
   background: rgba(82, 208, 152, 0.08);
   color: #c9ffe1;
 }
 
 .vault-switcher-chip.is-warning,
 .vault-switcher-chip.is-provider-selfHosted {
-  border-color: rgba(255, 213, 126, 0.24);
+  border-color: rgb(var(--gold-rgb) / 0.24);
   background: rgba(255, 197, 82, 0.08);
   color: #ffe2a4;
 }
@@ -432,8 +432,8 @@
 .vault-switcher-chip.is-provider-hosted,
 .vault-switcher-chip.is-provider-googleDrive,
 .vault-switcher-chip.is-active {
-  border-color: rgba(115, 247, 255, 0.22);
-  background: rgba(115, 247, 255, 0.08);
+  border-color: rgb(var(--cyan-rgb) / 0.22);
+  background: rgb(var(--cyan-rgb) / 0.08);
   color: #ccfbff;
 }
 

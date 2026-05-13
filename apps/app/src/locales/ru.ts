@@ -392,7 +392,7 @@ const ru = {
   settings: {
     kicker: "Настройки",
     title: "Настройки",
-    caption: "Язык интерфейса, обновления приложения и синхронизация хранилищ.",
+    caption: "Язык интерфейса, цветовые акценты, обновления приложения и синхронизация хранилищ.",
     networkOnline: "NET",
     networkOffline: "OFF",
     general: "Общее",
@@ -403,6 +403,17 @@ const ru = {
       "При первом запуске язык определяется автоматически, но в любой момент его можно переключить вручную.",
     languageEnglish: "Английский",
     languageRussian: "Русский",
+    accentTheme: "Акценты интерфейса",
+    accentThemeDescription:
+      "Локальная тема клиента: меняет системные цвета приложения, не затрагивая цвета проектов, заметок и текста внутри документов.",
+    accentThemeAriaLabel: "Цветовые акценты приложения",
+    accentThemePanelCaption:
+      "Выбери один из встроенных темных пресетов. Каждый меняет поверхности, границы, подсветку и системные акценты интерфейса.",
+    accentThemeChoose: "Палитра",
+    accentThemeClassic: "Locris",
+    accentThemeGraphite: "Графит",
+    accentThemeVerdant: "Вердант",
+    accentThemeEmber: "Эмбер",
     syncTitle: "Синхронизация",
     syncDescription: "{{vaultCount}} хранилищ на этом устройстве, подключено {{connectionCount}} способов синхронизации.",
     desktopUpdateTitle: "Обновления приложения",

@@ -122,6 +122,62 @@ export function normalizeNoteContent(blocks: NoteContent): NoteContent {
   return blocks.map((block) => normalizeStoredBlock(block));
 }
 
+type ChecklistItemCheckedUpdate = {
+  blocks: StoredBlock[];
+  changed: boolean;
+};
+
+function updateChecklistItemCheckedInternal(
+  blocks: StoredBlock[],
+  blockId: string,
+  checked: boolean
+): ChecklistItemCheckedUpdate {
+  let changed = false;
+
+  const nextBlocks: StoredBlock[] = blocks.map((block) => {
+    const normalizedChildren = Array.isArray(block.children) ? block.children : [];
+    const childResult: ChecklistItemCheckedUpdate | null =
+      normalizedChildren.length > 0
+        ? updateChecklistItemCheckedInternal(normalizedChildren, blockId, checked)
+        : null;
+
+    if (block.id === blockId && block.type === "checkListItem") {
+      changed = true;
+      return {
+        ...block,
+        props: {
+          ...(block.props ?? {}),
+          checked
+        },
+        children: childResult?.blocks ?? normalizedChildren
+      };
+    }
+
+    if (childResult?.changed) {
+      changed = true;
+      return {
+        ...block,
+        children: childResult.blocks
+      };
+    }
+
+    return block;
+  });
+
+  return {
+    blocks: changed ? nextBlocks : blocks,
+    changed
+  };
+}
+
+export function updateChecklistItemChecked(
+  blocks: NoteContent,
+  blockId: string,
+  checked: boolean
+) {
+  return updateChecklistItemCheckedInternal(blocks, blockId, checked);
+}
+
 function isCheckedChecklistBlock(block: StoredBlock) {
   return block.type === "checkListItem" && Boolean(block.props?.checked);
 }
