@@ -27,6 +27,25 @@ import {
   isEditorStoredFontId,
   resolveEditorFontFamily
 } from "../lib/blocknoteSchema";
+import { EDITOR_AI_OPEN_EVENT } from "../lib/aiIntegration";
+
+function AiToolbarIcon() {
+  return (
+    <span className="editor-formatting-ai-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path
+          d="M12 2.75l1.48 4.22a4.16 4.16 0 0 0 2.55 2.55L20.25 11l-4.22 1.48a4.16 4.16 0 0 0-2.55 2.55L12 19.25l-1.48-4.22a4.16 4.16 0 0 0-2.55-2.55L3.75 11l4.22-1.48a4.16 4.16 0 0 0 2.55-2.55L12 2.75Z"
+          fill="currentColor"
+        />
+        <path
+          d="M19 16.75l.58 1.67 1.67.58-1.67.58L19 21.25l-.58-1.67-1.67-.58 1.67-.58.58-1.67ZM5.25 3.5l.82 2.18 2.18.82-2.18.82L5.25 9.5l-.82-2.18-2.18-.82 2.18-.82.82-2.18Z"
+          fill="currentColor"
+          opacity="0.72"
+        />
+      </svg>
+    </span>
+  );
+}
 
 function FontStyleSelect() {
   const Components = useComponentsContext()!;
@@ -92,6 +111,30 @@ function FontStyleSelect() {
   );
 }
 
+function AiSelectionButton() {
+  const Components = useComponentsContext()!;
+  const { t } = useTranslation();
+
+  return (
+    <Components.FormattingToolbar.Button
+      className="editor-formatting-ai-button"
+      mainTooltip={t("note.aiSelection")}
+      icon={<AiToolbarIcon />}
+      label={t("note.aiShort")}
+      onClick={(event) => {
+        event.preventDefault();
+        window.dispatchEvent(
+          new CustomEvent(EDITOR_AI_OPEN_EVENT, {
+            detail: {
+              scope: "selection"
+            }
+          })
+        );
+      }}
+    />
+  );
+}
+
 export default function EditorFormattingToolbar() {
   return (
     <div className="editor-formatting-toolbar-shell">
@@ -116,6 +159,7 @@ export default function EditorFormattingToolbar() {
         <CreateLinkButton />
         <NestBlockButton />
         <UnnestBlockButton />
+        <AiSelectionButton />
       </FormattingToolbar>
     </div>
   );

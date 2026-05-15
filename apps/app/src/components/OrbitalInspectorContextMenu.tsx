@@ -6,6 +6,9 @@ type OrbitalInspectorContextMenuPresentation = "popover" | "sheet";
 type OrbitalInspectorContextMenuActionTone = "default" | "danger" | "accent";
 type OrbitalInspectorContextMenuActionIcon =
   | "rename"
+  | "copy"
+  | "paste"
+  | "duplicate"
   | "folder"
   | "note"
   | "canvas"
@@ -34,6 +37,7 @@ interface OrbitalInspectorContextMenuProps {
   title: string;
   kindLabel: string;
   actions: OrbitalInspectorContextMenuAction[];
+  quickActions?: OrbitalInspectorContextMenuAction[];
   colorOptions?: Array<{
     id: string;
     hex: string;
@@ -70,6 +74,33 @@ function toAnchoredRect(rect: DOMRect): AnchoredRect {
 }
 
 function renderActionIcon(icon: OrbitalInspectorContextMenuActionIcon) {
+  if (icon === "copy") {
+    return (
+      <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+        <rect x="6" y="4" width="9.2" height="11.2" rx="2" />
+        <path d="M4.8 13.2H4.1a1.8 1.8 0 0 1-1.8-1.8V6.1a1.8 1.8 0 0 1 1.8-1.8h5.2" className="orbital-context-menu-icon-accent" />
+      </svg>
+    );
+  }
+
+  if (icon === "paste") {
+    return (
+      <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+        <path d="M6.1 5.8H5a2 2 0 0 0-2 2v6.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.8a2 2 0 0 0-2-2h-1.1" />
+        <path d="M7.3 4.9c.2-1 1.1-1.7 2.2-1.7h1c1.1 0 2 .7 2.2 1.7l.2 1H7.1l.2-1ZM7 10h6M7 12.6h4.2" className="orbital-context-menu-icon-accent" />
+      </svg>
+    );
+  }
+
+  if (icon === "duplicate") {
+    return (
+      <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+        <rect x="6.5" y="5.4" width="9" height="9.5" rx="2" />
+        <rect x="3.6" y="3.2" width="9" height="9.5" rx="2" className="orbital-context-menu-icon-accent" />
+      </svg>
+    );
+  }
+
   if (icon === "rename") {
     return (
       <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
@@ -149,6 +180,7 @@ export default function OrbitalInspectorContextMenu({
   title,
   kindLabel,
   actions,
+  quickActions = [],
   colorOptions = [],
   activeColor,
   chooseColorLabel,
@@ -372,6 +404,36 @@ export default function OrbitalInspectorContextMenu({
     </button>
   );
 
+  const renderQuickAction = (action: OrbitalInspectorContextMenuAction) => (
+    <button
+      key={action.id}
+      type="button"
+      className={`orbital-context-menu-quickaction ${
+        action.tone === "danger"
+          ? "is-danger"
+          : action.tone === "accent"
+            ? "is-accent"
+            : ""
+      }`}
+      onClick={(event) => {
+        event.stopPropagation();
+
+        if (action.disabled) {
+          return;
+        }
+
+        action.onSelect();
+      }}
+      disabled={action.disabled}
+      aria-label={action.label}
+      title={action.label}
+    >
+      <span className="orbital-context-menu-action-icon">
+        {renderActionIcon(action.icon)}
+      </span>
+    </button>
+  );
+
   return (
     <div className="orbital-context-menu-layer" style={style}>
       <button
@@ -403,6 +465,12 @@ export default function OrbitalInspectorContextMenu({
             ×
           </button>
         </div>
+
+        {quickActions.length > 0 ? (
+          <div className="orbital-context-menu-quickrow">
+            {quickActions.map(renderQuickAction)}
+          </div>
+        ) : null}
 
         <div className="orbital-context-menu-actions">
           {primaryActions.map(renderAction)}

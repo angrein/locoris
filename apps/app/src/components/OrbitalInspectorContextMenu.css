@@ -109,6 +109,45 @@
   gap: 6px;
 }
 
+.orbital-context-menu-quickrow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: -4px 0 10px;
+}
+
+.orbital-context-menu-quickaction {
+  min-width: 0;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgb(var(--line-rgb) / 0.08);
+  background: rgba(255, 255, 255, 0.022);
+  color: inherit;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.orbital-context-menu-quickaction:hover {
+  border-color: color-mix(in srgb, var(--menu-accent) 28%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--menu-accent) 8%, transparent), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.028);
+}
+
+.orbital-context-menu-quickaction:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.orbital-context-menu-quickaction.is-accent {
+  border-color: color-mix(in srgb, var(--menu-accent) 30%, rgb(var(--line-rgb) / 0.1));
+}
+
 .orbital-context-menu-action {
   width: 100%;
   min-width: 0;

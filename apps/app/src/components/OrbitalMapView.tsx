@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode
@@ -53,6 +54,7 @@ const PROJECT_DRAG_THRESHOLD_PX = 5;
 const ORBITAL_NODE_POSITION_EASE_MS = 180;
 const ORBITAL_NODE_POSITION_SNAP_DISTANCE = 0.18;
 const LOW_DENSITY_DPR_THRESHOLD = 1.5;
+const HIERARCHY_SORT_ORDER_STEP = 1024;
 
 interface OrbitalMapViewProps {
   projects: Project[];
@@ -109,6 +111,30 @@ interface OrbitalMapViewProps {
   onRenameFolder: (folderId: string, name: string) => Promise<void> | void;
   onUpdateFolderColor: (folderId: string, color: string) => void;
   onDeleteFolder: (folderId: string) => Promise<void> | void;
+  onMoveFolder: (
+    folderId: string,
+    parentId: string | null,
+    projectId?: string,
+    sortOrder?: number
+  ) => Promise<void> | void;
+  onMoveNote: (
+    noteId: string,
+    folderId: string | null,
+    projectId?: string,
+    sortOrder?: number
+  ) => Promise<void> | void;
+  onDuplicateFolder: (
+    folderId: string,
+    parentId: string | null,
+    projectId?: string,
+    sortOrder?: number
+  ) => Promise<Folder | null> | Folder | null;
+  onDuplicateNote: (
+    noteId: string,
+    folderId: string | null,
+    projectId?: string,
+    sortOrder?: number
+  ) => Promise<Note | null> | Note | null;
   onRenameNote: (noteId: string, name: string) => Promise<void> | void;
   onUpdateNoteColor: (noteId: string, color: string) => void;
   onSetNotePinned: (noteId: string, pinned: boolean) => Promise<void> | void;
@@ -199,6 +225,15 @@ interface OrbitalMapViewProps {
     noteColor: string;
     chooseColor: string;
     customColor: string;
+    copyAction: string;
+    pasteAction: string;
+    duplicateAction: string;
+    selectedCount: string;
+    clipboardEmpty: string;
+    moveBlockedDepth: string;
+    moveBlockedInvalid: string;
+    moveBlockedMissingTarget: string;
+    deleteSelection: string;
     deleteSystem: string;
     deleteFolder: string;
     moveToTrash: string;
@@ -412,6 +447,22 @@ type InspectorRenameState = {
   id: string;
 };
 
+type InspectorSelectableTarget = Extract<
+  InspectorContextMenuTarget,
+  { kind: "folder" | "note" | "canvas" }
+>;
+
+type InspectorClipboardItem =
+  | { kind: "folder"; id: string }
+  | { kind: "note" | "canvas"; id: string };
+
+type InspectorDropPlacement = "inside" | "before" | "after";
+
+type InspectorDropIntent = {
+  targetEntityId: string;
+  placement: InspectorDropPlacement;
+};
+
 const VIEWBOX = {
   minX: -980,
   minY: -720,
@@ -531,6 +582,41 @@ function noteSorter(left: Note, right: Note) {
   return right.updatedAt - left.updatedAt;
 }
 
+function getHierarchySortOrder(record: { sortOrder?: number; createdAt: number }) {
+  return typeof record.sortOrder === "number" ? record.sortOrder : record.createdAt;
+}
+
+function compareHierarchyRecords(
+  left: { sortOrder?: number; createdAt: number; id: string },
+  right: { sortOrder?: number; createdAt: number; id: string }
+) {
+  const sortDelta = getHierarchySortOrder(left) - getHierarchySortOrder(right);
+
+  if (sortDelta !== 0) {
+    return sortDelta;
+  }
+
+  const createdDelta = left.createdAt - right.createdAt;
+
+  if (createdDelta !== 0) {
+    return createdDelta;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function getHierarchyItemSortOrder(item: InspectorHierarchyItem) {
+  if (item.folder) {
+    return getHierarchySortOrder(item.folder);
+  }
+
+  if (item.note) {
+    return getHierarchySortOrder(item.note);
+  }
+
+  return item.project?.createdAt ?? 0;
+}
+
 function getNoteMass(note: Note) {
   const favoriteWeight = isEntryFavorite(note) ? 0.45 : 0;
 
@@ -598,6 +684,14 @@ function getOrbitalChildCreatedAt(child: OrbitalChild) {
   return child.folder?.folder.createdAt ?? child.note?.createdAt ?? 0;
 }
 
+function getOrbitalChildSortOrder(child: OrbitalChild) {
+  return child.folder
+    ? getHierarchySortOrder(child.folder.folder)
+    : child.note
+      ? getHierarchySortOrder(child.note)
+      : 0;
+}
+
 function getOrbitalChildStableId(child: OrbitalChild) {
   return child.folder?.folder.id ?? child.note?.id ?? "";
 }
@@ -615,6 +709,12 @@ function getOrbitalChildGroupOrder(kind: OrbitalChildKind) {
 }
 
 function compareOrbitalChildren(left: OrbitalChild, right: OrbitalChild) {
+  const sortDelta = getOrbitalChildSortOrder(left) - getOrbitalChildSortOrder(right);
+
+  if (sortDelta !== 0) {
+    return sortDelta;
+  }
+
   const leftKind = getOrbitalChildKind(left);
   const rightKind = getOrbitalChildKind(right);
   const groupDelta = getOrbitalChildGroupOrder(leftKind) - getOrbitalChildGroupOrder(rightKind);
@@ -799,11 +899,11 @@ function buildOrbitalData(projects: Project[], folders: Folder[], notes: Note[])
   });
 
   foldersByParent.forEach((bucket) => {
-    bucket.sort((left, right) => left.name.localeCompare(right.name));
+    bucket.sort(compareHierarchyRecords);
   });
 
   notesByFolder.forEach((bucket) => {
-    bucket.sort(noteSorter);
+    bucket.sort(compareHierarchyRecords);
   });
 
   const buildBranch = (folder: Folder, depth: number): FolderBranch => {
@@ -1995,6 +2095,10 @@ export default function OrbitalMapView({
   onUpdateNoteColor,
   onSetNotePinned,
   onDeleteFolder,
+  onMoveFolder,
+  onMoveNote,
+  onDuplicateFolder,
+  onDuplicateNote,
   onDeleteNote,
   onCreateNote,
   onCreateCanvas,
@@ -2076,6 +2180,10 @@ export default function OrbitalMapView({
   const [activeFolderFilters, setActiveFolderFilters] = useState<string[]>([]);
   const [activeNoteFilters, setActiveNoteFilters] = useState<string[]>([]);
   const [activeAssetFilters, setActiveAssetFilters] = useState<string[]>([]);
+  const [hierarchySelectionAnchorEntityId, setHierarchySelectionAnchorEntityId] = useState<string | null>(null);
+  const [inspectorClipboard, setInspectorClipboard] = useState<InspectorClipboardItem[]>([]);
+  const [inspectorDropIntent, setInspectorDropIntent] = useState<InspectorDropIntent | null>(null);
+  const [inspectorToast, setInspectorToast] = useState<string | null>(null);
   const [activeInspectorDocumentKinds, setActiveInspectorDocumentKinds] = useState<
     InspectorDocumentKindFilter[]
   >([]);
@@ -2129,6 +2237,8 @@ export default function OrbitalMapView({
   const orbitInteractionTimeoutRef = useRef<number | null>(null);
   const orbitInteractionActiveRef = useRef(true);
   const vaultRenameErrorTimeoutRef = useRef<number | null>(null);
+  const inspectorToastTimeoutRef = useRef<number | null>(null);
+  const inspectorDragItemsRef = useRef<InspectorClipboardItem[]>([]);
   const suppressInspectorClickRef = useRef(false);
   const pendingInspectorCenterRef = useRef<{
     entityId: string;
@@ -2815,8 +2925,8 @@ export default function OrbitalMapView({
   const selectedHierarchyExpandedProjectSet = useMemo(() => {
     const expandedProjects = new Set<string>();
     const entityIds = [
-      selectedEntityId,
-      hierarchyFocusedEntityId,
+      selectedEntityId?.startsWith("project:") ? null : selectedEntityId,
+      hierarchyFocusedEntityId?.startsWith("project:") ? null : hierarchyFocusedEntityId,
       ...activeFolderFilters.map((id) => `folder:${id}`),
       ...activeNoteFilters.map((id) => `note:${id}`)
     ].filter((value): value is string => Boolean(value));
@@ -2845,7 +2955,7 @@ export default function OrbitalMapView({
 
     let currentFolderId =
       selectedNode.kind === "folder"
-        ? selectedNode.folder?.id ?? null
+        ? selectedNode.folder?.parentId ?? null
         : selectedNode.note?.folderId ?? null;
 
     while (currentFolderId) {
@@ -3035,6 +3145,10 @@ export default function OrbitalMapView({
         window.clearTimeout(vaultRenameErrorTimeoutRef.current);
         vaultRenameErrorTimeoutRef.current = null;
       }
+      if (inspectorToastTimeoutRef.current) {
+        window.clearTimeout(inspectorToastTimeoutRef.current);
+        inspectorToastTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -3098,6 +3212,66 @@ export default function OrbitalMapView({
       closeInspectorContextMenu();
     }
   }, [activeModal, editorOpen]);
+
+  useEffect(() => {
+    if (editorOpen || activeModal || effectiveInspectorMenu !== "folders") {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      const isShortcut = event.metaKey || event.ctrlKey;
+
+      if (isShortcut && event.key.toLowerCase() === "c") {
+        const targets = getCurrentInspectorSelectionTargets();
+
+        if (targets.length === 0) {
+          return;
+        }
+
+        event.preventDefault();
+        setInspectorClipboard(getClipboardItemsFromTargets(targets));
+        return;
+      }
+
+      if (isShortcut && event.key.toLowerCase() === "v") {
+        event.preventDefault();
+        void pasteInspectorClipboard(null);
+        return;
+      }
+
+      if (event.key === "Delete") {
+        const targets = getCurrentInspectorSelectionTargets();
+
+        if (targets.length === 0) {
+          return;
+        }
+
+        event.preventDefault();
+        void deleteInspectorTargets(targets);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    activeFolderFilters,
+    activeModal,
+    activeNoteFilters,
+    currentProjectId,
+    editorOpen,
+    effectiveInspectorMenu,
+    inspectorClipboard,
+    orbitalData.folderById,
+    orbitalData.folderMeta,
+    orbitalData.noteById,
+    selectedNode
+  ]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -3884,7 +4058,9 @@ export default function OrbitalMapView({
       resetFolderDraft();
       setFolderDraftError(null);
       setSelectedEntityId(`folder:${createdFolder.id}`);
+      setActiveProjectId(createdFolder.projectId);
       setHierarchyFocusedEntityId(`folder:${createdFolder.id}`);
+      setHierarchySelectionAnchorEntityId(`folder:${createdFolder.id}`);
     } catch (error) {
       if (error instanceof Error && error.message === "FOLDER_DEPTH_LIMIT") {
         setFolderDraftError(labels.maxDepthReached);
@@ -4102,7 +4278,12 @@ export default function OrbitalMapView({
     clearInspectorLongPress();
     closeSelectionHoverPreview();
 
-    if (options?.selectTarget !== false) {
+    const shouldPreserveMultiSelection =
+      target.kind !== "core" &&
+      isInspectorTargetInMultiSelection(target) &&
+      (activeFolderFilterSet.size + activeNoteFilterSet.size) > 1;
+
+    if (options?.selectTarget !== false && !shouldPreserveMultiSelection) {
       applySingleInspectorTargetSelection(target);
     }
 
@@ -4257,9 +4438,48 @@ export default function OrbitalMapView({
     event: ReactMouseEvent<HTMLElement>
   ) => {
     const isAdditiveSelection = event.metaKey || event.ctrlKey;
+    const isRangeSelection = event.shiftKey;
     setHierarchyFocusedEntityId(item.entityId);
 
+    if (isRangeSelection && item.kind !== "core") {
+      const anchorEntityId =
+        hierarchySelectionAnchorEntityId &&
+        flattenedSelectableHierarchy.some((entry) => entry.entityId === hierarchySelectionAnchorEntityId)
+          ? hierarchySelectionAnchorEntityId
+          : flattenedSelectableHierarchy.find((entry) => entry.kind !== "core")?.entityId ?? item.entityId;
+      const anchorIndex = flattenedSelectableHierarchy.findIndex(
+        (entry) => entry.entityId === anchorEntityId
+      );
+      const currentIndex = flattenedSelectableHierarchy.findIndex(
+        (entry) => entry.entityId === item.entityId
+      );
+
+      if (anchorIndex >= 0 && currentIndex >= 0) {
+        const [from, to] =
+          anchorIndex < currentIndex
+            ? [anchorIndex, currentIndex]
+            : [currentIndex, anchorIndex];
+        const range = flattenedSelectableHierarchy.slice(from, to + 1);
+
+        setActiveFolderFilters(
+          range
+            .filter((entry) => entry.kind === "folder")
+            .map((entry) => entry.id)
+        );
+        setActiveNoteFilters(
+          range
+            .filter((entry) => entry.kind === "note" || entry.kind === "canvas")
+            .map((entry) => entry.id)
+        );
+        setSelectedEntityId(item.entityId);
+        setActiveProjectId(item.folder?.projectId ?? item.note?.projectId ?? currentProjectId);
+        closeSelectionHoverPreview();
+        return;
+      }
+    }
+
     if (item.kind === "core") {
+      setHierarchySelectionAnchorEntityId(item.entityId);
       selectInspectorEntity(item.entityId, item.project?.id ?? currentProjectId ?? null, {
         centerInScene: true
       });
@@ -4270,6 +4490,7 @@ export default function OrbitalMapView({
     }
 
     if (!isAdditiveSelection) {
+      setHierarchySelectionAnchorEntityId(item.entityId);
       if (item.kind === "folder") {
         selectInspectorEntity(item.entityId, item.folder?.projectId ?? currentProjectId ?? null, {
           centerInScene: true
@@ -4283,6 +4504,7 @@ export default function OrbitalMapView({
 
     if (item.kind === "folder") {
       if (isAdditiveSelection) {
+        setHierarchySelectionAnchorEntityId(item.entityId);
         toggleFolderFilter(item.id);
       }
 
@@ -4298,6 +4520,7 @@ export default function OrbitalMapView({
     }
 
     if (isAdditiveSelection) {
+      setHierarchySelectionAnchorEntityId(item.entityId);
       toggleNoteFilter(item.id);
     }
   };
@@ -4578,6 +4801,18 @@ export default function OrbitalMapView({
 
   function createHierarchyFolderItem(branch: FolderBranch): InspectorHierarchyItem {
     const folderPath = folderPathMap.get(branch.folder.id) ?? branch.folder.name;
+    const children = [
+      ...branch.children.map((childBranch) => createHierarchyFolderItem(childBranch)),
+      ...branch.notes.map((note) => createHierarchyNoteItem(note))
+    ].sort((left, right) => {
+      const sortDelta = getHierarchyItemSortOrder(left) - getHierarchyItemSortOrder(right);
+
+      if (sortDelta !== 0) {
+        return sortDelta;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
 
     return {
       id: branch.folder.id,
@@ -4587,10 +4822,7 @@ export default function OrbitalMapView({
       color: branch.folder.color || DEFAULT_FOLDER_COLOR,
       folder: branch.folder,
       searchText: `${branch.folder.name} ${folderPath}`.toLowerCase(),
-      children: [
-        ...branch.children.map((childBranch) => createHierarchyFolderItem(childBranch)),
-        ...branch.notes.map((note) => createHierarchyNoteItem(note))
-      ]
+      children
     };
   }
 
@@ -4617,7 +4849,15 @@ export default function OrbitalMapView({
       ...(orbitalData.looseNotesByProject.get(project.id) ?? []).map((note) =>
         createHierarchyNoteItem(note)
       )
-    ]
+    ].sort((left, right) => {
+      const sortDelta = getHierarchyItemSortOrder(left) - getHierarchyItemSortOrder(right);
+
+      if (sortDelta !== 0) {
+        return sortDelta;
+      }
+
+      return left.id.localeCompare(right.id);
+    })
   });
 
   const currentProjectHierarchyTree = useMemo(() => {
@@ -4697,6 +4937,20 @@ export default function OrbitalMapView({
   const filteredFoldersMenu = useMemo(
     () => filterInspectorHierarchy(inspectorHierarchyTree, normalizedInspectorQuery),
     [inspectorHierarchyTree, normalizedInspectorQuery]
+  );
+  const flattenedInspectorHierarchy = useMemo(() => {
+    const items: InspectorHierarchyItem[] = [];
+    const visit = (item: InspectorHierarchyItem) => {
+      items.push(item);
+      item.children.forEach(visit);
+    };
+
+    filteredFoldersMenu.forEach(visit);
+    return items;
+  }, [filteredFoldersMenu]);
+  const flattenedSelectableHierarchy = useMemo(
+    () => flattenedInspectorHierarchy.filter((item) => item.kind !== "core"),
+    [flattenedInspectorHierarchy]
   );
   const filteredFilesMenu = useMemo(
     () =>
@@ -5064,6 +5318,599 @@ export default function OrbitalMapView({
               : target.note.id)
     );
 
+  const getInspectorTargetEntityId = (target: InspectorContextMenuTarget) =>
+    target.kind === "core"
+      ? getProjectEntityId(target.project.id)
+      : target.kind === "folder"
+        ? `folder:${target.folder.id}`
+        : `note:${target.note.id}`;
+
+  const getSelectableTargetEntityId = (target: InspectorSelectableTarget) =>
+    target.kind === "folder" ? `folder:${target.folder.id}` : `note:${target.note.id}`;
+
+  const isInspectorTargetInMultiSelection = (target: InspectorContextMenuTarget) => {
+    if (target.kind === "core") {
+      return false;
+    }
+
+    if (target.kind === "folder") {
+      return activeFolderFilterSet.has(target.folder.id);
+    }
+
+    return activeNoteFilterSet.has(target.note.id);
+  };
+
+  const getCurrentInspectorSelectionTargets = (): InspectorSelectableTarget[] => {
+    const targets: InspectorSelectableTarget[] = [];
+
+    activeFolderFilters.forEach((folderId) => {
+      const folder = orbitalData.folderById.get(folderId);
+
+      if (!folder) {
+        return;
+      }
+
+      targets.push({
+        kind: "folder",
+        folder,
+        label: folder.name,
+        color: folder.color || DEFAULT_FOLDER_COLOR,
+        canCreateFolder: (orbitalData.folderMeta.get(folder.id)?.depth ?? 0) < 1
+      });
+    });
+
+    activeNoteFilters.forEach((noteId) => {
+      const note = orbitalData.noteById.get(noteId);
+
+      if (!note) {
+        return;
+      }
+
+      targets.push(buildInspectorNoteContextTarget(note) as InspectorSelectableTarget);
+    });
+
+    if (targets.length > 0) {
+      return targets;
+    }
+
+    if (selectedNode?.kind === "folder" && selectedNode.folder) {
+      return [
+        {
+          kind: "folder",
+          folder: selectedNode.folder,
+          label: selectedNode.label,
+          color: selectedNode.folder.color || DEFAULT_FOLDER_COLOR,
+          canCreateFolder: (orbitalData.folderMeta.get(selectedNode.folder.id)?.depth ?? 0) < 1
+        }
+      ];
+    }
+
+    if (selectedNode?.kind === "note" && selectedNode.note) {
+      return [buildInspectorNoteContextTarget(selectedNode.note) as InspectorSelectableTarget];
+    }
+
+    return [];
+  };
+
+  const getContextOperationTargets = (
+    target: InspectorContextMenuTarget | null
+  ): InspectorSelectableTarget[] => {
+    if (target && target.kind !== "core" && isInspectorTargetInMultiSelection(target)) {
+      return getCurrentInspectorSelectionTargets();
+    }
+
+    if (target && target.kind !== "core") {
+      return [target];
+    }
+
+    return getCurrentInspectorSelectionTargets();
+  };
+
+  const showInspectorToast = (message: string) => {
+    if (inspectorToastTimeoutRef.current) {
+      window.clearTimeout(inspectorToastTimeoutRef.current);
+    }
+
+    setInspectorToast(message);
+    inspectorToastTimeoutRef.current = window.setTimeout(() => {
+      setInspectorToast(null);
+      inspectorToastTimeoutRef.current = null;
+    }, 2600);
+  };
+
+  const getMoveErrorMessage = (error: unknown) => {
+    if (!(error instanceof Error)) {
+      return labels.moveBlockedInvalid;
+    }
+
+    if (error.message === "FOLDER_DEPTH_LIMIT") {
+      return labels.moveBlockedDepth;
+    }
+
+    if (error.message === "TARGET_FOLDER_NOT_FOUND") {
+      return labels.moveBlockedMissingTarget;
+    }
+
+    return labels.moveBlockedInvalid;
+  };
+
+  const getClipboardItemsFromTargets = (targets: InspectorSelectableTarget[]) => {
+    const selectedFolderIds = new Set(
+      targets
+        .filter((target) => target.kind === "folder")
+        .map((target) => target.folder.id)
+    );
+
+    const orderByEntityId = new Map(
+      flattenedSelectableHierarchy.map((item, index) => [item.entityId, index])
+    );
+
+    return targets
+      .filter((target) => {
+        if (target.kind === "folder") {
+          let parentId = target.folder.parentId;
+
+          while (parentId) {
+            if (selectedFolderIds.has(parentId)) {
+              return false;
+            }
+
+            parentId = orbitalData.folderById.get(parentId)?.parentId ?? null;
+          }
+
+          return true;
+        }
+
+        let parentId = target.note.folderId;
+
+        while (parentId) {
+          if (selectedFolderIds.has(parentId)) {
+            return false;
+          }
+
+          parentId = orbitalData.folderById.get(parentId)?.parentId ?? null;
+        }
+
+        return true;
+      })
+      .sort((left, right) => {
+        const leftEntityId = getSelectableTargetEntityId(left);
+        const rightEntityId = getSelectableTargetEntityId(right);
+        return (
+          (orderByEntityId.get(leftEntityId) ?? Number.MAX_SAFE_INTEGER) -
+          (orderByEntityId.get(rightEntityId) ?? Number.MAX_SAFE_INTEGER)
+        );
+      })
+      .map<InspectorClipboardItem>((target) =>
+        target.kind === "folder"
+          ? { kind: "folder", id: target.folder.id }
+          : { kind: target.kind, id: target.note.id }
+      );
+  };
+
+  const copyInspectorSelection = (target: InspectorContextMenuTarget | null = contextMenuTarget) => {
+    const targets = getContextOperationTargets(target);
+    const items = getClipboardItemsFromTargets(targets);
+
+    if (items.length === 0) {
+      return;
+    }
+
+    setInspectorClipboard(items);
+  };
+
+  const getPasteDestination = (target: InspectorContextMenuTarget | null) => {
+    if (target?.kind === "core") {
+      return {
+        parentId: null,
+        projectId: target.project.id
+      };
+    }
+
+    if (target?.kind === "folder") {
+      return {
+        parentId: target.folder.id,
+        projectId: target.folder.projectId
+      };
+    }
+
+    if (target) {
+      return {
+        parentId: target.note.folderId,
+        projectId: target.note.projectId
+      };
+    }
+
+    const targets = getCurrentInspectorSelectionTargets();
+    const onlyTarget = targets.length === 1 ? targets[0] : null;
+
+    if (onlyTarget?.kind === "folder") {
+      return {
+        parentId: onlyTarget.folder.id,
+        projectId: onlyTarget.folder.projectId
+      };
+    }
+
+    if (onlyTarget) {
+      return {
+        parentId: onlyTarget.note.folderId,
+        projectId: onlyTarget.note.projectId
+      };
+    }
+
+    return {
+      parentId: null,
+      projectId: currentProjectId ?? undefined
+    };
+  };
+
+  const pasteInspectorClipboard = async (
+    target: InspectorContextMenuTarget | null = contextMenuTarget
+  ) => {
+    if (inspectorClipboard.length === 0) {
+      showInspectorToast(labels.clipboardEmpty);
+      return;
+    }
+
+    const destination = getPasteDestination(target);
+
+    if (!destination.projectId) {
+      return;
+    }
+
+    closeInspectorContextMenu();
+
+    try {
+      let lastCreated: Folder | Note | null = null;
+
+      for (const item of inspectorClipboard) {
+        if (item.kind === "folder") {
+          lastCreated = await onDuplicateFolder(
+            item.id,
+            destination.parentId,
+            destination.projectId
+          );
+        } else {
+          lastCreated = await onDuplicateNote(
+            item.id,
+            destination.parentId,
+            destination.projectId
+          );
+        }
+      }
+
+      if (lastCreated) {
+        const entityId =
+          "parentId" in lastCreated
+            ? `folder:${lastCreated.id}`
+            : `note:${lastCreated.id}`;
+        setSelectedEntityId(entityId);
+        setHierarchyFocusedEntityId(entityId);
+        setActiveProjectId(lastCreated.projectId);
+      }
+    } catch (error) {
+      showInspectorToast(getMoveErrorMessage(error));
+    }
+  };
+
+  const duplicateInspectorSelection = async (
+    target: InspectorContextMenuTarget | null = contextMenuTarget
+  ) => {
+    const targets = getContextOperationTargets(target);
+    const items = getClipboardItemsFromTargets(targets);
+
+    if (items.length === 0) {
+      return;
+    }
+
+    closeInspectorContextMenu();
+
+    try {
+      let lastCreated: Folder | Note | null = null;
+
+      for (const item of items) {
+        if (item.kind === "folder") {
+          const folder = orbitalData.folderById.get(item.id);
+
+          if (!folder) {
+            continue;
+          }
+
+          lastCreated = await onDuplicateFolder(
+            folder.id,
+            folder.parentId,
+            folder.projectId,
+            getHierarchySortOrder(folder) + HIERARCHY_SORT_ORDER_STEP / 2
+          );
+        } else {
+          const note = orbitalData.noteById.get(item.id);
+
+          if (!note) {
+            continue;
+          }
+
+          lastCreated = await onDuplicateNote(
+            note.id,
+            note.folderId,
+            note.projectId,
+            getHierarchySortOrder(note) + HIERARCHY_SORT_ORDER_STEP / 2
+          );
+        }
+      }
+
+      if (lastCreated) {
+        const entityId =
+          "parentId" in lastCreated
+            ? `folder:${lastCreated.id}`
+            : `note:${lastCreated.id}`;
+        setSelectedEntityId(entityId);
+        setHierarchyFocusedEntityId(entityId);
+        setActiveProjectId(lastCreated.projectId);
+      }
+    } catch (error) {
+      showInspectorToast(getMoveErrorMessage(error));
+    }
+  };
+
+  const deleteInspectorTargets = async (targets: InspectorSelectableTarget[]) => {
+    const items = getClipboardItemsFromTargets(targets);
+
+    if (items.length === 0) {
+      return;
+    }
+
+    closeInspectorContextMenu();
+
+    for (const item of items) {
+      if (item.kind === "folder") {
+        await onDeleteFolder(item.id);
+      } else {
+        await onDeleteNote(item.id);
+      }
+    }
+
+    setActiveFolderFilters([]);
+    setActiveNoteFilters([]);
+    setHierarchySelectionAnchorEntityId(null);
+  };
+
+  const getHierarchyItemParent = (item: InspectorHierarchyItem) => {
+    if (item.kind === "folder" && item.folder) {
+      return {
+        parentId: item.folder.parentId,
+        projectId: item.folder.projectId
+      };
+    }
+
+    if (item.note) {
+      return {
+        parentId: item.note.folderId,
+        projectId: item.note.projectId
+      };
+    }
+
+    return {
+      parentId: null,
+      projectId: item.project?.id ?? currentProjectId ?? null
+    };
+  };
+
+  const getSiblingHierarchyItems = (projectId: string, parentId: string | null) =>
+    flattenedSelectableHierarchy
+      .filter((item) => {
+        const itemParent = getHierarchyItemParent(item);
+        return itemParent.projectId === projectId && itemParent.parentId === parentId;
+      })
+      .sort((left, right) => {
+        const sortDelta = getHierarchyItemSortOrder(left) - getHierarchyItemSortOrder(right);
+
+        if (sortDelta !== 0) {
+          return sortDelta;
+        }
+
+        return left.id.localeCompare(right.id);
+      });
+
+  const getDropSortOrders = (
+    previousOrder: number | null,
+    nextOrder: number | null,
+    count: number
+  ) => {
+    if (count <= 0) {
+      return [];
+    }
+
+    if (previousOrder !== null && nextOrder !== null) {
+      const step = (nextOrder - previousOrder) / (count + 1);
+      return Array.from({ length: count }, (_, index) => previousOrder + step * (index + 1));
+    }
+
+    if (previousOrder !== null) {
+      return Array.from(
+        { length: count },
+        (_, index) => previousOrder + HIERARCHY_SORT_ORDER_STEP * (index + 1)
+      );
+    }
+
+    if (nextOrder !== null) {
+      return Array.from(
+        { length: count },
+        (_, index) => nextOrder - HIERARCHY_SORT_ORDER_STEP * (count - index)
+      );
+    }
+
+    return Array.from(
+      { length: count },
+      (_, index) => HIERARCHY_SORT_ORDER_STEP * (index + 1)
+    );
+  };
+
+  const getDragItemsForHierarchyItem = (item: InspectorHierarchyItem) => {
+    const target = buildInspectorHierarchyContextTarget(item);
+
+    if (target.kind === "core") {
+      return [];
+    }
+
+    if (isInspectorTargetInMultiSelection(target)) {
+      const selectedItems = getClipboardItemsFromTargets(getCurrentInspectorSelectionTargets());
+      return selectedItems.length > 0 ? selectedItems : getClipboardItemsFromTargets([target]);
+    }
+
+    return getClipboardItemsFromTargets([target]);
+  };
+
+  const resolveDropPlacement = (
+    item: InspectorHierarchyItem,
+    event: ReactDragEvent<HTMLElement>
+  ): InspectorDropPlacement => {
+    if (item.kind === "core") {
+      return "inside";
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+
+    if (item.kind === "folder") {
+      if (ratio < 0.24) {
+        return "before";
+      }
+
+      if (ratio > 0.76) {
+        return "after";
+      }
+
+      return "inside";
+    }
+
+    return ratio < 0.5 ? "before" : "after";
+  };
+
+  const moveInspectorDragItems = async (
+    items: InspectorClipboardItem[],
+    targetItem: InspectorHierarchyItem,
+    placement: InspectorDropPlacement
+  ) => {
+    if (items.length === 0) {
+      return;
+    }
+
+    const draggedEntityIds = new Set(
+      items.map((item) => (item.kind === "folder" ? `folder:${item.id}` : `note:${item.id}`))
+    );
+
+    if (draggedEntityIds.has(targetItem.entityId)) {
+      return;
+    }
+
+    let destinationParentId: string | null = null;
+    let destinationProjectId: string | null = null;
+    let sortOrders: number[] = [];
+
+    if (placement === "inside") {
+      if (targetItem.kind === "core") {
+        destinationParentId = null;
+        destinationProjectId = targetItem.project?.id ?? currentProjectId;
+      } else if (targetItem.kind === "folder" && targetItem.folder) {
+        destinationParentId = targetItem.folder.id;
+        destinationProjectId = targetItem.folder.projectId;
+      } else {
+        const parent = getHierarchyItemParent(targetItem);
+        destinationParentId = parent.parentId;
+        destinationProjectId = parent.projectId;
+      }
+    } else {
+      const parent = getHierarchyItemParent(targetItem);
+      destinationParentId = parent.parentId;
+      destinationProjectId = parent.projectId;
+      const siblings = getSiblingHierarchyItems(parent.projectId ?? "", parent.parentId).filter(
+        (item) => !draggedEntityIds.has(item.entityId)
+      );
+      const targetIndex = siblings.findIndex((item) => item.entityId === targetItem.entityId);
+      const previous =
+        placement === "before"
+          ? siblings[targetIndex - 1] ?? null
+          : siblings[targetIndex] ?? null;
+      const next =
+        placement === "before"
+          ? siblings[targetIndex] ?? null
+          : siblings[targetIndex + 1] ?? null;
+      sortOrders = getDropSortOrders(
+        previous ? getHierarchyItemSortOrder(previous) : null,
+        next ? getHierarchyItemSortOrder(next) : null,
+        items.length
+      );
+    }
+
+    if (!destinationProjectId) {
+      return;
+    }
+
+    try {
+      for (const [index, item] of items.entries()) {
+        const sortOrder = sortOrders[index];
+
+        if (item.kind === "folder") {
+          await onMoveFolder(item.id, destinationParentId, destinationProjectId, sortOrder);
+        } else {
+          await onMoveNote(item.id, destinationParentId, destinationProjectId, sortOrder);
+        }
+      }
+    } catch (error) {
+      showInspectorToast(getMoveErrorMessage(error));
+    }
+  };
+
+  const handleHierarchyDragStart = (
+    item: InspectorHierarchyItem,
+    event: ReactDragEvent<HTMLButtonElement>
+  ) => {
+    const items = getDragItemsForHierarchyItem(item);
+
+    if (items.length === 0) {
+      event.preventDefault();
+      return;
+    }
+
+    inspectorDragItemsRef.current = items;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", item.entityId);
+  };
+
+  const handleHierarchyDragOver = (
+    item: InspectorHierarchyItem,
+    event: ReactDragEvent<HTMLElement>
+  ) => {
+    if (inspectorDragItemsRef.current.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setInspectorDropIntent({
+      targetEntityId: item.entityId,
+      placement: resolveDropPlacement(item, event)
+    });
+  };
+
+  const handleHierarchyDrop = (
+    item: InspectorHierarchyItem,
+    event: ReactDragEvent<HTMLElement>
+  ) => {
+    if (inspectorDragItemsRef.current.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    const placement = inspectorDropIntent?.targetEntityId === item.entityId
+      ? inspectorDropIntent.placement
+      : resolveDropPlacement(item, event);
+    const items = inspectorDragItemsRef.current;
+    inspectorDragItemsRef.current = [];
+    setInspectorDropIntent(null);
+    void moveInspectorDragItems(items, item, placement);
+  };
+
   const renderInspectorRenameField = (
     target: InspectorContextMenuTarget,
     className: string
@@ -5115,14 +5962,32 @@ export default function OrbitalMapView({
     }
 
     const target = contextMenuState.target;
-    const actions: OrbitalInspectorContextMenuAction[] = [
-      {
-        id: "rename",
-        label: labels.renameAction,
-        icon: "rename",
-        onSelect: () => beginInspectorRename(target)
-      }
-    ];
+    const operationTargets = getContextOperationTargets(target);
+    const isMultiTargetAction = operationTargets.length > 1;
+    const actions: OrbitalInspectorContextMenuAction[] = isMultiTargetAction
+      ? []
+      : [
+          {
+            id: "rename",
+            label: labels.renameAction,
+            icon: "rename",
+            onSelect: () => beginInspectorRename(target)
+          }
+        ];
+
+    if (isMultiTargetAction) {
+      actions.push({
+        id: "delete-selection",
+        label: labels.deleteSelection,
+        icon: "trash",
+        tone: "danger",
+        onSelect: () => {
+          void deleteInspectorTargets(operationTargets);
+        }
+      });
+
+      return actions;
+    }
 
     if (target.kind === "core") {
       actions.push(
@@ -5212,8 +6077,7 @@ export default function OrbitalMapView({
           icon: "trash",
           tone: "danger",
           onSelect: () => {
-            closeInspectorContextMenu();
-            void onDeleteFolder(target.folder.id);
+            void deleteInspectorTargets([target]);
           }
         }
       );
@@ -5237,8 +6101,7 @@ export default function OrbitalMapView({
         icon: "trash",
         tone: "danger",
         onSelect: () => {
-          closeInspectorContextMenu();
-          void onDeleteNote(target.note.id);
+          void deleteInspectorTargets([target]);
         }
       }
     );
@@ -5256,15 +6119,71 @@ export default function OrbitalMapView({
     labels.addNote,
     labels.addRootFolder,
     labels.deleteFolder,
+    labels.deleteSelection,
     labels.deleteSystem,
     labels.moveToTrash,
     labels.renameAction,
     onDeleteProject,
     onDeleteFolder,
     onDeleteNote,
+    activeFolderFilters,
+    activeNoteFilters,
+    orbitalData.folderById,
+    orbitalData.folderMeta,
+    orbitalData.noteById,
     onRenameProject,
     onSetNotePinned,
     t
+  ]);
+
+  const contextMenuQuickActions = useMemo<OrbitalInspectorContextMenuAction[]>(() => {
+    if (!contextMenuState) {
+      return [];
+    }
+
+    const target = contextMenuState.target;
+    const operationTargets = getContextOperationTargets(target);
+    const canCopy = target.kind !== "core" || operationTargets.length > 0;
+
+    return [
+      {
+        id: "copy",
+        label: labels.copyAction,
+        icon: "copy",
+        disabled: !canCopy,
+        onSelect: () => copyInspectorSelection(target)
+      },
+      {
+        id: "paste",
+        label: labels.pasteAction,
+        icon: "paste",
+        tone: "accent",
+        disabled: inspectorClipboard.length === 0,
+        onSelect: () => {
+          void pasteInspectorClipboard(target);
+        }
+      },
+      {
+        id: "duplicate",
+        label: labels.duplicateAction,
+        icon: "duplicate",
+        disabled: operationTargets.length === 0,
+        onSelect: () => {
+          void duplicateInspectorSelection(target);
+        }
+      }
+    ];
+  }, [
+    activeFolderFilters,
+    activeNoteFilters,
+    contextMenuState,
+    inspectorClipboard.length,
+    labels.copyAction,
+    labels.duplicateAction,
+    labels.pasteAction,
+    orbitalData.folderById,
+    orbitalData.folderMeta,
+    orbitalData.noteById
   ]);
 
   function renderInspectorItemIcon(kind: InspectorCompactIconKind, color: string) {
@@ -5823,6 +6742,10 @@ export default function OrbitalMapView({
           : false;
     const isSceneSelected = selectedEntityId === item.entityId;
     const isHierarchyFocused = hierarchyFocusedEntityId === item.entityId;
+    const dropPlacement =
+      inspectorDropIntent?.targetEntityId === item.entityId
+        ? inspectorDropIntent.placement
+        : null;
     const isActive =
       (item.kind === "core"
         ? false
@@ -5894,9 +6817,17 @@ export default function OrbitalMapView({
               type="button"
               className={`orbital-tree-item ${isActive ? "is-active" : ""} ${
                 isSceneSelected ? "is-scene-selected" : ""
-              }`}
+              } ${dropPlacement ? `is-drop-target is-drop-${dropPlacement}` : ""}`}
               ref={(node) => registerInspectorHierarchyItemRef(item.entityId, node)}
               title={metaLabel}
+              draggable={item.kind !== "core"}
+              onDragStart={(event) => handleHierarchyDragStart(item, event)}
+              onDragOver={(event) => handleHierarchyDragOver(item, event)}
+              onDrop={(event) => handleHierarchyDrop(item, event)}
+              onDragEnd={() => {
+                inspectorDragItemsRef.current = [];
+                setInspectorDropIntent(null);
+              }}
               onClick={(event) => {
                 if (consumeSuppressedInspectorClick()) {
                   event.preventDefault();
@@ -7098,6 +8029,13 @@ export default function OrbitalMapView({
         ? buildInspectorNoteContextTarget(selectedNode.note)
         : null;
   const contextMenuTarget = contextMenuState?.target ?? null;
+  const contextMenuOperationTargets = contextMenuTarget
+    ? getContextOperationTargets(contextMenuTarget)
+    : [];
+  const contextMenuTitle =
+    contextMenuOperationTargets.length > 1
+      ? t("orbit.selectedCount", { count: contextMenuOperationTargets.length })
+      : contextMenuTarget?.label ?? "";
   const contextMenuKindLabel = !contextMenuTarget
     ? ""
     : contextMenuTarget.kind === "core"
@@ -7589,6 +8527,11 @@ export default function OrbitalMapView({
           )}
 
           {!(!selectedNode || shouldShowHierarchyInspector) ? renderFolderDraftErrorMessage() : null}
+          {inspectorToast ? (
+            <div className="orbital-inspector-toast" role="status">
+              {inspectorToast}
+            </div>
+          ) : null}
         </aside>
 
         <div
@@ -8124,9 +9067,10 @@ export default function OrbitalMapView({
           presentation={contextMenuState?.presentation ?? "popover"}
           position={contextMenuState?.position}
           accentColor={contextMenuTarget.color}
-          title={contextMenuTarget.label}
+          title={contextMenuTitle}
           kindLabel={contextMenuKindLabel}
           actions={contextMenuActions}
+          quickActions={contextMenuQuickActions}
           colorOptions={contextMenuColorOptions}
           activeColor={contextMenuTarget.color}
           chooseColorLabel={labels.chooseColor}

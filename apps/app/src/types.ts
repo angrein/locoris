@@ -69,6 +69,7 @@ export interface Folder {
   name: string;
   parentId: string | null;
   color: string;
+  sortOrder: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -88,6 +89,7 @@ export interface Note {
   projectId: string;
   folderId: string | null;
   color: string;
+  sortOrder: number;
   tagIds: string[];
   content: NoteContent;
   canvasContent: CanvasContent | null;
@@ -293,6 +295,7 @@ export interface SyncedNoteRecord {
   projectId: string;
   folderId: string | null;
   color: string;
+  sortOrder: number;
   tagIds: string[];
   content: NoteContent;
   canvasContent: CanvasContent | null;

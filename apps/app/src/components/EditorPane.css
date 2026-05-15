@@ -14,6 +14,7 @@
   --editor-content-padding-right: clamp(22px, 4vw, 46px);
   --editor-content-padding-bottom: 60px;
   --editor-content-padding-left: clamp(54px, 6vw, 78px);
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
@@ -207,6 +208,57 @@
   background: transparent;
 }
 
+.editor-pane-ai-trigger {
+  min-height: 25px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 5px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 30%, rgb(var(--line-rgb) / 0.14));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 17%, transparent), transparent 60%),
+    rgba(255, 255, 255, 0.035);
+  color: color-mix(in srgb, var(--text) 90%, var(--editor-accent) 10%);
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.editor-pane-ai-trigger:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--editor-accent) 46%, rgb(var(--cyan-rgb) / 0.16));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 24%, transparent), transparent 60%),
+    rgba(255, 255, 255, 0.052);
+}
+
+.editor-pane-ai-trigger-glyph {
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.24), transparent 45%),
+    color-mix(in srgb, var(--editor-accent) 36%, rgba(255, 255, 255, 0.04));
+  color: var(--text);
+  font-size: 0.55rem;
+  letter-spacing: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.editor-pane-ai-trigger-glyph svg {
+  width: 13px;
+  height: 13px;
+}
+
 .editor-pane-markdown-actions {
   min-width: 0;
   display: flex;
@@ -273,6 +325,262 @@
 
 .editor-pane-hidden-input {
   display: none;
+}
+
+.editor-ai-panel {
+  width: min(420px, calc(100vw - 28px));
+  max-height: min(520px, calc(100vh - 28px));
+  display: grid;
+  gap: 8px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  z-index: 90;
+}
+
+.editor-ai-panel.is-docked {
+  position: fixed;
+  top: 90px;
+  right: 18px;
+}
+
+.editor-ai-panel.is-floating {
+  position: fixed;
+}
+
+.editor-ai-prompt-card,
+.editor-ai-command-card {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 16%, rgb(var(--line-rgb) / 0.14));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 8%, transparent), transparent 54%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.018)),
+    rgb(var(--surface-deep-rgb) / 0.9);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  backdrop-filter: blur(20px);
+}
+
+.editor-ai-prompt-card {
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px 8px 14px;
+  border-radius: 14px;
+}
+
+.editor-ai-command-card {
+  display: grid;
+  gap: 6px;
+  overflow: hidden;
+  padding: 6px;
+  border-radius: 13px;
+}
+
+.editor-ai-prompt-icon,
+.editor-ai-command-icon {
+  display: inline-grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--text-dim) 70%, var(--editor-accent) 30%);
+}
+
+.editor-ai-prompt-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.editor-ai-prompt-icon svg,
+.editor-ai-command-icon svg,
+.editor-ai-prompt-run svg {
+  width: 18px;
+  height: 18px;
+}
+
+.editor-ai-prompt-card textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  max-height: 94px;
+  resize: none;
+  overflow: auto;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  outline: none;
+}
+
+.editor-ai-prompt-card textarea::placeholder {
+  color: color-mix(in srgb, var(--text-dim) 76%, rgba(255, 255, 255, 0.16));
+}
+
+.editor-ai-prompt-run {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.editor-ai-prompt-run {
+  color: color-mix(in srgb, var(--text) 82%, var(--editor-accent) 18%);
+}
+
+.editor-ai-prompt-run:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.editor-ai-prompt-run:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.editor-ai-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: max-content;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.editor-ai-mode-pill {
+  min-height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.editor-ai-mode-pill.is-active {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--editor-accent) 13%, rgba(255, 255, 255, 0.025));
+  color: color-mix(in srgb, var(--text) 90%, var(--editor-accent) 10%);
+}
+
+.editor-ai-command-list {
+  display: grid;
+  gap: 2px;
+}
+
+.editor-ai-command-row,
+.editor-ai-command-main {
+  min-width: 0;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in srgb, var(--text) 84%, var(--text-dim) 16%);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 620;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.editor-ai-command-row:hover:not(:disabled),
+.editor-ai-command-main:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.065);
+  color: var(--text);
+}
+
+.editor-ai-command-row:disabled,
+.editor-ai-command-main:disabled,
+.editor-ai-mode-pill:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.editor-ai-command-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.editor-ai-translate-row {
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 138px);
+  padding-right: 7px;
+}
+
+.editor-ai-command-main {
+  min-height: 42px;
+  padding: 0;
+}
+
+.editor-ai-translate-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid rgb(var(--line-rgb) / 0.11);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
+  outline: none;
+}
+
+.editor-ai-translate-row input:focus {
+  border-color: color-mix(in srgb, var(--editor-accent) 40%, rgb(var(--line-rgb) / 0.16));
+  background: rgba(255, 255, 255, 0.052);
+}
+
+.editor-ai-message {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
+  background: rgba(255, 255, 255, 0.028);
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.editor-ai-message.is-error {
+  border-color: rgba(255, 113, 113, 0.24);
+  background: rgba(255, 113, 113, 0.08);
+  color: color-mix(in srgb, var(--text) 82%, #ff7171 18%);
+}
+
+.editor-ai-message.is-success {
+  border-color: rgb(var(--cyan-rgb) / 0.2);
+  background: rgb(var(--cyan-rgb) / 0.075);
+  color: color-mix(in srgb, var(--text) 86%, #73f7ff 14%);
 }
 
 .editor-pane-shell {
@@ -642,6 +950,28 @@
     font-size: 0.58rem;
   }
 
+  .editor-pane-ai-trigger {
+    min-height: 23px;
+    padding: 2px 8px 2px 4px;
+    font-size: 0.58rem;
+  }
+
+  .editor-pane-ai-trigger-glyph {
+    width: 18px;
+    height: 18px;
+  }
+
+  .editor-ai-panel.is-docked,
+  .editor-ai-panel.is-floating {
+    position: fixed;
+    top: auto !important;
+    right: 12px;
+    bottom: 12px;
+    left: 12px !important;
+    width: auto;
+    max-height: min(620px, calc(100vh - 24px));
+  }
+
   .editor-pane-ghost-action {
     min-height: 28px;
     padding-inline: 9px;
@@ -712,6 +1042,25 @@
 
   .editor-stage-shell .bn-side-menu {
     margin-left: 6px;
+  }
+
+  .editor-ai-panel {
+    max-height: min(520px, calc(100vh - 24px));
+  }
+
+  .editor-ai-prompt-card {
+    min-height: 52px;
+    padding: 7px 8px 7px 12px;
+    border-radius: 13px;
+  }
+
+  .editor-ai-command-card {
+    border-radius: 12px;
+  }
+
+  .editor-ai-translate-row {
+    grid-template-columns: 1fr;
+    padding-right: 0;
   }
 
   .editor-sidepanel {

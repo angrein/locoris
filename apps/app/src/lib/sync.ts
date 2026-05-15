@@ -859,6 +859,7 @@ function serializeNote(note: Note): SyncedNoteRecord {
     projectId: note.projectId,
     folderId: note.folderId,
     color: note.color,
+    sortOrder: note.sortOrder ?? note.createdAt,
     tagIds: [...note.tagIds],
     content: normalizeNoteContent(note.content),
     canvasContent: note.canvasContent ? normalizeCanvasContent(note.canvasContent) : null,
@@ -886,6 +887,7 @@ function hydrateNote(record: SyncedNoteRecord): Note {
 
   return {
     ...record,
+    sortOrder: record.sortOrder ?? record.createdAt,
     tagIds: [...record.tagIds],
     content: normalizedContent,
     canvasContent: normalizedCanvas,

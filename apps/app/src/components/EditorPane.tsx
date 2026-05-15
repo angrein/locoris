@@ -23,10 +23,20 @@ import {
 import {
   flattenFolderOptions,
   formatTimestamp,
+  extractPlainText,
   normalizeChecklistOrdering,
   normalizeNoteContent,
   seedChecklistStableOrderMap
 } from "../lib/notes";
+import {
+  EDITOR_AI_OPEN_EVENT,
+  generateGeminiMarkdown,
+  readGeminiApiKey,
+  readStoredGeminiModel,
+  type GeminiAiAction,
+  type GeminiAiScope,
+  type GeminiCustomMode
+} from "../lib/aiIntegration";
 import {
   openTextFileWithDialog,
   saveTextFileWithDialog
@@ -38,6 +48,21 @@ type EditorTypographyMode = "focus" | "reading";
 type PendingMarkdownImport = {
   fileName: string;
   markdown: string;
+};
+type AiPanelState = {
+  scope: GeminiAiScope;
+  status: "idle" | "generating" | "applying" | "error";
+  customMode: GeminiCustomMode;
+  customPrompt: string;
+  targetLanguage: string;
+  error: string | null;
+  targetBlockIds: string[];
+  sourceMarkdown: string;
+  anchor: {
+    top: number;
+    left: number;
+    placement: "top" | "bottom" | "left" | "right";
+  } | null;
 };
 
 const EDITOR_TYPOGRAPHY_MODE_STORAGE_KEY = "zen:editor-typography-mode";
@@ -66,6 +91,16 @@ const LIST_CONTINUATION_BLOCK_PROP_KEYS = [
   "backgroundColor",
   "textAlignment"
 ] as const;
+const INLINE_AI_REPLACE_ACTIONS = new Set<GeminiAiAction>([
+  "fix",
+  "improve",
+  "translate",
+  "custom"
+]);
+const AI_PANEL_WIDTH = 420;
+const AI_PANEL_HEIGHT = 324;
+const AI_PANEL_GAP = 10;
+const AI_PANEL_MARGIN = 12;
 
 type BlockNoteEditorInstance = ReturnType<typeof useCreateBlockNote>;
 type EmptyInlineBlockPasteTarget = {
@@ -82,6 +117,92 @@ type ListContinuationStyleSeed = {
   styles: Record<string, unknown>;
   props: Record<string, unknown>;
 };
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function AiSparkleGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M12 2.75l1.48 4.22a4.16 4.16 0 0 0 2.55 2.55L20.25 11l-4.22 1.48a4.16 4.16 0 0 0-2.55 2.55L12 19.25l-1.48-4.22a4.16 4.16 0 0 0-2.55-2.55L3.75 11l4.22-1.48a4.16 4.16 0 0 0 2.55-2.55L12 2.75Z"
+        fill="currentColor"
+      />
+      <path
+        d="M19 16.75l.58 1.67 1.67.58-1.67.58L19 21.25l-.58-1.67-1.67-.58 1.67-.58.58-1.67ZM5.25 3.5l.82 2.18 2.18.82-2.18.82L5.25 9.5l-.82-2.18-2.18-.82 2.18-.82.82-2.18Z"
+        fill="currentColor"
+        opacity="0.72"
+      />
+    </svg>
+  );
+}
+
+function AiTextGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M5 5.75h14M12 5.75v12.5M8.25 18.25h7.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.9"
+      />
+    </svg>
+  );
+}
+
+function AiCheckGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="m5 12.5 4.1 4.1L19.25 6.75"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function AiGlobeGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <circle
+        cx="12"
+        cy="12"
+        r="8.25"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+      />
+      <path
+        d="M3.95 12h16.1M12 3.75c2.15 2.2 3.1 4.9 3.1 8.25s-.95 6.05-3.1 8.25C9.85 18.05 8.9 15.35 8.9 12S9.85 5.95 12 3.75Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.55"
+      />
+    </svg>
+  );
+}
+
+function AiArrowGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M5 12h13.25m0 0-5.1-5.1m5.1 5.1-5.1 5.1"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.9"
+      />
+    </svg>
+  );
+}
 
 function shouldCarryStyleValue(value: unknown) {
   return value !== undefined && value !== null && value !== "" && value !== "default";
@@ -579,6 +700,8 @@ export default function EditorPane({
   const [markdownStatus, setMarkdownStatus] = useState<MarkdownStatus>(null);
   const [pendingMarkdownImport, setPendingMarkdownImport] =
     useState<PendingMarkdownImport | null>(null);
+  const [aiPanel, setAiPanel] = useState<AiPanelState | null>(null);
+  const aiPanelRef = useRef<HTMLDivElement | null>(null);
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
   const markdownStatusTimeoutRef = useRef<number | null>(null);
@@ -607,6 +730,7 @@ export default function EditorPane({
 
   useEffect(() => {
     setPendingMarkdownImport(null);
+    setAiPanel(null);
     checklistStableOrderRef.current = new Map();
   }, [note.id]);
 
@@ -653,6 +777,437 @@ export default function EditorPane({
     },
     [note.id, language]
   );
+
+  const buildAiPanelAnchor = (
+    scope: GeminiAiScope,
+    triggerRect?: DOMRect | null
+  ): AiPanelState["anchor"] => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const box = triggerRect ?? (scope === "selection" ? editor.getSelectionBoundingBox() : null);
+
+    if (!box) {
+      return null;
+    }
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const panelWidth = Math.min(AI_PANEL_WIDTH, viewportWidth - AI_PANEL_MARGIN * 2);
+    const panelHeight = Math.min(AI_PANEL_HEIGHT, viewportHeight - AI_PANEL_MARGIN * 2);
+    const maxLeft = viewportWidth - panelWidth - AI_PANEL_MARGIN;
+    const maxTop = viewportHeight - panelHeight - AI_PANEL_MARGIN;
+    const centeredLeft = clampNumber(
+      box.left + box.width / 2 - panelWidth / 2,
+      AI_PANEL_MARGIN,
+      Math.max(AI_PANEL_MARGIN, maxLeft)
+    );
+    const centeredTop = clampNumber(
+      box.top + box.height / 2 - panelHeight / 2,
+      AI_PANEL_MARGIN,
+      Math.max(AI_PANEL_MARGIN, maxTop)
+    );
+    const spaces = {
+      bottom: viewportHeight - box.bottom - AI_PANEL_GAP - AI_PANEL_MARGIN,
+      top: box.top - AI_PANEL_GAP - AI_PANEL_MARGIN,
+      right: viewportWidth - box.right - AI_PANEL_GAP - AI_PANEL_MARGIN,
+      left: box.left - AI_PANEL_GAP - AI_PANEL_MARGIN
+    };
+    const preferredPlacements: Array<"top" | "bottom" | "left" | "right"> =
+      triggerRect && scope === "note"
+        ? ["bottom", "right", "left", "top"]
+        : ["bottom", "top", "right", "left"];
+    const placement =
+      preferredPlacements.find((candidate) =>
+        candidate === "top" || candidate === "bottom"
+          ? spaces[candidate] >= panelHeight
+          : spaces[candidate] >= panelWidth
+      ) ??
+      preferredPlacements.reduce((best, candidate) => {
+        const bestSpace =
+          best === "top" || best === "bottom" ? spaces[best] : spaces[best];
+        const candidateSpace =
+          candidate === "top" || candidate === "bottom" ? spaces[candidate] : spaces[candidate];
+
+        return candidateSpace > bestSpace ? candidate : best;
+      }, preferredPlacements[0]);
+
+    if (placement === "top") {
+      return {
+        placement,
+        top: clampNumber(box.top - panelHeight - AI_PANEL_GAP, AI_PANEL_MARGIN, maxTop),
+        left: centeredLeft
+      };
+    }
+
+    if (placement === "right") {
+      return {
+        placement,
+        top: centeredTop,
+        left: clampNumber(box.right + AI_PANEL_GAP, AI_PANEL_MARGIN, maxLeft)
+      };
+    }
+
+    if (placement === "left") {
+      return {
+        placement,
+        top: centeredTop,
+        left: clampNumber(box.left - panelWidth - AI_PANEL_GAP, AI_PANEL_MARGIN, maxLeft)
+      };
+    }
+
+    return {
+      placement,
+      top: clampNumber(box.bottom + AI_PANEL_GAP, AI_PANEL_MARGIN, maxTop),
+      left: centeredLeft
+    };
+  };
+
+  const getAiSourceSnapshot = (scope: GeminiAiScope) => {
+    if (scope === "note") {
+      return {
+        markdown: editor.blocksToMarkdownLossy(editor.document as any).trim(),
+        targetBlockIds: (editor.document as StoredBlock[])
+          .map((block) => block.id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      };
+    }
+
+    const selection = editor.getSelection();
+    const selectedText = editor.getSelectedText().trim();
+    const targetBlockIds =
+      selection?.blocks
+        .map((block) => block.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0) ?? [];
+
+    let markdown = selectedText;
+
+    try {
+      const cutBlocks = editor.getSelectionCutBlocks(true).blocks as unknown as StoredBlock[];
+      const cutMarkdown = editor.blocksToMarkdownLossy(cutBlocks as any).trim();
+
+      if (cutMarkdown) {
+        markdown = cutMarkdown;
+      }
+    } catch {
+      markdown = selectedText;
+    }
+
+    return {
+      markdown,
+      targetBlockIds
+    };
+  };
+
+  const openAiPanel = (scope: GeminiAiScope, triggerRect?: DOMRect | null) => {
+    const snapshot = getAiSourceSnapshot(scope);
+
+    setAiPanel({
+      scope,
+      status: "idle",
+      customMode: snapshot.markdown ? "edit" : "generate",
+      customPrompt: "",
+      targetLanguage: language === "ru" ? "английский" : "Russian",
+      error: null,
+      targetBlockIds: snapshot.targetBlockIds,
+      sourceMarkdown: snapshot.markdown,
+      anchor: buildAiPanelAnchor(scope, triggerRect)
+    });
+  };
+
+  useEffect(() => {
+    const handleOpenAi = (event: Event) => {
+      const detail = (event as CustomEvent<{ scope?: GeminiAiScope }>).detail;
+      openAiPanel(detail?.scope === "selection" ? "selection" : "note");
+    };
+
+    window.addEventListener(EDITOR_AI_OPEN_EVENT, handleOpenAi);
+    return () => window.removeEventListener(EDITOR_AI_OPEN_EVENT, handleOpenAi);
+  });
+
+  useEffect(() => {
+    if (!aiPanel) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+
+      if (target && aiPanelRef.current?.contains(target)) {
+        return;
+      }
+
+      setAiPanel(null);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAiPanel(null);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [aiPanel]);
+
+  const persistEditorDocument = (state: SaveState = "saved") => {
+    const nextDocument = normalizeNoteContent(editor.document as unknown as NoteContent);
+
+    seedChecklistStableOrderMap(nextDocument, checklistStableOrderRef.current);
+
+    if (contentTimeoutRef.current) {
+      window.clearTimeout(contentTimeoutRef.current);
+      contentTimeoutRef.current = null;
+    }
+
+    onContentChange(nextDocument, state);
+  };
+
+  const getAiErrorMessage = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+
+    if (message === "GEMINI_API_KEY_MISSING") {
+      return t("note.aiMissingKey");
+    }
+
+    if (message === "GEMINI_INPUT_EMPTY") {
+      return t("note.aiEmptyInput");
+    }
+
+    if (
+      message.includes("API key not valid") ||
+      message.includes("API_KEY_INVALID") ||
+      message.includes("PERMISSION_DENIED")
+    ) {
+      return t("note.aiInvalidKey");
+    }
+
+    if (message.includes("quota") || message.includes("RESOURCE_EXHAUSTED")) {
+      return t("note.aiQuota");
+    }
+
+    return t("note.aiFailed");
+  };
+
+  const parseAiMarkdownToBlocks = async (markdown: string) => {
+    const blocks = await Promise.resolve(editor.tryParseMarkdownToBlocks(markdown));
+
+    if (!blocks.length) {
+      throw new Error("GEMINI_EMPTY_RESPONSE");
+    }
+
+    return blocks as unknown as NoteContent;
+  };
+
+  const getAiInsertReferenceBlockId = (panelState: AiPanelState) => {
+    const targetBlockId = panelState.targetBlockIds.at(-1);
+
+    if (targetBlockId) {
+      return targetBlockId;
+    }
+
+    const documentBlocks = editor.document as unknown as StoredBlock[];
+    const lastBlockId = documentBlocks.at(-1)?.id;
+
+    return typeof lastBlockId === "string" ? lastBlockId : null;
+  };
+
+  const applyAiMarkdownResult = async (
+    panelState: AiPanelState,
+    resultMarkdown: string,
+    mode: "replace" | "insert",
+    action: GeminiAiAction
+  ) => {
+    setAiPanel((previous) =>
+      previous
+        ? {
+            ...previous,
+            status: "applying",
+            error: null
+          }
+        : previous
+    );
+
+    try {
+      const blocks = await parseAiMarkdownToBlocks(resultMarkdown);
+
+      if (mode === "insert") {
+        const referenceBlockId = getAiInsertReferenceBlockId(panelState);
+
+        if (referenceBlockId) {
+          editor.insertBlocks(blocks as any, referenceBlockId, "after");
+        } else {
+          editor.replaceBlocks(editor.document as any, blocks as any);
+        }
+
+        persistEditorDocument("saved");
+        setAiPanel(null);
+        return;
+      }
+
+      if (panelState.scope === "note") {
+        const rootBlockIds = (editor.document as unknown as StoredBlock[])
+          .map((block) => block.id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+        const blocksToReplace = rootBlockIds.length > 0 ? rootBlockIds : (editor.document as any);
+
+        editor.replaceBlocks(blocksToReplace, blocks as any);
+        persistEditorDocument("saved");
+        setAiPanel(null);
+        return;
+      }
+
+      const shouldReplaceInline =
+        panelState.sourceMarkdown.trim().length > 0 &&
+        INLINE_AI_REPLACE_ACTIONS.has(action) &&
+        panelState.targetBlockIds.length <= 1 &&
+        blocks.length === 1;
+      const inlineText = shouldReplaceInline
+        ? extractPlainText(blocks as unknown as NoteContent).trim()
+        : "";
+
+      if (shouldReplaceInline && inlineText && !inlineText.includes("\n")) {
+        editor.focus();
+        editor.insertInlineContent(inlineText, {
+          updateSelection: true
+        });
+      } else {
+        const targetBlockIds =
+          panelState.targetBlockIds.length > 0
+            ? panelState.targetBlockIds
+            : editor
+                .getSelection()
+                ?.blocks.map((block) => block.id)
+                .filter((id): id is string => typeof id === "string" && id.length > 0) ?? [];
+
+        if (targetBlockIds.length > 0) {
+          editor.replaceBlocks(targetBlockIds, blocks as any);
+        } else {
+          const referenceBlockId = getAiInsertReferenceBlockId(panelState);
+
+          if (referenceBlockId) {
+            editor.insertBlocks(blocks as any, referenceBlockId, "after");
+          } else {
+            editor.replaceBlocks(editor.document as any, blocks as any);
+          }
+        }
+      }
+
+      persistEditorDocument("saved");
+      setAiPanel(null);
+    } catch (error) {
+      setAiPanel((previous) =>
+        previous
+          ? {
+              ...previous,
+              status: "error",
+              error: getAiErrorMessage(error)
+            }
+          : previous
+      );
+    }
+  };
+
+  const handleRunAiAction = async (action: GeminiAiAction) => {
+    const currentPanel = aiPanel;
+
+    if (
+      !currentPanel ||
+      currentPanel.status === "generating" ||
+      currentPanel.status === "applying"
+    ) {
+      return;
+    }
+
+    const customPrompt = currentPanel.customPrompt.trim();
+    const targetLanguage = currentPanel.targetLanguage.trim();
+    const customMode = currentPanel.customMode;
+    const shouldGenerateNew = action === "custom" && customMode === "generate";
+
+    if (action === "custom" && !customPrompt) {
+      setAiPanel({
+        ...currentPanel,
+        status: "error",
+        error: t("note.aiPromptRequired")
+      });
+      return;
+    }
+
+    if (action === "translate" && !targetLanguage) {
+      setAiPanel({
+        ...currentPanel,
+        status: "error",
+        error: t("note.aiTargetLanguageRequired")
+      });
+      return;
+    }
+
+    const snapshot =
+      currentPanel.scope === "note"
+        ? getAiSourceSnapshot("note")
+        : {
+            markdown: currentPanel.sourceMarkdown,
+            targetBlockIds: currentPanel.targetBlockIds
+          };
+
+    if (!shouldGenerateNew && !snapshot.markdown.trim()) {
+      setAiPanel({
+        ...currentPanel,
+        status: "error",
+        error: t("note.aiEmptyInput")
+      });
+      return;
+    }
+
+    const nextPanelState = {
+      ...currentPanel,
+      status: "generating" as const,
+      sourceMarkdown: snapshot.markdown,
+      targetBlockIds: snapshot.targetBlockIds,
+      error: null
+    };
+
+    setAiPanel(nextPanelState);
+
+    try {
+      const apiKey = await readGeminiApiKey();
+      const resultMarkdown = await generateGeminiMarkdown({
+        apiKey,
+        model: readStoredGeminiModel(),
+        action,
+        scope: currentPanel.scope,
+        markdown: snapshot.markdown,
+        appLanguage: language,
+        noteTitle: titleDraft.trim() || note.title,
+        customPrompt,
+        customMode,
+        targetLanguage
+      });
+
+      await applyAiMarkdownResult(
+        nextPanelState,
+        resultMarkdown,
+        shouldGenerateNew ? "insert" : "replace",
+        action
+      );
+    } catch (error) {
+      setAiPanel((previous) =>
+        previous
+          ? {
+              ...previous,
+              status: "error",
+              error: getAiErrorMessage(error)
+            }
+          : previous
+      );
+    }
+  };
 
   useEffect(() => {
     latestTitleDraftRef.current = titleDraft;
@@ -968,6 +1523,8 @@ export default function EditorPane({
     };
   }, []);
 
+  const aiPanelBusy = aiPanel?.status === "generating" || aiPanel?.status === "applying";
+
   return (
     <section
       className={`editor-pane ${immersive ? "is-immersive" : ""} ${
@@ -1029,6 +1586,20 @@ export default function EditorPane({
               <span className="editor-pane-contextmeta">
                 {t("note.updated")}: {formatTimestamp(note.updatedAt, language)}
               </span>
+              <button
+                type="button"
+                className="editor-pane-ai-trigger"
+                onClick={(event) =>
+                  openAiPanel("note", event.currentTarget.getBoundingClientRect())
+                }
+                aria-label={t("note.aiNote")}
+                title={t("note.aiNote")}
+              >
+                <span className="editor-pane-ai-trigger-glyph" aria-hidden="true">
+                  <AiSparkleGlyph />
+                </span>
+                <span>{t("note.aiShort")}</span>
+              </button>
             </div>
           </div>
 
@@ -1081,6 +1652,201 @@ export default function EditorPane({
           void applyMarkdownImport(pendingMarkdownImport.markdown);
         }}
       />
+
+      {aiPanel ? (
+        <div
+          ref={aiPanelRef}
+          className={`editor-ai-panel ${aiPanel.anchor ? "is-floating" : "is-docked"} is-${
+            aiPanel.scope
+          } is-${aiPanel.anchor?.placement ?? "bottom"}`}
+          style={
+            aiPanel.anchor
+              ? ({
+                  top: aiPanel.anchor.top,
+                  left: aiPanel.anchor.left
+                } as CSSProperties)
+              : undefined
+          }
+        >
+          <div className="editor-ai-prompt-card">
+            <span className="editor-ai-prompt-icon" aria-hidden="true">
+              <AiSparkleGlyph />
+            </span>
+            <textarea
+              value={aiPanel.customPrompt}
+              onChange={(event) =>
+                setAiPanel((previous) =>
+                  previous
+                    ? {
+                        ...previous,
+                        customPrompt: event.target.value,
+                        error: null
+                      }
+                    : previous
+                )
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void handleRunAiAction("custom");
+                }
+              }}
+              placeholder={t("note.aiPromptPlaceholder")}
+              aria-label={t("note.aiCustomPrompt")}
+              rows={1}
+              disabled={aiPanelBusy}
+            />
+            <button
+              type="button"
+              className="editor-ai-prompt-run"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => void handleRunAiAction("custom")}
+              disabled={aiPanelBusy}
+              aria-label={t("note.aiRun")}
+              title={t("note.aiRun")}
+            >
+              <AiArrowGlyph />
+            </button>
+          </div>
+
+          <div className="editor-ai-command-card">
+            <div
+              className="editor-ai-mode-switch"
+              role="group"
+              aria-label={t("note.aiModeLabel")}
+            >
+              <button
+                type="button"
+                className={`editor-ai-mode-pill ${
+                  aiPanel.customMode === "edit" ? "is-active" : ""
+                }`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() =>
+                  setAiPanel((previous) =>
+                    previous
+                      ? {
+                          ...previous,
+                          customMode: "edit",
+                          error: null
+                        }
+                      : previous
+                  )
+                }
+                disabled={aiPanelBusy}
+              >
+                {t("note.aiModeEdit")}
+              </button>
+              <button
+                type="button"
+                className={`editor-ai-mode-pill ${
+                  aiPanel.customMode === "generate" ? "is-active" : ""
+                }`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() =>
+                  setAiPanel((previous) =>
+                    previous
+                      ? {
+                          ...previous,
+                          customMode: "generate",
+                          error: null
+                        }
+                      : previous
+                  )
+                }
+                disabled={aiPanelBusy}
+              >
+                {t("note.aiModeGenerate")}
+              </button>
+            </div>
+
+            <div className="editor-ai-command-list">
+              <button
+                type="button"
+                className="editor-ai-command-row"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleRunAiAction("beautify")}
+                disabled={aiPanelBusy}
+              >
+                <span className="editor-ai-command-icon" aria-hidden="true">
+                  <AiSparkleGlyph />
+                </span>
+                <span>{t("note.aiBeautify")}</span>
+              </button>
+              <button
+                type="button"
+                className="editor-ai-command-row"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleRunAiAction("improve")}
+                disabled={aiPanelBusy}
+              >
+                <span className="editor-ai-command-icon" aria-hidden="true">
+                  <AiTextGlyph />
+                </span>
+                <span>{t("note.aiImprove")}</span>
+              </button>
+              <button
+                type="button"
+                className="editor-ai-command-row"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleRunAiAction("fix")}
+                disabled={aiPanelBusy}
+              >
+                <span className="editor-ai-command-icon" aria-hidden="true">
+                  <AiCheckGlyph />
+                </span>
+                <span>{t("note.aiFix")}</span>
+              </button>
+              <div className="editor-ai-command-row editor-ai-translate-row">
+                <button
+                  type="button"
+                  className="editor-ai-command-main"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => void handleRunAiAction("translate")}
+                  disabled={aiPanelBusy}
+                >
+                  <span className="editor-ai-command-icon" aria-hidden="true">
+                    <AiGlobeGlyph />
+                  </span>
+                  <span>{t("note.aiTranslate")}</span>
+                </button>
+                <input
+                  type="text"
+                  value={aiPanel.targetLanguage}
+                  onChange={(event) =>
+                    setAiPanel((previous) =>
+                      previous
+                        ? {
+                            ...previous,
+                            targetLanguage: event.target.value,
+                            error: null
+                          }
+                        : previous
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleRunAiAction("translate");
+                    }
+                  }}
+                  placeholder={t("note.aiTargetLanguagePlaceholder")}
+                  disabled={aiPanelBusy}
+                />
+              </div>
+            </div>
+
+            {aiPanel.status === "generating" ? (
+              <p className="editor-ai-message is-muted">{t("note.aiGenerating")}</p>
+            ) : null}
+            {aiPanel.status === "applying" ? (
+              <p className="editor-ai-message is-muted">{t("note.aiApplying")}</p>
+            ) : null}
+            {aiPanel.error ? (
+              <p className="editor-ai-message is-error">{aiPanel.error}</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="editor-pane-shell">
         <div className="editor-stage-column">

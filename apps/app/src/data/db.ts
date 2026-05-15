@@ -12,14 +12,16 @@ import {
   extractPlainText,
   extractReferencedAssetIds,
   getFolderCascade,
-  normalizeNoteContent
+  normalizeNoteContent,
+  remapReferencedAssetIds
 } from "../lib/notes";
 import {
   buildCanvasExcerpt,
   createStarterCanvasContent,
   extractCanvasPlainText,
   extractCanvasReferencedFileIds,
-  normalizeCanvasContent
+  normalizeCanvasContent,
+  remapCanvasFileIds
 } from "../lib/canvas";
 import { normalizeTagLookup, normalizeTagName } from "../lib/tags";
 import { buildLocalVaultDatabaseName, getStoredActiveLocalVaultId } from "../lib/localVaults";
@@ -92,9 +94,22 @@ function createColor(colorPool: string[], seedIndex: number) {
 }
 
 const NODE_COLORS = COLOR_PALETTE.map((entry) => entry.hex);
+const SORT_ORDER_STEP = 1024;
 
 function createDeviceId() {
   return `device-${crypto.randomUUID()}`;
+}
+
+function getSortableOrder(record: { sortOrder?: number; createdAt: number }) {
+  return typeof record.sortOrder === "number" ? record.sortOrder : record.createdAt;
+}
+
+function getNextSortOrder(records: Array<{ sortOrder?: number; createdAt: number }>) {
+  if (records.length === 0) {
+    return SORT_ORDER_STEP;
+  }
+
+  return Math.max(...records.map((record) => getSortableOrder(record))) + SORT_ORDER_STEP;
 }
 
 function nextSyncState(currentSyncState: Note["syncState"] | undefined): Note["syncState"] {
@@ -245,6 +260,14 @@ function hydrateImportedAsset(record: SyncedAssetRecord): Asset {
   };
 }
 
+function hydrateFolderRecord(record: Folder): Folder {
+  return {
+    ...record,
+    color: record.color || DEFAULT_FOLDER_COLOR,
+    sortOrder: record.sortOrder ?? record.createdAt
+  };
+}
+
 function hydrateImportedNote(record: SyncedNoteRecord): Note {
   const normalizedContent = normalizeNoteContent(record.content);
   const normalizedCanvas = record.canvasContent ? normalizeCanvasContent(record.canvasContent) : null;
@@ -259,6 +282,7 @@ function hydrateImportedNote(record: SyncedNoteRecord): Note {
 
   return {
     ...record,
+    sortOrder: record.sortOrder ?? record.createdAt,
     tagIds: [...record.tagIds],
     content: normalizedContent,
     canvasContent: normalizedCanvas,
@@ -334,6 +358,7 @@ function hydrateDesktopBackupNote(record: Note): Note {
   return {
     ...record,
     color: record.color || DEFAULT_NOTE_COLOR,
+    sortOrder: record.sortOrder ?? record.createdAt,
     content: normalizedContent,
     canvasContent: normalizedCanvas,
     excerpt,
@@ -909,6 +934,36 @@ export class ZenNotesDatabase extends Dexie {
             settings.encryptionUpdatedAt ??= null;
           });
       });
+
+    this.version(14)
+      .stores({
+        projects: "id,updatedAt",
+        folders: "id,projectId,parentId,sortOrder,updatedAt",
+        tags: "id,name,updatedAt",
+        notes:
+          "id,projectId,contentType,folderId,sortOrder,*tagIds,updatedAt,createdAt,pinned,favorite,archived,trashedAt,syncState,conflictOriginId,color",
+        assets: "id,noteId,updatedAt",
+        settings:
+          "id,syncProvider,syncStatus,syncCursor,selfHostedVaultId,hostedVaultId,hostedUserId,encryptionKeyId",
+        syncDirtyEntries: "key,entityType,entityId,updatedAt,deleted",
+        syncShadows: "key,entityType,entityId",
+        syncTombstones: "key,entityType,entityId,deletedAt"
+      })
+      .upgrade(async (transaction) => {
+        await transaction
+          .table("folders")
+          .toCollection()
+          .modify((folder) => {
+            folder.sortOrder ??= folder.createdAt ?? now();
+          });
+
+        await transaction
+          .table("notes")
+          .toCollection()
+          .modify((note) => {
+            note.sortOrder ??= note.createdAt ?? now();
+          });
+      });
   }
 }
 
@@ -1034,6 +1089,7 @@ export async function restoreLocalVaultDesktopBackup(
   backup: DesktopLocalVaultBackup
 ) {
   return withLocalVaultDatabase(localVaultId, async (database) => {
+    const folders = sortById(backup.folders).map((folder) => hydrateFolderRecord(folder));
     const notes = sortById(backup.notes).map((note) => hydrateDesktopBackupNote(note));
     const assets = sortById(backup.assets).map((asset) => hydrateDesktopBackupAsset(asset));
     const backupSettings = stripAppSettingsSecrets(backup.settings);
@@ -1078,8 +1134,8 @@ export async function restoreLocalVaultDesktopBackup(
           await database.projects.bulkAdd(sortById(backup.projects));
         }
 
-        if (backup.folders.length > 0) {
-          await database.folders.bulkAdd(sortById(backup.folders));
+        if (folders.length > 0) {
+          await database.folders.bulkAdd(folders);
         }
 
         if (backup.tags.length > 0) {
@@ -1225,6 +1281,7 @@ export async function ensureSeedData() {
       name: language === "ru" ? "Входящие" : "Inbox",
       parentId: null,
       color: createColor(NODE_COLORS, 0),
+      sortOrder: SORT_ORDER_STEP,
       createdAt: timestamp,
       updatedAt: timestamp
     },
@@ -1234,6 +1291,7 @@ export async function ensureSeedData() {
       name: language === "ru" ? "Исследования" : "Research",
       parentId: null,
       color: createColor(NODE_COLORS, 1),
+      sortOrder: SORT_ORDER_STEP * 2,
       createdAt: timestamp,
       updatedAt: timestamp
     },
@@ -1243,6 +1301,7 @@ export async function ensureSeedData() {
       name: language === "ru" ? "Прототипы" : "Prototypes",
       parentId: null,
       color: createColor(NODE_COLORS, 2),
+      sortOrder: SORT_ORDER_STEP * 3,
       createdAt: timestamp,
       updatedAt: timestamp
     }
@@ -1280,6 +1339,7 @@ export async function ensureSeedData() {
     projectId: project.id,
     folderId: folders[0].id,
     color: DEFAULT_NOTE_COLOR,
+    sortOrder: SORT_ORDER_STEP,
     tagIds: [tags[0].id, tags[2].id],
     content: starterContent,
     canvasContent: null,
@@ -1415,6 +1475,7 @@ export async function writeImportedVaultSnapshot(
   await withLocalVaultDatabase(localVaultId, async (database) => {
     const existingSettings = stripAppSettingsSecrets(await database.settings.get("app"));
     const language = input.language ?? existingSettings?.language ?? detectLanguage();
+    const folders = input.snapshot.folders.map((folder) => hydrateFolderRecord(folder));
     const notes = input.snapshot.notes.map((note) => hydrateImportedNote(note));
     const assets = input.snapshot.assets.map((asset) => hydrateImportedAsset(asset));
     const shadows = buildSyncShadowEntries(input.snapshot, input.revision);
@@ -1450,8 +1511,8 @@ export async function writeImportedVaultSnapshot(
           await database.projects.bulkAdd(input.snapshot.projects);
         }
 
-        if (input.snapshot.folders.length > 0) {
-          await database.folders.bulkAdd(input.snapshot.folders);
+        if (folders.length > 0) {
+          await database.folders.bulkAdd(folders);
         }
 
         if (input.snapshot.tags.length > 0) {
@@ -1694,6 +1755,24 @@ export async function removeProject(projectId: string) {
   scheduleActiveLocalVaultDesktopBackup();
 }
 
+async function getNextHierarchySortOrder(projectId: string, parentId: string | null) {
+  const [siblingFolders, siblingNotes] = await Promise.all([
+    db.folders.toArray(),
+    db.notes.toArray()
+  ]);
+  const scopedSiblings = [
+    ...siblingFolders.filter(
+      (folder) => folder.projectId === projectId && folder.parentId === parentId
+    ),
+    ...siblingNotes.filter(
+      (note) =>
+        note.projectId === projectId && note.folderId === parentId && note.trashedAt === null
+    )
+  ];
+
+  return getNextSortOrder(scopedSiblings);
+}
+
 export async function createFolder(
   name: string,
   parentId: string | null,
@@ -1718,12 +1797,15 @@ export async function createFolder(
     throw new Error("PROJECT_REQUIRED");
   }
 
+  const sortOrder = await getNextHierarchySortOrder(resolvedProjectId, parentId);
+
   const folder: Folder = {
     id: crypto.randomUUID(),
     projectId: resolvedProjectId,
     name,
     parentId,
     color: color ?? createColor(NODE_COLORS, count),
+    sortOrder,
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -1813,6 +1895,440 @@ export async function inspectFolderRemoval(folderId: string) {
     folderCount: cascade.folderIds.length,
     noteCount: cascade.noteIds.length
   };
+}
+
+function collectDescendantFolderIds(folderId: string, folders: readonly Folder[]) {
+  const descendants: string[] = [];
+  const visit = (currentFolderId: string) => {
+    folders
+      .filter((folder) => folder.parentId === currentFolderId)
+      .forEach((child) => {
+        descendants.push(child.id);
+        visit(child.id);
+      });
+  };
+
+  visit(folderId);
+  return descendants;
+}
+
+function resolveSiblingSortOrder(
+  folders: readonly Folder[],
+  notes: readonly Note[],
+  projectId: string,
+  parentId: string | null,
+  excludeEntityIds: readonly string[],
+  preferredSortOrder?: number
+) {
+  if (typeof preferredSortOrder === "number") {
+    return preferredSortOrder;
+  }
+
+  const excluded = new Set(excludeEntityIds);
+  return getNextSortOrder([
+    ...folders.filter(
+      (folder) =>
+        folder.projectId === projectId &&
+        folder.parentId === parentId &&
+        !excluded.has(`folder:${folder.id}`)
+    ),
+    ...notes.filter(
+      (note) =>
+        note.projectId === projectId &&
+        note.folderId === parentId &&
+        note.trashedAt === null &&
+        !excluded.has(`note:${note.id}`)
+    )
+  ]);
+}
+
+export async function moveFolder(
+  folderId: string,
+  parentId: string | null,
+  projectId?: string,
+  sortOrder?: number
+) {
+  const timestamp = now();
+  let changed = false;
+
+  await db.transaction("rw", db.folders, db.notes, db.syncDirtyEntries, async () => {
+    const [folder, targetParent, folders, notes] = await Promise.all([
+      db.folders.get(folderId),
+      parentId ? db.folders.get(parentId) : Promise.resolve(null),
+      db.folders.toArray(),
+      db.notes.toArray()
+    ]);
+
+    if (!folder) {
+      return;
+    }
+
+    if (parentId && !targetParent) {
+      throw new Error("TARGET_FOLDER_NOT_FOUND");
+    }
+
+    if (parentId === folderId) {
+      throw new Error("INVALID_FOLDER_MOVE");
+    }
+
+    const descendantFolderIds = collectDescendantFolderIds(folderId, folders);
+
+    if (parentId && descendantFolderIds.includes(parentId)) {
+      throw new Error("INVALID_FOLDER_MOVE");
+    }
+
+    if (targetParent?.parentId) {
+      throw new Error("FOLDER_DEPTH_LIMIT");
+    }
+
+    if (parentId && descendantFolderIds.length > 0) {
+      throw new Error("FOLDER_DEPTH_LIMIT");
+    }
+
+    const nextProjectId = targetParent?.projectId ?? projectId ?? folder.projectId;
+    const nextSortOrder = resolveSiblingSortOrder(
+      folders,
+      notes,
+      nextProjectId,
+      parentId,
+      [`folder:${folderId}`],
+      sortOrder
+    );
+
+    const cascade = getFolderCascade(folderId, folders, notes);
+    const folderIdsToUpdate = new Set(cascade.folderIds);
+    const noteIdsToUpdate = new Set(cascade.noteIds);
+
+    await Promise.all(
+      [...folderIdsToUpdate].map((currentFolderId) => {
+        const patch: Partial<Folder> = {
+          projectId: nextProjectId,
+          updatedAt: timestamp
+        };
+
+        if (currentFolderId === folderId) {
+          patch.parentId = parentId;
+          patch.sortOrder = nextSortOrder;
+        }
+
+        return db.folders.update(currentFolderId, patch);
+      })
+    );
+
+    await Promise.all(
+      [...noteIdsToUpdate].map((noteId) =>
+        db.notes.update(noteId, {
+          projectId: nextProjectId,
+          updatedAt: timestamp,
+          syncState: nextSyncState(notes.find((note) => note.id === noteId)?.syncState)
+        })
+      )
+    );
+
+    await putSyncDirtyEntries([
+      ...[...folderIdsToUpdate].map((currentFolderId) =>
+        createSyncDirtyEntry("folder", currentFolderId, timestamp)
+      ),
+      ...[...noteIdsToUpdate].map((noteId) => createSyncDirtyEntry("note", noteId, timestamp))
+    ]);
+    changed = true;
+  });
+
+  if (changed) {
+    scheduleActiveLocalVaultDesktopBackup();
+  }
+
+  return changed;
+}
+
+export async function moveNote(
+  noteId: string,
+  folderId: string | null,
+  projectId?: string,
+  sortOrder?: number
+) {
+  const existingNote = await db.notes.get(noteId);
+  const targetFolder = folderId ? await db.folders.get(folderId) : null;
+
+  if (!existingNote) {
+    return false;
+  }
+
+  if (folderId && !targetFolder) {
+    throw new Error("TARGET_FOLDER_NOT_FOUND");
+  }
+
+  const nextProjectId = targetFolder?.projectId ?? projectId ?? existingNote.projectId;
+  const nextSortOrder =
+    typeof sortOrder === "number"
+      ? sortOrder
+      : await getNextHierarchySortOrder(nextProjectId, folderId);
+
+  return updateNoteMeta(noteId, {
+    projectId: nextProjectId,
+    folderId,
+    sortOrder: nextSortOrder
+  });
+}
+
+function buildDuplicateTitle(title: string, suffix: string) {
+  const normalizedTitle = title.trim();
+  return normalizedTitle ? `${normalizedTitle} ${suffix}` : title;
+}
+
+async function cloneNoteRecord(
+  note: Note,
+  nextFolderId: string | null,
+  nextProjectId: string,
+  sortOrder: number,
+  duplicateSuffix: string,
+  timestamp: number
+) {
+  const nextNoteId = crypto.randomUUID();
+  const sourceAssets = await db.assets.where("noteId").equals(note.id).toArray();
+  const sourceAssetsById = new Map(sourceAssets.map((asset) => [asset.id, asset]));
+  const referencedAssetIds =
+    note.contentType === "canvas"
+      ? extractCanvasReferencedFileIds(note.canvasContent)
+      : extractReferencedAssetIds(note.content);
+  const assetIdMap = new Map<string, string>();
+  const clonedAssets: Asset[] = [];
+
+  referencedAssetIds.forEach((assetId) => {
+    const sourceAsset = sourceAssetsById.get(assetId);
+
+    if (!sourceAsset) {
+      return;
+    }
+
+    const nextAssetId = crypto.randomUUID();
+    assetIdMap.set(assetId, nextAssetId);
+    clonedAssets.push({
+      ...sourceAsset,
+      id: nextAssetId,
+      noteId: nextNoteId,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+  });
+
+  const normalizedContent =
+    note.contentType === "canvas"
+      ? normalizeNoteContent(note.content)
+      : remapReferencedAssetIds(normalizeNoteContent(note.content), assetIdMap);
+  const normalizedCanvas =
+    note.contentType === "canvas"
+      ? remapCanvasFileIds(note.canvasContent, assetIdMap)
+      : note.canvasContent
+        ? normalizeCanvasContent(note.canvasContent)
+        : null;
+  const plainText =
+    note.contentType === "canvas"
+      ? extractCanvasPlainText(normalizedCanvas)
+      : extractPlainText(normalizedContent);
+  const excerpt =
+    note.contentType === "canvas"
+      ? buildCanvasExcerpt(normalizedCanvas)
+      : buildExcerpt(normalizedContent);
+  const nextNote: Note = {
+    ...note,
+    id: nextNoteId,
+    title: buildDuplicateTitle(note.title, duplicateSuffix),
+    projectId: nextProjectId,
+    folderId: nextFolderId,
+    sortOrder,
+    tagIds: [...note.tagIds],
+    content: normalizedContent,
+    canvasContent: normalizedCanvas,
+    excerpt,
+    plainText,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    pinned: false,
+    favorite: false,
+    archived: false,
+    trashedAt: null,
+    syncState: "local",
+    conflictOriginId: null
+  };
+
+  return {
+    note: nextNote,
+    assets: clonedAssets
+  };
+}
+
+export async function duplicateNote(
+  noteId: string,
+  folderId: string | null,
+  projectId?: string,
+  sortOrder?: number,
+  duplicateSuffix = "copy"
+) {
+  const timestamp = now();
+  const sourceNote = await db.notes.get(noteId);
+  const targetFolder = folderId ? await db.folders.get(folderId) : null;
+
+  if (!sourceNote) {
+    return null;
+  }
+
+  if (folderId && !targetFolder) {
+    throw new Error("TARGET_FOLDER_NOT_FOUND");
+  }
+
+  const nextProjectId = targetFolder?.projectId ?? projectId ?? sourceNote.projectId;
+  const nextSortOrder =
+    typeof sortOrder === "number"
+      ? sortOrder
+      : await getNextHierarchySortOrder(nextProjectId, folderId);
+  const cloned = await cloneNoteRecord(
+    sourceNote,
+    folderId,
+    nextProjectId,
+    nextSortOrder,
+    duplicateSuffix,
+    timestamp
+  );
+
+  await db.transaction("rw", db.notes, db.assets, db.syncDirtyEntries, async () => {
+    await db.notes.add(cloned.note);
+
+    if (cloned.assets.length > 0) {
+      await db.assets.bulkAdd(cloned.assets);
+    }
+
+    await putSyncDirtyEntries([
+      createSyncDirtyEntry("note", cloned.note.id, timestamp),
+      ...cloned.assets.map((asset) => createSyncDirtyEntry("asset", asset.id, timestamp))
+    ]);
+  });
+  scheduleActiveLocalVaultDesktopBackup();
+  return cloned.note;
+}
+
+export async function duplicateFolder(
+  folderId: string,
+  parentId: string | null,
+  projectId?: string,
+  sortOrder?: number,
+  duplicateSuffix = "copy"
+) {
+  const timestamp = now();
+  const [sourceFolder, targetParent, folders, notes] = await Promise.all([
+    db.folders.get(folderId),
+    parentId ? db.folders.get(parentId) : Promise.resolve(null),
+    db.folders.toArray(),
+    db.notes.toArray()
+  ]);
+
+  if (!sourceFolder) {
+    return null;
+  }
+
+  if (parentId && !targetParent) {
+    throw new Error("TARGET_FOLDER_NOT_FOUND");
+  }
+
+  if (targetParent?.parentId) {
+    throw new Error("FOLDER_DEPTH_LIMIT");
+  }
+
+  const descendantFolderIds = collectDescendantFolderIds(folderId, folders);
+
+  if (parentId && descendantFolderIds.length > 0) {
+    throw new Error("FOLDER_DEPTH_LIMIT");
+  }
+
+  const nextProjectId = targetParent?.projectId ?? projectId ?? sourceFolder.projectId;
+  const nextSortOrder = resolveSiblingSortOrder(
+    folders,
+    notes,
+    nextProjectId,
+    parentId,
+    [],
+    sortOrder
+  );
+  const foldersByParent = new Map<string | null, Folder[]>();
+  const notesByFolder = new Map<string | null, Note[]>();
+
+  folders.forEach((folder) => {
+    const bucket = foldersByParent.get(folder.parentId) ?? [];
+    bucket.push(folder);
+    foldersByParent.set(folder.parentId, bucket);
+  });
+
+  notes
+    .filter((note) => note.trashedAt === null)
+    .forEach((note) => {
+      const bucket = notesByFolder.get(note.folderId) ?? [];
+      bucket.push(note);
+      notesByFolder.set(note.folderId, bucket);
+    });
+
+  const clonedFolders: Folder[] = [];
+  const clonedNotes: Note[] = [];
+  const clonedAssets: Asset[] = [];
+
+  const cloneFolderTree = async (
+    folder: Folder,
+    nextParentId: string | null,
+    root: boolean
+  ): Promise<string> => {
+    const nextFolderId = crypto.randomUUID();
+    const nextFolder: Folder = {
+      ...folder,
+      id: nextFolderId,
+      projectId: nextProjectId,
+      parentId: nextParentId,
+      name: root ? buildDuplicateTitle(folder.name, duplicateSuffix) : folder.name,
+      sortOrder: root ? nextSortOrder : getSortableOrder(folder),
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    clonedFolders.push(nextFolder);
+
+    for (const note of notesByFolder.get(folder.id) ?? []) {
+      const clonedNote = await cloneNoteRecord(
+        note,
+        nextFolderId,
+        nextProjectId,
+        getSortableOrder(note),
+        duplicateSuffix,
+        timestamp
+      );
+      clonedNotes.push(clonedNote.note);
+      clonedAssets.push(...clonedNote.assets);
+    }
+
+    for (const childFolder of foldersByParent.get(folder.id) ?? []) {
+      await cloneFolderTree(childFolder, nextFolderId, false);
+    }
+
+    return nextFolderId;
+  };
+
+  await cloneFolderTree(sourceFolder, parentId, true);
+
+  await db.transaction("rw", db.folders, db.notes, db.assets, db.syncDirtyEntries, async () => {
+    await db.folders.bulkAdd(clonedFolders);
+
+    if (clonedNotes.length > 0) {
+      await db.notes.bulkAdd(clonedNotes);
+    }
+
+    if (clonedAssets.length > 0) {
+      await db.assets.bulkAdd(clonedAssets);
+    }
+
+    await putSyncDirtyEntries([
+      ...clonedFolders.map((folder) => createSyncDirtyEntry("folder", folder.id, timestamp)),
+      ...clonedNotes.map((note) => createSyncDirtyEntry("note", note.id, timestamp)),
+      ...clonedAssets.map((asset) => createSyncDirtyEntry("asset", asset.id, timestamp))
+    ]);
+  });
+  scheduleActiveLocalVaultDesktopBackup();
+  return clonedFolders[0] ?? null;
 }
 
 export async function createTag(name: string) {
@@ -1959,6 +2475,8 @@ export async function createNote(
     throw new Error("PROJECT_REQUIRED");
   }
 
+  const sortOrder = await getNextHierarchySortOrder(resolvedProjectId, folderId);
+
   const note: Note = {
     id: crypto.randomUUID(),
     title: "",
@@ -1966,6 +2484,7 @@ export async function createNote(
     projectId: resolvedProjectId,
     folderId,
     color: DEFAULT_NOTE_COLOR,
+    sortOrder,
     tagIds,
     content,
     canvasContent: null,
@@ -2008,6 +2527,8 @@ export async function createCanvas(
     throw new Error("PROJECT_REQUIRED");
   }
 
+  const sortOrder = await getNextHierarchySortOrder(resolvedProjectId, folderId);
+
   const note: Note = {
     id: crypto.randomUUID(),
     title: "",
@@ -2015,6 +2536,7 @@ export async function createCanvas(
     projectId: resolvedProjectId,
     folderId,
     color: DEFAULT_NOTE_COLOR,
+    sortOrder,
     tagIds,
     content: [],
     canvasContent,
@@ -2051,6 +2573,7 @@ export async function updateNoteMeta(
       | "projectId"
       | "folderId"
       | "color"
+      | "sortOrder"
       | "tagIds"
       | "pinned"
       | "favorite"
@@ -2075,6 +2598,7 @@ export async function updateNoteMeta(
     projectId: nextProjectId,
     folderId: patch.folderId !== undefined ? patch.folderId : existingNote.folderId,
     color: patch.color ?? existingNote.color,
+    sortOrder: patch.sortOrder ?? existingNote.sortOrder ?? existingNote.createdAt,
     tagIds: patch.tagIds ?? existingNote.tagIds,
     pinned: patch.pinned ?? existingNote.pinned,
     favorite: patch.favorite ?? existingNote.favorite,
@@ -2087,6 +2611,7 @@ export async function updateNoteMeta(
     existingNote.projectId === nextValues.projectId &&
     existingNote.folderId === nextValues.folderId &&
     existingNote.color === nextValues.color &&
+    (existingNote.sortOrder ?? existingNote.createdAt) === nextValues.sortOrder &&
     !hasStableValueChanged(existingNote.tagIds, nextValues.tagIds) &&
     existingNote.pinned === nextValues.pinned &&
     existingNote.favorite === nextValues.favorite &&

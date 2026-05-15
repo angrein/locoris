@@ -4,12 +4,12 @@
 
 .editor-formatting-toolbar-shell .bn-toolbar {
   width: auto;
-  max-width: min(760px, calc(100vw - 40px));
-  min-height: 44px;
-  flex-wrap: wrap;
+  max-width: min(980px, calc(100vw - 40px));
+  min-height: 40px;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 4px;
-  padding: 5px;
+  gap: 2px;
+  padding: 4px;
   overflow: visible;
   border-radius: 22px;
 }
@@ -20,17 +20,48 @@
 
 .editor-formatting-toolbar-shell .mantine-Button-root,
 .editor-formatting-toolbar-shell .mantine-ActionIcon-root {
-  min-height: 32px;
+  flex: 0 0 auto;
+  min-height: 30px;
 }
 
 .editor-formatting-toolbar-shell .mantine-Button-root {
-  max-width: min(210px, calc(100vw - 84px));
+  max-width: min(150px, calc(100vw - 84px));
 }
 
 .editor-formatting-toolbar-shell .mantine-Button-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.editor-formatting-toolbar-shell .editor-formatting-ai-button {
+  border-color: color-mix(in srgb, var(--editor-accent) 34%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 16%, transparent), transparent 64%),
+    rgba(255, 255, 255, 0.035);
+  color: color-mix(in srgb, var(--text) 90%, var(--editor-accent) 10%);
+  font-weight: 700;
+}
+
+.editor-formatting-ai-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--text) 82%, var(--editor-accent) 18%);
+}
+
+.editor-formatting-ai-icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.editor-formatting-toolbar-shell .editor-formatting-ai-button:hover {
+  border-color: color-mix(in srgb, var(--editor-accent) 48%, rgb(var(--cyan-rgb) / 0.18));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 23%, transparent), transparent 64%),
+    rgba(255, 255, 255, 0.052);
 }
 
 .editor-stage-shell .bn-formatting-toolbar,
@@ -92,18 +123,20 @@
 @media (max-width: 720px) {
   .editor-formatting-toolbar-shell .bn-toolbar {
     max-width: calc(100vw - 20px);
-    min-height: 40px;
-    gap: 3px;
-    padding: 4px;
+    min-height: 38px;
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: 3px;
+    overflow: visible;
     border-radius: 18px;
   }
 
   .editor-formatting-toolbar-shell .mantine-Button-root,
   .editor-formatting-toolbar-shell .mantine-ActionIcon-root {
-    min-height: 30px;
+    min-height: 28px;
   }
 
   .editor-formatting-toolbar-shell .mantine-Button-root {
-    max-width: min(180px, calc(100vw - 60px));
+    max-width: min(124px, calc(100vw - 60px));
   }
 }

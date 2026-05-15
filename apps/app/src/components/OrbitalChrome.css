@@ -1787,6 +1787,7 @@
 }
 
 .orbital-overlay .orbital-tree-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -1803,6 +1804,48 @@
     border-color 160ms ease,
     background 160ms ease,
     box-shadow 160ms ease;
+}
+
+.orbital-overlay .orbital-tree-item[draggable="true"] {
+  cursor: grab;
+}
+
+.orbital-overlay .orbital-tree-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.orbital-overlay .orbital-tree-item.is-drop-target {
+  border-color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 34%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 7%, transparent), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.028);
+}
+
+.orbital-overlay .orbital-tree-item.is-drop-before::before,
+.orbital-overlay .orbital-tree-item.is-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 74%, #ffffff);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 34%, transparent);
+  pointer-events: none;
+}
+
+.orbital-overlay .orbital-tree-item.is-drop-before::before {
+  top: 2px;
+}
+
+.orbital-overlay .orbital-tree-item.is-drop-after::after {
+  bottom: 2px;
+}
+
+.orbital-overlay .orbital-tree-item.is-drop-inside {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 22%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 22%, transparent);
 }
 
 .orbital-overlay .orbital-tree-item:hover,
@@ -2151,6 +2194,26 @@
 
 .orbital-overlay .orbital-inspector-static-row {
   cursor: default;
+}
+
+.orbital-overlay .orbital-inspector-toast {
+  position: sticky;
+  bottom: 10px;
+  z-index: 4;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 177, 107, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 197, 116, 0.08), rgba(255, 255, 255, 0.018)),
+    rgba(17, 19, 35, 0.92);
+  color: rgba(255, 229, 190, 0.94);
+  font-size: 0.74rem;
+  line-height: 1.42;
+  box-shadow:
+    0 16px 42px rgba(2, 5, 15, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
 }
 
 .orbital-overlay .orbital-core-color-section .orbital-color-field {

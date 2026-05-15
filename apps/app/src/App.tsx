@@ -12,6 +12,8 @@ import {
   createCanvas,
   clearTrash,
   createProject,
+  duplicateFolder,
+  duplicateNote,
   createFolder,
   createNote,
   createTag,
@@ -20,6 +22,8 @@ import {
   ensureSeedData,
   inspectFolderRemoval,
   moveNoteToTrash,
+  moveFolder,
+  moveNote,
   patchSettings,
   patchLocalVaultSettings,
   readLocalVaultSettings,
@@ -1535,6 +1539,82 @@ export default function App() {
         delayMs: 1800
       });
     }
+  };
+
+  const handleMoveFolder = async (
+    folderId: string,
+    parentId: string | null,
+    projectId?: string,
+    sortOrder?: number
+  ) => {
+    const changed = await moveFolder(folderId, parentId, projectId, sortOrder);
+
+    if (changed) {
+      requestAutoSync({
+        delayMs: 1500
+      });
+    }
+  };
+
+  const handleMoveNote = async (
+    noteId: string,
+    folderId: string | null,
+    projectId?: string,
+    sortOrder?: number
+  ) => {
+    const changed = await moveNote(noteId, folderId, projectId, sortOrder);
+
+    if (changed) {
+      requestAutoSync({
+        delayMs: 1500
+      });
+    }
+  };
+
+  const handleDuplicateFolder = async (
+    folderId: string,
+    parentId: string | null,
+    projectId?: string,
+    sortOrder?: number
+  ) => {
+    const folder = await duplicateFolder(
+      folderId,
+      parentId,
+      projectId,
+      sortOrder,
+      t("orbit.duplicateSuffix")
+    );
+
+    if (folder) {
+      requestAutoSync({
+        delayMs: 1500
+      });
+    }
+
+    return folder;
+  };
+
+  const handleDuplicateNote = async (
+    noteId: string,
+    folderId: string | null,
+    projectId?: string,
+    sortOrder?: number
+  ) => {
+    const note = await duplicateNote(
+      noteId,
+      folderId,
+      projectId,
+      sortOrder,
+      t("orbit.duplicateSuffix")
+    );
+
+    if (note) {
+      requestAutoSync({
+        delayMs: 1500
+      });
+    }
+
+    return note;
   };
 
   const handleCreateTag = async (name: string) => {
@@ -3193,6 +3273,14 @@ export default function App() {
         onUpdateFolderColor={(folderId, color) => void handleUpdateFolderColor(folderId, color)}
         onRenameFolder={(folderId, name) => void handleRenameFolder(folderId, name)}
         onDeleteFolder={(folderId) => void handleDeleteFolder(folderId)}
+        onMoveFolder={(folderId, parentId, projectId, sortOrder) =>
+          void handleMoveFolder(folderId, parentId, projectId, sortOrder)
+        }
+        onMoveNote={(noteId, folderId, projectId, sortOrder) =>
+          void handleMoveNote(noteId, folderId, projectId, sortOrder)
+        }
+        onDuplicateFolder={handleDuplicateFolder}
+        onDuplicateNote={handleDuplicateNote}
         onRenameNote={(noteId, name) =>
           void handleUpdateNoteMeta(noteId, {
             title: name
@@ -3302,6 +3390,15 @@ export default function App() {
           noteColor: t("note.color"),
           chooseColor: t("orbit.chooseColor"),
           customColor: t("orbit.customColor"),
+          copyAction: t("orbit.copyAction"),
+          pasteAction: t("orbit.pasteAction"),
+          duplicateAction: t("orbit.duplicateAction"),
+          selectedCount: t("orbit.selectedCount"),
+          clipboardEmpty: t("orbit.clipboardEmpty"),
+          moveBlockedDepth: t("orbit.moveBlockedDepth"),
+          moveBlockedInvalid: t("orbit.moveBlockedInvalid"),
+          moveBlockedMissingTarget: t("orbit.moveBlockedMissingTarget"),
+          deleteSelection: t("orbit.deleteSelection"),
           deleteSystem: t("project.delete"),
           deleteFolder: t("folders.delete"),
           moveToTrash: t("note.moveToTrash"),
