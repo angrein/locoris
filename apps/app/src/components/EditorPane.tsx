@@ -705,6 +705,7 @@ export default function EditorPane({
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
   const markdownStatusTimeoutRef = useRef<number | null>(null);
+  const isTitleFieldFocusedRef = useRef(false);
   const isApplyingChecklistTransformRef = useRef(false);
   const pendingEmptyInlinePasteRestoreRef =
     useRef<EmptyInlinePasteRestoreSnapshot | null>(null);
@@ -725,8 +726,15 @@ export default function EditorPane({
   const normalizedContent = useMemo(() => normalizeNoteContent(note.content), [note.content]);
 
   useEffect(() => {
+    isTitleFieldFocusedRef.current = false;
     setTitleDraft(note.title);
-  }, [note.id, note.title]);
+  }, [note.id]);
+
+  useEffect(() => {
+    if (!isTitleFieldFocusedRef.current) {
+      setTitleDraft(note.title);
+    }
+  }, [note.title]);
 
   useEffect(() => {
     setPendingMarkdownImport(null);
@@ -1388,7 +1396,21 @@ export default function EditorPane({
 
     titleTimeoutRef.current = window.setTimeout(() => {
       onTitleChange(value.trim());
+      titleTimeoutRef.current = null;
     }, 220);
+  };
+
+  const flushTitleDraft = () => {
+    if (titleTimeoutRef.current) {
+      window.clearTimeout(titleTimeoutRef.current);
+      titleTimeoutRef.current = null;
+    }
+
+    const normalizedTitle = latestTitleDraftRef.current.trim();
+
+    if (normalizedTitle !== latestStoredTitleRef.current.trim()) {
+      latestOnTitleChangeRef.current(normalizedTitle);
+    }
   };
 
   const showMarkdownStatus = (status: Exclude<MarkdownStatus, null>) => {
@@ -1538,6 +1560,13 @@ export default function EditorPane({
             <input
               value={titleDraft}
               onChange={(event) => handleTitleChange(event.target.value)}
+              onFocus={() => {
+                isTitleFieldFocusedRef.current = true;
+              }}
+              onBlur={() => {
+                isTitleFieldFocusedRef.current = false;
+                flushTitleDraft();
+              }}
               className="note-title-input editor-pane-title-field"
               placeholder={t("note.titlePlaceholder")}
             />

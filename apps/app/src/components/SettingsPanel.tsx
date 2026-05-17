@@ -10,8 +10,10 @@ import {
 import {
   deleteGeminiApiKey,
   GEMINI_MODEL_OPTIONS,
+  isValidGeminiModelId,
   readGeminiApiKey,
   readStoredGeminiModel,
+  sanitizeGeminiModelId,
   testGeminiConnection,
   writeGeminiApiKey,
   writeStoredGeminiModel
@@ -244,10 +246,14 @@ export default function SettingsPanel({
   const [desktopUpdateState, setDesktopUpdateState] = useState(() => readDesktopUpdateSnapshot());
   const [aiKeyDraft, setAiKeyDraft] = useState("");
   const [aiModelId, setAiModelId] = useState(() => readStoredGeminiModel());
+  const [aiModelDraft, setAiModelDraft] = useState(() => readStoredGeminiModel());
   const [aiFeedback, setAiFeedback] = useState<SyncFeedbackState>(null);
-  const [aiBusy, setAiBusy] = useState<"saving" | "testing" | "disconnecting" | null>(null);
+  const [aiBusy, setAiBusy] = useState<
+    "saving" | "testing" | "checkingModel" | "disconnecting" | null
+  >(null);
   const [aiKeyLoaded, setAiKeyLoaded] = useState(false);
   const [aiInstructionsOpen, setAiInstructionsOpen] = useState(false);
+  const [aiAdvancedModelOpen, setAiAdvancedModelOpen] = useState(false);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopUpdatesEnabled = supportsDesktopUpdates();
 
@@ -423,9 +429,36 @@ export default function SettingsPanel({
   const currentAccentThemeId = resolveAppAccentThemeId(accentThemeId);
   const currentAccentTheme = getAppAccentTheme(currentAccentThemeId);
   const hasGeminiKey = aiKeyDraft.trim().length > 0;
+  const selectedAiModelOption =
+    GEMINI_MODEL_OPTIONS.find((model) => model.id === aiModelId) ?? null;
+  const customAiModelActive = selectedAiModelOption === null;
+  const normalizedAiModelDraft = sanitizeGeminiModelId(aiModelDraft);
+  const aiModelDraftInvalid =
+    normalizedAiModelDraft.length > 0 && !isValidGeminiModelId(normalizedAiModelDraft);
   const aiConnectionLabel = hasGeminiKey
     ? t("settings.aiConnected")
     : t("settings.aiNotConnected");
+
+  const selectAiModel = (modelId: string) => {
+    const normalizedModelId = sanitizeGeminiModelId(modelId);
+
+    setAiModelId(normalizedModelId);
+    setAiModelDraft(normalizedModelId);
+    setAiFeedback(null);
+  };
+
+  const renderAiModelMeter = (label: string, value: number) => (
+    <span className="settings-ai-model-meter">
+      <span>
+        {label}
+        <b>{value}/5</b>
+      </span>
+      <i
+        aria-hidden="true"
+        style={{ "--ai-model-meter": `${Math.max(0, Math.min(value, 5)) * 20}%` } as CSSProperties}
+      />
+    </span>
+  );
 
   const handleSaveAiIntegration = async () => {
     const apiKey = aiKeyDraft.trim();
@@ -434,6 +467,14 @@ export default function SettingsPanel({
       setAiFeedback({
         tone: "error",
         text: t("settings.aiKeyRequired")
+      });
+      return;
+    }
+
+    if (!isValidGeminiModelId(aiModelId)) {
+      setAiFeedback({
+        tone: "error",
+        text: t("settings.aiModelInvalid")
       });
       return;
     }
@@ -469,6 +510,14 @@ export default function SettingsPanel({
       return;
     }
 
+    if (!isValidGeminiModelId(aiModelId)) {
+      setAiFeedback({
+        tone: "error",
+        text: t("settings.aiModelInvalid")
+      });
+      return;
+    }
+
     setAiBusy("testing");
     setAiFeedback(null);
 
@@ -483,6 +532,48 @@ export default function SettingsPanel({
       setAiFeedback({
         tone: "error",
         text: t("settings.aiTestFailed")
+      });
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
+  const handleCheckAdvancedAiModel = async () => {
+    const apiKey = aiKeyDraft.trim() || (await readGeminiApiKey());
+    const modelId = sanitizeGeminiModelId(aiModelDraft);
+
+    if (!apiKey) {
+      setAiFeedback({
+        tone: "error",
+        text: t("settings.aiKeyRequired")
+      });
+      return;
+    }
+
+    if (!isValidGeminiModelId(modelId)) {
+      setAiFeedback({
+        tone: "error",
+        text: t("settings.aiModelInvalid")
+      });
+      return;
+    }
+
+    setAiBusy("checkingModel");
+    setAiFeedback(null);
+
+    try {
+      await testGeminiConnection(apiKey, modelId);
+      setAiModelId(modelId);
+      setAiModelDraft(modelId);
+      writeStoredGeminiModel(modelId);
+      setAiFeedback({
+        tone: "success",
+        text: t("settings.aiModelAvailable", { model: modelId })
+      });
+    } catch {
+      setAiFeedback({
+        tone: "error",
+        text: t("settings.aiModelUnavailable", { model: modelId })
       });
     } finally {
       setAiBusy(null);
@@ -668,7 +759,18 @@ export default function SettingsPanel({
                   <span>{t("settings.aiModelLabel")}</span>
                   <span>{t("settings.aiModelHint")}</span>
                 </div>
-                <div className="settings-ai-model-grid" role="radiogroup" aria-label={t("settings.aiModelLabel")}>
+                <div className="settings-ai-selected-model">
+                  <span>{t("settings.aiModelSelected")}</span>
+                  <code>{selectedAiModelOption?.label ?? aiModelId}</code>
+                  {customAiModelActive ? (
+                    <em>{t("settings.aiModelCustomActive")}</em>
+                  ) : null}
+                </div>
+                <div
+                  className="settings-ai-model-grid"
+                  role="radiogroup"
+                  aria-label={t("settings.aiModelLabel")}
+                >
                   {GEMINI_MODEL_OPTIONS.map((model) => {
                     const active = aiModelId === model.id;
 
@@ -677,18 +779,80 @@ export default function SettingsPanel({
                         type="button"
                         key={model.id}
                         className={`settings-ai-model-card ${active ? "is-active" : ""}`}
-                        onClick={() => {
-                          setAiModelId(model.id);
-                          setAiFeedback(null);
-                        }}
+                        onClick={() => selectAiModel(model.id)}
                         role="radio"
                         aria-checked={active}
+                        title={`${t(model.bestForKey)} ${t(model.limitKey)}`}
                       >
-                        <span>{model.label}</span>
-                        <small>{model.description}</small>
+                        <span className="settings-ai-model-card-head">
+                          <span>{model.label}</span>
+                          <em>{t(model.badgeKey)}</em>
+                        </span>
+                        <code>{model.id}</code>
+                        <small>{t(model.descriptionKey)}</small>
+                        <span className="settings-ai-model-best">
+                          {t(model.bestForKey)}
+                        </span>
+                        <span className="settings-ai-model-meters" aria-hidden="true">
+                          {renderAiModelMeter(t("settings.aiModelMetricSpeed"), model.speed)}
+                          {renderAiModelMeter(t("settings.aiModelMetricQuality"), model.quality)}
+                          {renderAiModelMeter(t("settings.aiModelMetricQuota"), model.quota)}
+                        </span>
+                        <span className="settings-ai-model-limit">{t(model.limitKey)}</span>
                       </button>
                     );
                   })}
+                </div>
+                <p className="settings-ai-model-note">
+                  {t("settings.aiModelLimitsDisclaimer")}
+                </p>
+
+                <div className={`settings-ai-advanced-model ${aiAdvancedModelOpen ? "is-open" : ""}`}>
+                  <button
+                    type="button"
+                    className="settings-ai-advanced-toggle"
+                    onClick={() => setAiAdvancedModelOpen((open) => !open)}
+                    aria-expanded={aiAdvancedModelOpen}
+                  >
+                    <span>
+                      <strong>{t("settings.aiModelAdvancedTitle")}</strong>
+                      <small>{t("settings.aiModelAdvancedDescription")}</small>
+                    </span>
+                    <em aria-hidden="true">{aiAdvancedModelOpen ? "-" : "+"}</em>
+                  </button>
+
+                  {aiAdvancedModelOpen ? (
+                    <div className="settings-ai-advanced-body">
+                      <label className="settings-ai-field">
+                        <span>{t("settings.aiModelIdLabel")}</span>
+                        <input
+                          type="text"
+                          value={aiModelDraft}
+                          onChange={(event) => {
+                            setAiModelDraft(event.target.value);
+                            setAiFeedback(null);
+                          }}
+                          placeholder={t("settings.aiModelIdPlaceholder")}
+                          autoComplete="off"
+                          spellCheck={false}
+                          className={aiModelDraftInvalid ? "is-invalid" : ""}
+                        />
+                      </label>
+                      <div className="settings-ai-advanced-actions">
+                        <button
+                          type="button"
+                          className="settings-row-action"
+                          onClick={() => void handleCheckAdvancedAiModel()}
+                          disabled={aiBusy !== null || normalizedAiModelDraft.length === 0}
+                        >
+                          {aiBusy === "checkingModel"
+                            ? t("settings.aiModelChecking")
+                            : t("settings.aiModelCheckAndUse")}
+                        </button>
+                        <span>{t("settings.aiModelAdvancedHint")}</span>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

@@ -19,30 +19,87 @@ export type GeminiCustomMode = "edit" | "generate";
 export type GeminiModelOption = {
   id: string;
   label: string;
-  description: string;
+  badgeKey: string;
+  descriptionKey: string;
+  bestForKey: string;
+  limitKey: string;
+  speed: number;
+  quality: number;
+  quota: number;
 };
 
 export const GEMINI_API_KEY_SECRET_KEY = "ai:gemini:api-key";
 export const GEMINI_API_KEY_BROWSER_STORAGE_KEY = "zen:ai.gemini.api-key";
 export const GEMINI_MODEL_STORAGE_KEY = "locoris.ai.gemini.model";
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
 export const EDITOR_AI_OPEN_EVENT = "locoris:editor-ai-open";
 
 export const GEMINI_MODEL_OPTIONS: readonly GeminiModelOption[] = [
   {
+    id: "gemini-3.1-flash-lite",
+    label: "Gemini 3.1 Flash Lite",
+    badgeKey: "settings.aiModelBadgeDefault",
+    descriptionKey: "settings.aiModelGemini31FlashLiteDescription",
+    bestForKey: "settings.aiModelGemini31FlashLiteBestFor",
+    limitKey: "settings.aiModelGemini31FlashLiteLimit",
+    speed: 5,
+    quality: 4,
+    quota: 5
+  },
+  {
     id: "gemini-2.5-flash",
     label: "Gemini 2.5 Flash",
-    description: "Balanced quality and speed for note editing."
+    badgeKey: "settings.aiModelBadgeBalanced",
+    descriptionKey: "settings.aiModelGemini25FlashDescription",
+    bestForKey: "settings.aiModelGemini25FlashBestFor",
+    limitKey: "settings.aiModelGemini25FlashLimit",
+    speed: 4,
+    quality: 4,
+    quota: 3
+  },
+  {
+    id: "gemma-4-31b-it",
+    label: "Gemma 4 31B IT",
+    badgeKey: "settings.aiModelBadgeGemma",
+    descriptionKey: "settings.aiModelGemma431bDescription",
+    bestForKey: "settings.aiModelGemma431bBestFor",
+    limitKey: "settings.aiModelGemma431bLimit",
+    speed: 3,
+    quality: 4,
+    quota: 4
+  },
+  {
+    id: "gemma-4-26b-a4b-it",
+    label: "Gemma 4 26B A4B IT",
+    badgeKey: "settings.aiModelBadgeGemmaFast",
+    descriptionKey: "settings.aiModelGemma426bDescription",
+    bestForKey: "settings.aiModelGemma426bBestFor",
+    limitKey: "settings.aiModelGemma426bLimit",
+    speed: 4,
+    quality: 3,
+    quota: 4
   },
   {
     id: "gemini-2.5-flash-lite",
     label: "Gemini 2.5 Flash-Lite",
-    description: "Lower-cost, faster option for short transformations."
+    badgeKey: "settings.aiModelBadgeFast",
+    descriptionKey: "settings.aiModelGemini25FlashLiteDescription",
+    bestForKey: "settings.aiModelGemini25FlashLiteBestFor",
+    limitKey: "settings.aiModelGemini25FlashLiteLimit",
+    speed: 5,
+    quality: 3,
+    quota: 4
   },
   {
     id: "gemini-2.5-pro",
     label: "Gemini 2.5 Pro",
-    description: "Stronger reasoning for larger notes when the account allows it."
+    badgeKey: "settings.aiModelBadgeSmart",
+    descriptionKey: "settings.aiModelGemini25ProDescription",
+    bestForKey: "settings.aiModelGemini25ProBestFor",
+    limitKey: "settings.aiModelGemini25ProLimit",
+    speed: 2,
+    quality: 5,
+    quota: 1
   }
 ] as const;
 
@@ -74,20 +131,39 @@ type GeminiGenerateResponse = {
   };
 };
 
-function normalizeModelId(model: string | null | undefined) {
-  const normalized = typeof model === "string" ? model.trim() : "";
+export function sanitizeGeminiModelId(model: string | null | undefined) {
+  return (typeof model === "string" ? model.trim() : "").replace(/^models\//i, "");
+}
 
-  return GEMINI_MODEL_OPTIONS.some((option) => option.id === normalized)
-    ? normalized
-    : DEFAULT_GEMINI_MODEL;
+export function isValidGeminiModelId(model: string | null | undefined) {
+  const normalized = sanitizeGeminiModelId(model);
+  return /^[a-z0-9][a-z0-9._-]{1,159}$/i.test(normalized);
+}
+
+function resolveModelId(model: string | null | undefined) {
+  const normalized = sanitizeGeminiModelId(model);
+
+  if (!normalized) {
+    return DEFAULT_GEMINI_MODEL;
+  }
+
+  if (!isValidGeminiModelId(normalized)) {
+    throw new Error("GEMINI_MODEL_ID_INVALID");
+  }
+
+  return normalized;
 }
 
 export function readStoredGeminiModel() {
-  return normalizeModelId(readPersistentString(GEMINI_MODEL_STORAGE_KEY));
+  try {
+    return resolveModelId(readPersistentString(GEMINI_MODEL_STORAGE_KEY));
+  } catch {
+    return DEFAULT_GEMINI_MODEL;
+  }
 }
 
 export function writeStoredGeminiModel(model: string) {
-  writePersistentString(GEMINI_MODEL_STORAGE_KEY, normalizeModelId(model));
+  writePersistentString(GEMINI_MODEL_STORAGE_KEY, resolveModelId(model));
 }
 
 function canUseBrowserGeminiKeyFallback() {
@@ -248,7 +324,7 @@ function extractGeminiText(payload: GeminiGenerateResponse) {
 
 export async function generateGeminiMarkdown(input: GenerateGeminiMarkdownInput) {
   const apiKey = input.apiKey.trim();
-  const model = normalizeModelId(input.model);
+  const model = resolveModelId(input.model);
   const markdown = input.markdown.trim();
 
   if (!apiKey) {

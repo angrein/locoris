@@ -1379,6 +1379,51 @@ export async function ensureSeedData() {
   scheduleActiveLocalVaultDesktopBackup();
 }
 
+export async function repairDerivedNoteText() {
+  const notes = await db.notes.toArray();
+  const updates = notes
+    .map((note) => {
+      const normalizedContent = normalizeNoteContent(note.content);
+      const normalizedCanvas = note.canvasContent ? normalizeCanvasContent(note.canvasContent) : null;
+      const excerpt =
+        note.contentType === "canvas"
+          ? buildCanvasExcerpt(normalizedCanvas)
+          : buildExcerpt(normalizedContent);
+      const plainText =
+        note.contentType === "canvas"
+          ? extractCanvasPlainText(normalizedCanvas)
+          : extractPlainText(normalizedContent);
+
+      if (note.excerpt === excerpt && note.plainText === plainText) {
+        return null;
+      }
+
+      return {
+        id: note.id,
+        excerpt,
+        plainText
+      };
+    })
+    .filter((update): update is { id: string; excerpt: string; plainText: string } => Boolean(update));
+
+  if (updates.length === 0) {
+    return false;
+  }
+
+  await db.transaction("rw", db.notes, async () => {
+    await Promise.all(
+      updates.map((update) =>
+        db.notes.update(update.id, {
+          excerpt: update.excerpt,
+          plainText: update.plainText
+        })
+      )
+    );
+  });
+  scheduleActiveLocalVaultDesktopBackup();
+  return true;
+}
+
 export async function patchSettings(patch: Partial<Omit<AppSettings, "id">>) {
   const activeLocalVaultId = getStoredActiveLocalVaultId();
   const { persistedPatch, secretPatch } = splitAppSettingsSecretPatch(patch);

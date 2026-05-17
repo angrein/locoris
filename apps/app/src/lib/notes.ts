@@ -80,6 +80,19 @@ export function createStarterContent(language: AppLanguage): NoteContent {
 }
 
 const FILE_BLOCK_TYPES = new Set(["image", "file", "audio", "video"]);
+const TEXT_METADATA_KEYS = new Set([
+  "type",
+  "id",
+  "props",
+  "styles",
+  "href",
+  "url",
+  "src",
+  "name",
+  "mimeType",
+  "previewWidth",
+  "caption"
+]);
 
 function normalizeStoredBlock(block: StoredBlock): StoredBlock {
   const normalizedChildren = Array.isArray(block.children)
@@ -475,7 +488,7 @@ function collectText(value: unknown, parts: string[]) {
   }
 
   Object.entries(record).forEach(([key, nestedValue]) => {
-    if (key !== "text") {
+    if (key !== "text" && !TEXT_METADATA_KEYS.has(key)) {
       collectText(nestedValue, parts);
     }
   });

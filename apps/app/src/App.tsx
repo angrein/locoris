@@ -27,6 +27,7 @@ import {
   patchSettings,
   patchLocalVaultSettings,
   readLocalVaultSettings,
+  repairDerivedNoteText,
   resetLocalVaultSyncBinding,
   removeProject,
   removeFolder,
@@ -323,11 +324,13 @@ export default function App() {
     let cancelled = false;
     setVaultBooting(true);
 
-    void ensureSeedData().finally(() => {
-      if (!cancelled) {
-        setVaultBooting(false);
-      }
-    });
+    void ensureSeedData()
+      .then(() => repairDerivedNoteText())
+      .finally(() => {
+        if (!cancelled) {
+          setVaultBooting(false);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -1734,7 +1737,7 @@ export default function App() {
     const note = notes.find((currentNote) => currentNote.id === noteId);
 
     if (!note) {
-      return;
+      return false;
     }
 
     if (note.trashedAt) {
@@ -1746,7 +1749,7 @@ export default function App() {
       });
 
       if (!confirmed) {
-        return;
+        return false;
       }
 
       await removeNote(note.id);
@@ -1759,7 +1762,7 @@ export default function App() {
       });
 
       if (!confirmed) {
-        return;
+        return false;
       }
 
       await moveNoteToTrash(note.id);
@@ -1778,6 +1781,8 @@ export default function App() {
     if (orbitalEditorNoteId === note.id) {
       setOrbitalEditorNoteId(null);
     }
+
+    return true;
   };
 
   const handleClearTrash = async () => {
@@ -1861,7 +1866,7 @@ export default function App() {
       });
 
       if (!confirmed) {
-        return;
+        return false;
       }
     }
 
@@ -1874,6 +1879,8 @@ export default function App() {
     if (selectedFolderId && deletedFolderIds.includes(selectedFolderId)) {
       setSelectedFolderId(null);
     }
+
+    return true;
   };
 
   const handleDeleteProject = async (projectId: string) => {
@@ -3262,23 +3269,19 @@ export default function App() {
           handleRenameLocalVault(localVaultId, name)
         }
         onCreateProject={handleCreateProjectNode}
-        onRenameProject={(projectId, name) => void handleRenameProject(projectId, name)}
+        onRenameProject={handleRenameProject}
         onUpdateProjectPosition={(projectId, x, y) =>
           void handleUpdateProjectPosition(projectId, x, y)
         }
         onUpdateProjectColor={(projectId, color) =>
           void handleUpdateProjectColor(projectId, color)
         }
-        onDeleteProject={(projectId) => void handleDeleteProject(projectId)}
+        onDeleteProject={handleDeleteProject}
         onUpdateFolderColor={(folderId, color) => void handleUpdateFolderColor(folderId, color)}
         onRenameFolder={(folderId, name) => void handleRenameFolder(folderId, name)}
-        onDeleteFolder={(folderId) => void handleDeleteFolder(folderId)}
-        onMoveFolder={(folderId, parentId, projectId, sortOrder) =>
-          void handleMoveFolder(folderId, parentId, projectId, sortOrder)
-        }
-        onMoveNote={(noteId, folderId, projectId, sortOrder) =>
-          void handleMoveNote(noteId, folderId, projectId, sortOrder)
-        }
+        onDeleteFolder={handleDeleteFolder}
+        onMoveFolder={handleMoveFolder}
+        onMoveNote={handleMoveNote}
         onDuplicateFolder={handleDuplicateFolder}
         onDuplicateNote={handleDuplicateNote}
         onRenameNote={(noteId, name) =>
@@ -3297,7 +3300,7 @@ export default function App() {
             favorite: false
           })
         }
-        onDeleteNote={(noteId) => void handleDeleteNoteById(noteId)}
+        onDeleteNote={handleDeleteNoteById}
         onCreateFolder={handleCreateFolderNode}
         onCreateNote={async (folderId, projectId) => {
           const note = await handleCreateNoteAt(folderId, [], projectId);
@@ -3380,6 +3383,8 @@ export default function App() {
           documentsMenu: t("orbit.documentsMenu"),
           notesMenu: t("orbit.notesMenu"),
           foldersMenu: t("orbit.foldersMenu"),
+          hierarchyScopeVault: t("orbit.hierarchyScopeVault"),
+          hierarchyScopeProject: t("orbit.hierarchyScopeProject"),
           tagsMenu: t("orbit.tagsMenu"),
           filesMenu: t("orbit.filesMenu"),
           pinnedMenu: t("orbit.pinnedMenu"),
@@ -3393,6 +3398,7 @@ export default function App() {
           copyAction: t("orbit.copyAction"),
           pasteAction: t("orbit.pasteAction"),
           duplicateAction: t("orbit.duplicateAction"),
+          goToLocationAction: t("orbit.goToLocationAction"),
           selectedCount: t("orbit.selectedCount"),
           clipboardEmpty: t("orbit.clipboardEmpty"),
           moveBlockedDepth: t("orbit.moveBlockedDepth"),

@@ -667,6 +667,11 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 14%, transparent);
 }
 
+.settings-ai-field input.is-invalid {
+  border-color: rgba(255, 113, 113, 0.34);
+  box-shadow: 0 0 0 1px rgba(255, 113, 113, 0.12);
+}
+
 .settings-ai-guide-trigger {
   min-height: 42px;
   padding: 0 13px;
@@ -726,22 +731,54 @@
   color: rgba(187, 194, 226, 0.62);
 }
 
+.settings-ai-selected-model {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 15%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 6%, transparent), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.022);
+  color: rgba(192, 201, 230, 0.72);
+  font-size: 0.69rem;
+  line-height: 1.25;
+}
+
+.settings-ai-selected-model code {
+  color: rgba(248, 250, 255, 0.92);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.settings-ai-selected-model em {
+  margin-left: auto;
+  color: color-mix(in srgb, var(--text) 74%, var(--utility-modal-accent, var(--gold)) 26%);
+  font-style: normal;
+  font-size: 0.66rem;
+}
+
 .settings-ai-model-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .settings-ai-model-card {
   min-width: 0;
-  min-height: 92px;
+  min-height: 176px;
   display: grid;
   align-content: start;
-  gap: 6px;
-  padding: 11px;
-  border-radius: 16px;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
   border: 1px solid rgb(var(--line-rgb) / 0.1);
   background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 6%, transparent), transparent 44%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
     rgba(255, 255, 255, 0.02);
   color: rgba(243, 246, 255, 0.9);
@@ -760,14 +797,192 @@
     rgba(255, 255, 255, 0.03);
 }
 
-.settings-ai-model-card span {
+.settings-ai-model-card.is-active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 18px 36px color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 8%, transparent);
+}
+
+.settings-ai-model-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-ai-model-card-head span {
   font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.25;
 }
 
+.settings-ai-model-card-head em {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 18%, rgb(var(--line-rgb) / 0.12));
+  background: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 9%, rgba(255, 255, 255, 0.018));
+  color: color-mix(in srgb, var(--text) 76%, var(--utility-modal-accent, var(--gold)) 24%);
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.settings-ai-model-card code {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(176, 186, 218, 0.64);
+  font-family: inherit;
+  font-size: 0.62rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-ai-model-card small {
   color: rgba(188, 197, 226, 0.68);
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.settings-ai-model-best,
+.settings-ai-model-limit {
+  display: block;
+  color: rgba(207, 215, 242, 0.75);
+  font-size: 0.64rem;
+  line-height: 1.42;
+}
+
+.settings-ai-model-limit {
+  color: rgba(170, 180, 214, 0.62);
+}
+
+.settings-ai-model-meters {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.settings-ai-model-meter {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-ai-model-meter span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: rgba(184, 194, 225, 0.66);
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
+.settings-ai-model-meter b {
+  color: rgba(236, 241, 255, 0.82);
+  font-size: 0.56rem;
+}
+
+.settings-ai-model-meter i {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.settings-ai-model-meter i::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--ai-model-meter, 0%);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--utility-modal-accent, var(--gold)), rgba(238, 244, 255, 0.9));
+}
+
+.settings-ai-advanced-model {
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.018);
+}
+
+.settings-ai-advanced-model.is-open {
+  border-color: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 22%, rgb(var(--line-rgb) / 0.14));
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 7%, transparent), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.022);
+}
+
+.settings-ai-advanced-toggle {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  color: rgba(241, 245, 255, 0.9);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-ai-advanced-toggle span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.settings-ai-advanced-toggle strong {
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+.settings-ai-advanced-toggle small {
+  color: rgba(184, 194, 225, 0.66);
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.settings-ai-advanced-toggle em {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 20%, rgb(var(--line-rgb) / 0.12));
+  color: color-mix(in srgb, var(--text) 80%, var(--utility-modal-accent, var(--gold)) 20%);
+  font-style: normal;
+  line-height: 1;
+}
+
+.settings-ai-advanced-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.settings-ai-advanced-actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-ai-advanced-actions span {
+  color: rgba(175, 185, 218, 0.64);
   font-size: 0.66rem;
   line-height: 1.45;
 }
@@ -1049,7 +1264,8 @@
 
   .settings-panel-shell.is-ai-settings .settings-panel-grid,
   .settings-ai-model-grid,
-  .settings-ai-key-row {
+  .settings-ai-key-row,
+  .settings-ai-advanced-actions {
     grid-template-columns: 1fr;
   }
 

@@ -458,7 +458,67 @@ const en = {
     aiApiKeyPlaceholder: "Paste the key from Google AI Studio",
     aiLoadingKey: "Loading saved key…",
     aiModelLabel: "Model",
-    aiModelHint: "You can change it later",
+    aiModelHint: "Profiles for different tasks and quota needs",
+    aiModelSelected: "Selected now",
+    aiModelCustomActive: "advanced ID",
+    aiModelBadgeDefault: "Default",
+    aiModelBadgeBalanced: "Balanced",
+    aiModelBadgeGemma: "Open model",
+    aiModelBadgeGemmaFast: "Gemma fast",
+    aiModelBadgeFast: "Fast",
+    aiModelBadgeSmart: "Smart",
+    aiModelMetricSpeed: "Speed",
+    aiModelMetricQuality: "Quality",
+    aiModelMetricQuota: "Quota",
+    aiModelGemini31FlashLiteDescription:
+      "A new lightweight Flash profile for daily work: quick edits, translation, and note formatting.",
+    aiModelGemini31FlashLiteBestFor:
+      "Best for: everyday editor AI actions where speed and generous free-tier headroom matter.",
+    aiModelGemini31FlashLiteLimit:
+      "Limits: the safest quota profile in this set; Google shows actual RPM/TPM/RPD in AI Studio.",
+    aiModelGemini25FlashDescription:
+      "A dependable general model for polished rewriting and structuring medium-sized notes.",
+    aiModelGemini25FlashBestFor:
+      "Best for: balanced quality and speed when you need more context awareness than Lite.",
+    aiModelGemini25FlashLimit:
+      "Limits: medium; more comfortable than Pro, but still best reserved for meaningful edits.",
+    aiModelGemma431bDescription:
+      "A larger instruct Gemma-family model for text tasks when you want an alternative generation style.",
+    aiModelGemma431bBestFor:
+      "Best for: drafts, rewriting, and open-model experiments without jumping to Pro.",
+    aiModelGemma431bLimit:
+      "Limits: depend on whether this model is enabled for your key; the check below confirms availability.",
+    aiModelGemma426bDescription:
+      "A leaner Gemma option for faster text operations and more frequent use.",
+    aiModelGemma426bBestFor:
+      "Best for: short edits, list generation, and quick editor commands.",
+    aiModelGemma426bLimit:
+      "Limits: usually more practical than 31B, but Google can vary availability and quota by account and region.",
+    aiModelGemini25FlashLiteDescription:
+      "A proven fast fallback for short AI commands when the newer Flash Lite is unavailable for your key.",
+    aiModelGemini25FlashLiteBestFor:
+      "Best for: quick fixes, spelling, short translation, and economical daily use.",
+    aiModelGemini25FlashLiteLimit:
+      "Limits: generous, but lower quality than Flash and Pro on complex notes.",
+    aiModelGemini25ProDescription:
+      "The strongest model in the list for complex context, long notes, and more careful editorial reasoning.",
+    aiModelGemini25ProBestFor:
+      "Best for: occasional hard tasks, large notes, deep restructuring, and careful research-style work.",
+    aiModelGemini25ProLimit:
+      "Limits: the smallest free-tier headroom; better used selectively instead of as the default.",
+    aiModelLimitsDisclaimer:
+      "Google changes free quotas by model, region, and account. Locoris shows a UX profile and verifies the selected model id with a live request.",
+    aiModelAdvancedTitle: "Advanced model id",
+    aiModelAdvancedDescription: "For new, experimental, or manually enabled Gemini API models.",
+    aiModelIdLabel: "Model ID",
+    aiModelIdPlaceholder: "For example: gemini-3.1-flash-lite",
+    aiModelCheckAndUse: "Check and use",
+    aiModelChecking: "Checking model…",
+    aiModelAdvancedHint:
+      "The check sends a tiny test request through your API key and selects the model only after a successful response.",
+    aiModelInvalid: "The model ID looks invalid. Use an ID such as gemini-2.5-flash or gemma-4-31b-it.",
+    aiModelAvailable: "{{model}} is available and selected.",
+    aiModelUnavailable: "{{model}} did not respond. Check the ID, model availability, quota, and key.",
     aiGetKey: "How to get a key",
     aiSave: "Save",
     aiSaving: "Saving…",
@@ -800,6 +860,8 @@ const en = {
     documentsMenu: "Documents",
     notesMenu: "Notes",
     foldersMenu: "Folders",
+    hierarchyScopeVault: "Vault",
+    hierarchyScopeProject: "Project",
     tagsMenu: "Tags",
     filesMenu: "Files",
     pinnedMenu: "Favorites",
@@ -811,6 +873,7 @@ const en = {
     copyAction: "Copy",
     pasteAction: "Paste",
     duplicateAction: "Duplicate",
+    goToLocationAction: "Go to location",
     duplicateSuffix: "copy",
     selectedCount: "Selected: {{count}}",
     clipboardEmpty: "Copy an item first.",

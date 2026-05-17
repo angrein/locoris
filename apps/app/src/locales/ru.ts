@@ -460,7 +460,67 @@ const ru = {
     aiApiKeyPlaceholder: "Вставь ключ из Google AI Studio",
     aiLoadingKey: "Загружаем сохраненный ключ…",
     aiModelLabel: "Модель",
-    aiModelHint: "Можно сменить позже",
+    aiModelHint: "Профили для разных задач и лимитов",
+    aiModelSelected: "Сейчас выбрана",
+    aiModelCustomActive: "advanced ID",
+    aiModelBadgeDefault: "По умолчанию",
+    aiModelBadgeBalanced: "Баланс",
+    aiModelBadgeGemma: "Open model",
+    aiModelBadgeGemmaFast: "Gemma fast",
+    aiModelBadgeFast: "Быстро",
+    aiModelBadgeSmart: "Умная",
+    aiModelMetricSpeed: "Скорость",
+    aiModelMetricQuality: "Качество",
+    aiModelMetricQuota: "Лимиты",
+    aiModelGemini31FlashLiteDescription:
+      "Новый легкий Flash-профиль для ежедневной работы: быстрые правки, переводы и форматирование заметок.",
+    aiModelGemini31FlashLiteBestFor:
+      "Лучше всего: постоянные AI-правки в редакторе и задачи, где важны скорость и большой запас бесплатного тира.",
+    aiModelGemini31FlashLiteLimit:
+      "Лимиты: самый щадящий профиль в нашем наборе; фактические RPM/TPM/RPD Google показывает в AI Studio.",
+    aiModelGemini25FlashDescription:
+      "Надежная универсальная модель для аккуратного улучшения текста и структурирования средних заметок.",
+    aiModelGemini25FlashBestFor:
+      "Лучше всего: баланс качества и скорости, когда нужно больше понимания контекста, чем у Lite.",
+    aiModelGemini25FlashLimit:
+      "Лимиты: средние; обычно комфортнее Pro, но экономнее использовать для важных преобразований.",
+    aiModelGemma431bDescription:
+      "Крупная instruct-модель семейства Gemma для текстовых задач, где нужен альтернативный стиль генерации.",
+    aiModelGemma431bBestFor:
+      "Лучше всего: черновики, переписывание и эксперименты с open-моделью без перехода на Pro.",
+    aiModelGemma431bLimit:
+      "Лимиты: зависят от доступности модели в твоем ключе; проверка ниже подтвердит, можно ли ее использовать.",
+    aiModelGemma426bDescription:
+      "Более легкий Gemma-вариант, который лучше подходит для быстрых текстовых операций и частого использования.",
+    aiModelGemma426bBestFor:
+      "Лучше всего: короткие изменения, генерация списков и быстрые редакторские команды.",
+    aiModelGemma426bLimit:
+      "Лимиты: обычно практичнее 31B, но доступность и квоты Google может менять по аккаунту и региону.",
+    aiModelGemini25FlashLiteDescription:
+      "Проверенный быстрый fallback для коротких AI-команд, если новый Flash Lite недоступен на ключе.",
+    aiModelGemini25FlashLiteBestFor:
+      "Лучше всего: быстрые исправления, орфография, короткий перевод и экономное ежедневное использование.",
+    aiModelGemini25FlashLiteLimit:
+      "Лимиты: щадящие, но качество ниже, чем у Flash и Pro на сложных заметках.",
+    aiModelGemini25ProDescription:
+      "Самая сильная модель в списке для сложного контекста, длинных заметок и более тонкой редакторской логики.",
+    aiModelGemini25ProBestFor:
+      "Лучше всего: редкие сложные задачи, большие заметки, глубокое структурирование и осторожный ресерч.",
+    aiModelGemini25ProLimit:
+      "Лимиты: самые маленькие в бесплатном тире; лучше использовать точечно, а не как модель по умолчанию.",
+    aiModelLimitsDisclaimer:
+      "Google меняет бесплатные квоты по модели, региону и аккаунту. Locoris показывает UX-профиль и проверяет выбранный model id живым запросом.",
+    aiModelAdvancedTitle: "Продвинутый model id",
+    aiModelAdvancedDescription: "Для новых, экспериментальных или вручную включенных моделей Gemini API.",
+    aiModelIdLabel: "Model ID",
+    aiModelIdPlaceholder: "Например: gemini-3.1-flash-lite",
+    aiModelCheckAndUse: "Проверить и выбрать",
+    aiModelChecking: "Проверяем модель…",
+    aiModelAdvancedHint:
+      "Проверка отправляет короткий тестовый запрос через твой API key и выбирает модель только при успешном ответе.",
+    aiModelInvalid: "Model ID выглядит некорректно. Используй ID вида gemini-2.5-flash или gemma-4-31b-it.",
+    aiModelAvailable: "{{model}} доступна и выбрана.",
+    aiModelUnavailable: "{{model}} не ответила. Проверь ID, доступность модели, лимиты и ключ.",
     aiGetKey: "Как получить ключ",
     aiSave: "Сохранить",
     aiSaving: "Сохраняем…",
@@ -803,6 +863,8 @@ const ru = {
     documentsMenu: "Документы",
     notesMenu: "Заметки",
     foldersMenu: "Папки",
+    hierarchyScopeVault: "Хранилище",
+    hierarchyScopeProject: "Проект",
     tagsMenu: "Теги",
     filesMenu: "Файлы",
     pinnedMenu: "Избранное",
@@ -814,6 +876,7 @@ const ru = {
     copyAction: "Копировать",
     pasteAction: "Вставить",
     duplicateAction: "Дублировать",
+    goToLocationAction: "Перейти к расположению",
     duplicateSuffix: "копия",
     selectedCount: "Выбрано: {{count}}",
     clipboardEmpty: "Сначала скопируй элемент.",

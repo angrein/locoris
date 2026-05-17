@@ -13,6 +13,7 @@ type OrbitalInspectorContextMenuActionIcon =
   | "note"
   | "canvas"
   | "color"
+  | "location"
   | "pin"
   | "unpin"
   | "trash";
@@ -151,6 +152,15 @@ function renderActionIcon(icon: OrbitalInspectorContextMenuActionIcon) {
       <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
         <path d="M7.6 3.8h4.8l-.8 4.1 2.2 2.2H6l2.4-2.2-.8-4.1Z" />
         <path d="M4.4 4.4 15.6 15.6" className="orbital-context-menu-icon-accent" />
+      </svg>
+    );
+  }
+
+  if (icon === "location") {
+    return (
+      <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+        <path d="M10 3.2a5.7 5.7 0 0 1 5.7 5.7c0 3.8-5.7 7.9-5.7 7.9s-5.7-4.1-5.7-7.9A5.7 5.7 0 0 1 10 3.2Z" />
+        <circle cx="10" cy="8.9" r="1.9" className="orbital-context-menu-icon-accent" />
       </svg>
     );
   }
