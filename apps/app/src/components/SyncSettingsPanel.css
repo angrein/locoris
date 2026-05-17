@@ -449,6 +449,7 @@
   overflow-x: hidden;
   align-content: start;
   grid-auto-rows: max-content;
+  padding-top: 1px;
   padding-right: 2px;
   overscroll-behavior: contain;
   border-radius: 15px;}

@@ -211,7 +211,7 @@ function buildActionInstruction(input: GenerateGeminiMarkdownInput) {
     return [
       `Transform the ${scopeLabel} into polished, elegant Markdown.`,
       "Use headings, concise sections, bullet lists, numbered lists, checklists, quotes, and tables only when they genuinely improve clarity.",
-      "Use emoji very sparingly and only when it fits the context. Never make the result noisy.",
+      "Add tasteful, context-aware emoji to headings or key list items when it improves warmth, scanability, or presentation. Keep it premium and not noisy.",
       "Preserve the input language exactly unless the user explicitly asked for a different language.",
       "Keep the meaning faithful. Do not invent facts."
     ].join("\n");

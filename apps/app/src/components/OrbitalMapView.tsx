@@ -15,6 +15,13 @@ import { useTranslation } from "react-i18next";
 
 import EntryStaticPreview from "./EntryStaticPreview";
 import LocalVaultSwitcher, { type LocalVaultSwitcherItem } from "./LocalVaultSwitcher";
+import OrbitalInspectorOverviewCard, {
+  type OrbitalOverviewLinkId,
+  type OrbitalOverviewLinkItem,
+  type OrbitalOverviewMetric,
+  type OrbitalOverviewProjectItem,
+  type OrbitalOverviewRecentItem
+} from "./OrbitalInspectorOverviewCard";
 import OrbitalInspectorContextMenu, {
   type OrbitalInspectorContextMenuAction
 } from "./OrbitalInspectorContextMenu";
@@ -3429,14 +3436,6 @@ export default function OrbitalMapView({
     selectedNode || currentProjectNode || renderedScene.nodes.find((node) => node.kind === "core");
   const visibleBodies = Math.max(renderedScene.nodes.filter((node) => node.kind !== "core").length, 0);
   const hiddenBodies = Math.max(orbitalData.totalEntities - renderedScene.nodes.length, 0);
-  const topFolders = useMemo(
-    () => (currentProjectId ? (orbitalData.rootFoldersByProject.get(currentProjectId) ?? []).slice(0, 5).map((branch) => branch.folder) : []),
-    [currentProjectId, orbitalData.rootFoldersByProject]
-  );
-  const topLooseEntries = useMemo(
-    () => (currentProjectId ? (orbitalData.looseNotesByProject.get(currentProjectId) ?? []).slice(0, 4) : []),
-    [currentProjectId, orbitalData.looseNotesByProject]
-  );
   const currentProjectTextNoteCount = useMemo(
     () => currentProjectNotes.filter((note) => note.contentType !== "canvas").length,
     [currentProjectNotes]
@@ -5112,41 +5111,242 @@ export default function OrbitalMapView({
               ? filteredColorsMenu.length
               : filteredPinnedMenu.length;
   const showInspectorHierarchyQuickActions =
-    effectiveInspectorMenu === "folders" && !isVaultInspectorScope && Boolean(currentProjectId);
+    effectiveInspectorMenu === "folders" && Boolean(currentProjectId);
   const activeProjectIndex = currentProjectId
     ? orbitalData.projects.findIndex((project) => project.id === currentProjectId)
     : -1;
   const canNavigateProjects = orbitalData.projects.length > 1;
   const isSystemOverview = effectiveInspectorMenu === "overview" && selectedNode?.kind === "core";
   const isVaultOverview = effectiveInspectorMenu === "overview" && !selectedNode;
-  const currentSystemOverviewLinks = [
-    { menu: "notes" as const, label: labels.documentsMenu, count: currentProjectNotes.length, iconKind: "note" as const },
-    { menu: "folders" as const, label: labels.foldersStat, count: currentProjectFolders.length, iconKind: "folder" as const },
-    { menu: "tags" as const, label: labels.tagsStat, count: currentProjectTagCounts.size, iconKind: "tag" as const },
-    { menu: "files" as const, label: labels.assetsStat, count: currentProjectAssets.length, iconKind: "file" as const },
-    { menu: "colors" as const, label: labels.colorsStat, count: colorCounts.size, iconKind: "color" as const },
-    { menu: "pinned" as const, label: labels.pinnedStat, count: pinnedCount, iconKind: "note" as const }
+  const overviewProjectItems = useMemo<OrbitalOverviewProjectItem[]>(() => {
+    const folderCounts = new Map<string, number>();
+    const documentCounts = new Map<string, number>();
+    const updatedAtByProject = new Map<string, number>();
+
+    orbitalData.projects.forEach((project) => {
+      folderCounts.set(project.id, 0);
+      documentCounts.set(project.id, 0);
+      updatedAtByProject.set(project.id, project.updatedAt);
+    });
+
+    folders.forEach((folder) => {
+      folderCounts.set(folder.projectId, (folderCounts.get(folder.projectId) ?? 0) + 1);
+      updatedAtByProject.set(
+        folder.projectId,
+        Math.max(updatedAtByProject.get(folder.projectId) ?? 0, folder.updatedAt)
+      );
+    });
+
+    visibleNotes.forEach((note) => {
+      documentCounts.set(note.projectId, (documentCounts.get(note.projectId) ?? 0) + 1);
+      updatedAtByProject.set(
+        note.projectId,
+        Math.max(updatedAtByProject.get(note.projectId) ?? 0, note.updatedAt)
+      );
+    });
+
+    return orbitalData.projects.map((project, index) => ({
+      id: project.id,
+      name: getDisplayProjectName(project, language, index),
+      color: project.color || DEFAULT_PROJECT_COLOR,
+      documentCount: documentCounts.get(project.id) ?? 0,
+      folderCount: folderCounts.get(project.id) ?? 0,
+      updatedAt: updatedAtByProject.get(project.id) ?? project.updatedAt,
+      isActive: project.id === currentProjectId
+    }));
+  }, [currentProjectId, folders, language, orbitalData.projects, visibleNotes]);
+  const vaultOverviewRecentItems = useMemo<OrbitalOverviewRecentItem[]>(() => {
+    const folderItems = folders.map((folder) => ({
+      id: folder.id,
+      entityId: `folder:${folder.id}`,
+      kind: "folder" as const,
+      title: folder.name || labels.folder,
+      color: folder.color || DEFAULT_FOLDER_COLOR,
+      meta: formatTimestamp(folder.updatedAt, language),
+      updatedAt: folder.updatedAt
+    }));
+    const noteItems = visibleNotes.map((note) => ({
+      id: note.id,
+      entityId: `note:${note.id}`,
+      kind: note.contentType,
+      title: getDisplayNoteTitle(note, language),
+      color: note.color || DEFAULT_NOTE_COLOR,
+      meta: formatTimestamp(note.updatedAt, language),
+      updatedAt: note.updatedAt
+    }));
+
+    return [...folderItems, ...noteItems].sort((left, right) => right.updatedAt - left.updatedAt);
+  }, [folders, labels.folder, language, visibleNotes]);
+  const projectOverviewRecentItems = useMemo<OrbitalOverviewRecentItem[]>(() => {
+    const folderItems = currentProjectFolders.map((folder) => ({
+      id: folder.id,
+      entityId: `folder:${folder.id}`,
+      kind: "folder" as const,
+      title: folder.name || labels.folder,
+      color: folder.color || DEFAULT_FOLDER_COLOR,
+      meta: formatTimestamp(folder.updatedAt, language),
+      updatedAt: folder.updatedAt
+    }));
+    const noteItems = currentProjectNotes.map((note) => ({
+      id: note.id,
+      entityId: `note:${note.id}`,
+      kind: note.contentType,
+      title: getDisplayNoteTitle(note, language),
+      color: note.color || DEFAULT_NOTE_COLOR,
+      meta: formatTimestamp(note.updatedAt, language),
+      updatedAt: note.updatedAt
+    }));
+
+    return [...folderItems, ...noteItems].sort((left, right) => right.updatedAt - left.updatedAt);
+  }, [currentProjectFolders, currentProjectNotes, labels.folder, language]);
+  const overviewRecentItems = isVaultOverview ? vaultOverviewRecentItems : projectOverviewRecentItems;
+  const overviewUpdatedLabel = overviewRecentItems[0]
+    ? formatTimestamp(overviewRecentItems[0].updatedAt, language)
+    : labels.empty;
+  const currentSystemOverviewLinks: OrbitalOverviewLinkItem[] = [
+    {
+      id: "notes",
+      label: labels.documentsMenu,
+      meta: currentProject?.name ?? labels.system,
+      count: currentProjectNotes.length,
+      icon: "note",
+      color: DEFAULT_NOTE_COLOR
+    },
+    {
+      id: "folders",
+      label: labels.foldersStat,
+      meta: currentProject?.name ?? labels.system,
+      count: currentProjectFolders.length,
+      icon: "folder",
+      color: DEFAULT_FOLDER_COLOR
+    },
+    {
+      id: "tags",
+      label: labels.tagsStat,
+      meta: currentProject?.name ?? labels.system,
+      count: currentProjectTagCounts.size,
+      icon: "tag",
+      color: "#73f7ff"
+    },
+    {
+      id: "files",
+      label: labels.assetsStat,
+      meta: currentProject?.name ?? labels.system,
+      count: currentProjectAssets.length,
+      icon: "file",
+      color: "#74f1b6"
+    },
+    {
+      id: "colors",
+      label: labels.colorsStat,
+      meta: currentProject?.name ?? labels.system,
+      count: colorCounts.size,
+      icon: "color",
+      color: "#ffd57e"
+    },
+    {
+      id: "pinned",
+      label: labels.pinnedStat,
+      meta: currentProject?.name ?? labels.system,
+      count: pinnedCount,
+      icon: "note",
+      color: "#ffd57e"
+    }
   ];
-  const vaultOverviewLinks = [
-    { menu: "folders" as const, label: labels.projectsStat, count: orbitalData.projects.length, iconKind: "core" as const },
-    { menu: "notes" as const, label: labels.documentsMenu, count: visibleNotes.length, iconKind: "note" as const },
-    { menu: "tags" as const, label: labels.tagsStat, count: vaultTagCounts.size, iconKind: "tag" as const },
-    { menu: "files" as const, label: labels.assetsStat, count: vaultVisibleAssets.length, iconKind: "file" as const },
-    { menu: "colors" as const, label: labels.colorsStat, count: vaultColorCounts.size, iconKind: "color" as const },
-    { menu: "pinned" as const, label: labels.pinnedStat, count: vaultPinnedCount, iconKind: "note" as const }
+  const vaultOverviewLinks: OrbitalOverviewLinkItem[] = [
+    {
+      id: "folders",
+      label: labels.projectsStat,
+      meta: labels.localVault,
+      count: orbitalData.projects.length,
+      icon: "project",
+      color: DEFAULT_PROJECT_COLOR
+    },
+    {
+      id: "notes",
+      label: labels.documentsMenu,
+      meta: labels.localVault,
+      count: visibleNotes.length,
+      icon: "note",
+      color: DEFAULT_NOTE_COLOR
+    },
+    {
+      id: "tags",
+      label: labels.tagsStat,
+      meta: labels.localVault,
+      count: vaultTagCounts.size,
+      icon: "tag",
+      color: "#73f7ff"
+    },
+    {
+      id: "files",
+      label: labels.assetsStat,
+      meta: labels.localVault,
+      count: vaultVisibleAssets.length,
+      icon: "file",
+      color: "#74f1b6"
+    },
+    {
+      id: "colors",
+      label: labels.colorsStat,
+      meta: labels.localVault,
+      count: vaultColorCounts.size,
+      icon: "color",
+      color: "#ffd57e"
+    },
+    {
+      id: "pinned",
+      label: labels.pinnedStat,
+      meta: labels.localVault,
+      count: vaultPinnedCount,
+      icon: "note",
+      color: "#ffd57e"
+    }
   ];
-  const vaultOverviewStats = [
+  const systemOverviewStats: OrbitalOverviewMetric[] = [
+    {
+      id: "folders",
+      label: labels.foldersStat,
+      value: currentProjectFolders.length,
+      tone: "folder"
+    },
+    {
+      id: "notes",
+      label: labels.notesStat,
+      value: currentProjectTextNoteCount,
+      tone: "note"
+    },
+    {
+      id: "canvas",
+      label: labels.canvas,
+      value: currentProjectCanvasCount,
+      tone: "canvas"
+    }
+  ];
+  const vaultOverviewStats: OrbitalOverviewMetric[] = [
+    {
+      id: "projects",
+      label: labels.projectsStat,
+      value: orbitalData.projects.length,
+      tone: "project"
+    },
     {
       id: "notes",
       label: labels.notesStat,
       value: vaultTextNoteCount,
-      tone: "note" as const
+      tone: "note"
     },
     {
       id: "canvas",
       label: labels.canvas,
       value: vaultCanvasCount,
-      tone: "canvas" as const
+      tone: "canvas"
+    },
+    {
+      id: "assets",
+      label: labels.assetsStat,
+      value: vaultVisibleAssets.length,
+      tone: "asset"
     }
   ];
   const preferredHierarchyContextEntityId = useMemo(() => {
@@ -6235,8 +6435,9 @@ export default function OrbitalMapView({
 	    }
 
 	    if (
-	      effectiveInspectorMenu === "notes" &&
-	      (target.kind === "note" || target.kind === "canvas")
+	      (effectiveInspectorMenu === "notes" &&
+	        (target.kind === "note" || target.kind === "canvas")) ||
+	      (effectiveInspectorMenu === "overview" && target.kind !== "core")
 	    ) {
 	      actions.push({
 	        id: "go-to-location",
@@ -6615,30 +6816,6 @@ export default function OrbitalMapView({
         <path d="M13.8 4.9v3.4h3.1" />
         <path d="M15.8 12v4.3M13.7 14.1H18" />
       </svg>
-    );
-  }
-
-  function renderAddProjectActionIcon() {
-    return (
-      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-        <circle cx="9.5" cy="12" r="3.9" />
-        <path d="M9.5 5.1a6.9 6.9 0 1 0 0 13.8" />
-        <path d="M17.8 6.7v5.2M15.2 9.3h5.2" />
-      </svg>
-    );
-  }
-
-  function renderOverviewAddProjectButton() {
-    return (
-      <button
-        type="button"
-        className="toolbar-action orbital-toolbar-action orbital-overview-primary-action"
-        onClick={() => void handleCreateProject()}
-        aria-label={labels.addProject}
-        title={labels.addProject}
-      >
-        <span className="orbital-overview-primary-action-icon">{renderAddProjectActionIcon()}</span>
-      </button>
     );
   }
 
@@ -7396,29 +7573,6 @@ export default function OrbitalMapView({
     centerOnProject(project.id, 760);
   };
   const coreFlareRotation = (timeMs * 0.0045) % 360;
-  const systemOverviewStats = [
-    {
-      id: "folders",
-      label: labels.foldersStat,
-      value: currentProjectFolders.length,
-      tone: "folder" as const
-    },
-    {
-      id: "notes",
-      label: labels.notesStat,
-      value: currentProjectTextNoteCount,
-      tone: "note" as const
-    },
-    {
-      id: "canvas",
-      label: labels.canvas,
-      value: currentProjectCanvasCount,
-      tone: "canvas" as const
-    }
-  ];
-  const overviewLineGradientId = `overviewTopologyLine-${currentProjectId ?? "default"}`;
-  const overviewAuraGradientId = `overviewTopologyAura-${currentProjectId ?? "default"}`;
-  const vaultOverviewLineGradientId = `vaultOverviewTopologyLine-${activeLocalVaultId}`;
   const overviewTitle = isVaultOverview
     ? getDisplayVaultName(
         activeLocalVaultItem,
@@ -7432,546 +7586,206 @@ export default function OrbitalMapView({
       );
   const overviewKicker = isVaultOverview ? labels.vaultOverview : labels.overview;
   const overviewLinks = isVaultOverview ? vaultOverviewLinks : currentSystemOverviewLinks;
-  const vaultPreviewProjects = useMemo(() => {
-    const total = orbitalData.projects.length;
-
-    if (total === 0) {
-      return [];
-    }
-
-    const centerX = 180;
-    const centerY = 130;
-    const outerRadius = total === 1 ? 74 : total === 2 ? 68 : total <= 4 ? 82 : 96;
-
-    return orbitalData.projects.map((project, index) => {
-      const angle = total === 1 ? -Math.PI / 2 : (Math.PI * 2 * index) / total - Math.PI / 2;
-      const radialOffset = total <= 2 ? 0 : index % 2 === 0 ? -8 : 8;
-      const orbitRadius = Math.max(0, outerRadius + radialOffset);
-
-      return {
-        project,
-        x: centerX + Math.cos(angle) * orbitRadius,
-        y: centerY + Math.sin(angle) * orbitRadius,
-        rootFolders: (orbitalData.rootFoldersByProject.get(project.id) ?? []).slice(0, 3),
-        looseEntries: (orbitalData.looseNotesByProject.get(project.id) ?? []).slice(0, 2),
-        isActive: project.id === currentProjectId
-      };
-    });
-  }, [
-    currentProjectId,
-    orbitalData.looseNotesByProject,
-    orbitalData.projects,
-    orbitalData.rootFoldersByProject
-  ]);
-  const getOverviewLinkColor = (menu: InspectorMenu) => {
-    switch (menu) {
-      case "folders":
-        return isVaultOverview ? DEFAULT_PROJECT_COLOR : DEFAULT_FOLDER_COLOR;
-      case "notes":
-        return DEFAULT_NOTE_COLOR;
-      case "tags":
-        return "#73f7ff";
-      case "files":
-        return "#74f1b6";
-      case "colors":
-        return "#ffd57e";
-      case "pinned":
-        return "#ffd57e";
-      default:
-        return DEFAULT_NOTE_COLOR;
-    }
-  };
-  const openOverviewMenu = (menu: InspectorMenu) => {
+  const openOverviewMenu = (menu: OrbitalOverviewLinkId) => {
     setInspectorHierarchyScope(isVaultOverview ? "vault" : "project");
     openInspectorMenu(menu);
   };
+  const handleOverviewSelectProject = (projectId: string) => {
+    setActiveProjectId(projectId);
+    setSelectedEntityId(getProjectEntityId(projectId));
+    setInspectorHierarchyScope("project");
+    setActiveFolderFilters([]);
+    setActiveNoteFilters([]);
+    openInspectorMenu("overview");
+    centerOnProject(projectId, 760);
+  };
+  const handleOverviewBackToVault = () => {
+    setSelectedEntityId(null);
+    setInspectorHierarchyScope("vault");
+    setActiveFolderFilters([]);
+    setActiveNoteFilters([]);
+    openInspectorMenu("overview");
+    handleCenterSelection();
+  };
+  const handleOverviewRecentItemSelect = (item: OrbitalOverviewRecentItem) => {
+    const projectId = getEntityProjectId(item.entityId, orbitalData);
+
+    selectInspectorEntity(item.entityId, projectId, {
+      centerInScene: true
+    });
+  };
+  const buildOverviewRecentContextTarget = (
+    item: OrbitalOverviewRecentItem
+  ): InspectorContextMenuTarget | null => {
+    if (item.kind === "folder") {
+      const folder = orbitalData.folderById.get(item.id);
+
+      if (!folder) {
+        return null;
+      }
+
+      return {
+        kind: "folder",
+        folder,
+        label: item.title,
+        color: item.color,
+        canCreateFolder: (orbitalData.folderMeta.get(folder.id)?.depth ?? 0) < 1
+      };
+    }
+
+    const note = orbitalData.noteById.get(item.id);
+
+    return note ? buildInspectorNoteContextTarget(note) : null;
+  };
+  const handleOverviewRecentItemOpen = (item: OrbitalOverviewRecentItem) => {
+    if (item.kind === "folder") {
+      const target = buildOverviewRecentContextTarget(item);
+
+      if (target) {
+        goToInspectorTargetLocation(target);
+      }
+
+      return;
+    }
+
+    const note = orbitalData.noteById.get(item.id);
+
+    if (!note) {
+      return;
+    }
+
+    closeSelectionHoverPreview();
+    onOpenNote(note.id);
+  };
+  const handleOverviewRecentItemContextMenu = (
+    item: OrbitalOverviewRecentItem,
+    event: ReactMouseEvent<HTMLButtonElement>
+  ) => {
+    event.preventDefault();
+    const target = buildOverviewRecentContextTarget(item);
+
+    if (!target) {
+      return;
+    }
+
+    openInspectorContextMenu(target, "popover", {
+      x: event.clientX,
+      y: event.clientY
+    });
+  };
+  const handleOverviewRecentItemPointerEnter = (
+    item: OrbitalOverviewRecentItem,
+    event: ReactPointerEvent<HTMLButtonElement>
+  ) => {
+    if (item.kind === "folder") {
+      return;
+    }
+
+    const note = orbitalData.noteById.get(item.id);
+
+    if (!note) {
+      return;
+    }
+
+    openSelectionHoverPreview(note.id, event.clientX, event.clientY, "inspector", {
+      anchorRect: toHoverPreviewAnchorRect(event.currentTarget.getBoundingClientRect())
+    });
+  };
+  const handleOverviewRecentItemPointerMove = (
+    item: OrbitalOverviewRecentItem,
+    event: ReactPointerEvent<HTMLButtonElement>
+  ) => {
+    if (item.kind === "folder" || !orbitalData.noteById.has(item.id)) {
+      return;
+    }
+
+    updateSelectionHoverPreviewCursor(event.clientX, event.clientY, {
+      anchorRect: toHoverPreviewAnchorRect(event.currentTarget.getBoundingClientRect())
+    });
+  };
+  const handleOverviewRecentItemPointerLeave = (item: OrbitalOverviewRecentItem) => {
+    if (item.kind !== "folder") {
+      scheduleSelectionHoverPreviewClose();
+    }
+  };
   const overviewBody = (
     <>
-      <div className="orbital-inspector-header orbital-inspector-header-overview">
-        <div className="orbital-inspector-heading">
-          <p className="panel-kicker orbital-inspector-kicker">{overviewKicker}</p>
-          {isVaultOverview ? (
-            renderEditableVaultTitle("panel-title orbital-inspector-title")
-          ) : (
-            renderEditableProjectTitle(
-              currentProject,
-              labels.title,
-              "panel-title orbital-inspector-title"
-            )
-          )}
-        </div>
-        <div className="orbital-inspector-header-actions">{renderOverviewAddProjectButton()}</div>
-      </div>
+      <OrbitalInspectorOverviewCard
+        mode={isVaultOverview ? "vault" : "project"}
+        title={overviewTitle}
+        titleNode={
+          isVaultOverview
+            ? renderEditableVaultTitle("orbital-inspector-overview-title-text")
+            : renderEditableProjectTitle(
+                currentProject,
+                labels.title,
+                "orbital-inspector-overview-title-text"
+              )
+        }
+        kicker={overviewKicker}
+        accentColor={isVaultOverview ? DEFAULT_PROJECT_COLOR : currentProject?.color ?? DEFAULT_PROJECT_COLOR}
+        activeProjectId={currentProjectId}
+        activeProjectIndex={activeProjectIndex}
+        projectCount={orbitalData.projects.length}
+        canNavigateProjects={canNavigateProjects}
+        projects={overviewProjectItems}
+        metrics={isVaultOverview ? vaultOverviewStats : systemOverviewStats}
+        links={overviewLinks}
+        recentItems={overviewRecentItems}
+        lastUpdatedLabel={labels.lastUpdated}
+        updatedLabel={overviewUpdatedLabel}
+        emptyLabel={labels.empty}
+        labels={labels}
+        colorButtonRef={overviewColorTriggerRef}
+        isColorPanelOpen={isOverviewColorPanelOpen}
+        onAddProject={() => void handleCreateProject()}
+        onAddFolder={() => {
+          if (!currentProjectId) {
+            return;
+          }
 
-      {isVaultOverview ? (
-        <div className="orbital-overview-switcher is-vault">
-          <div
-            className="orbital-overview-systemcard orbital-overview-systemcard-vault"
-            style={{ "--preview-accent": currentProject?.color ?? DEFAULT_PROJECT_COLOR } as CSSProperties}
-          >
-            <div className="orbital-overview-preview-stage is-vault">
-              <div className="orbital-overview-preview-head">
-                <div className="orbital-overview-preview-kicker">
-                  <span className="orbital-overview-preview-dot" aria-hidden="true" />
-                  <span>{labels.localVault}</span>
-                </div>
-                <span className="orbital-overview-preview-index" title={labels.projectsStat}>
-                  {orbitalData.projects.length}
-                </span>
-              </div>
+          beginFolderDraft(null, currentProjectId);
+        }}
+        onAddNote={() => {
+          if (!currentProjectId) {
+            return;
+          }
 
-              <button
-                type="button"
-                className="topology-activator orbit-preview-trigger orbital-overview-trigger"
-                onClick={handleCenterSelection}
-                aria-label={labels.centerSelection}
-                title={labels.centerSelection}
-              >
-                <svg viewBox="0 0 360 260" className="topology-map" role="img" aria-label={labels.vaultOverview}>
-                  <defs>
-                    <linearGradient id={vaultOverviewLineGradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#ffe08a" stopOpacity="0.94" />
-                      <stop offset="100%" stopColor="#73f7ff" stopOpacity="0.34" />
-                    </linearGradient>
-                  </defs>
+          void handleCreateNote(null, currentProjectId);
+        }}
+        onAddCanvas={() => {
+          if (!currentProjectId) {
+            return;
+          }
 
-                  <circle cx="180" cy="130" r="44" className="orbital-overview-core-aura orbital-overview-vault-halo" />
-                  <circle cx="180" cy="130" r="30" className="orbital-overview-core-pulse orbital-overview-vault-pulse" />
-                  <circle cx="180" cy="130" r="102" className="topology-ring topology-ring-outer orbital-overview-vault-orbit" />
-                  <circle cx="180" cy="130" r="74" className="topology-ring topology-ring-inner orbital-overview-vault-orbit-inner" />
-                  <g transform={`rotate(${coreFlareRotation} 180 130)`}>
-                    <path
-                      d="M180 100 L185 116 L201 121 L185 126 L180 142 L175 126 L159 121 L175 116 Z"
-                      className="orbital-overview-core-flare"
-                    />
-                  </g>
-                  <circle cx="180" cy="130" r="24" className="topology-core orbital-overview-vault-anchor" />
+          void handleCreateCanvas(null, currentProjectId);
+        }}
+        onBackToVault={handleOverviewBackToVault}
+        onCycleProject={cycleProject}
+        onDeleteProject={() => {
+          if (!currentProjectId) {
+            return;
+          }
 
-                  {vaultPreviewProjects.map((entry, projectIndex) => {
-                    const systemOrbitRadius = entry.rootFolders.length > 0 ? 18 : 14;
-                    const innerOrbitRadius = entry.looseEntries.length > 0 ? 11 : 0;
+          void onDeleteProject(currentProjectId);
+        }}
+        onOpenLink={openOverviewMenu}
+        onSelectProject={handleOverviewSelectProject}
+        onSelectRecentItem={handleOverviewRecentItemSelect}
+        onOpenRecentItem={handleOverviewRecentItemOpen}
+        onRecentContextMenu={handleOverviewRecentItemContextMenu}
+        onRecentPointerEnter={handleOverviewRecentItemPointerEnter}
+        onRecentPointerMove={handleOverviewRecentItemPointerMove}
+        onRecentPointerLeave={handleOverviewRecentItemPointerLeave}
+        onRecentPointerCancel={handleOverviewRecentItemPointerLeave}
+        onToggleColorPanel={() => {
+          if (!currentProjectId) {
+            return;
+          }
 
-                    return (
-                      <g key={entry.project.id}>
-                        <line
-                          x1="180"
-                          y1="130"
-                          x2={entry.x}
-                          y2={entry.y}
-                          className="topology-link topology-link-soft orbital-overview-vault-link"
-                          stroke={`url(#${vaultOverviewLineGradientId})`}
-                        />
-                        <circle
-                          cx={entry.x}
-                          cy={entry.y}
-                          r={entry.isActive ? 15 : 12}
-                          className="orbital-overview-vault-core-aura"
-                          fill={entry.project.color}
-                          opacity={entry.isActive ? 0.17 : 0.1}
-                        />
-                        <circle
-                          cx={entry.x}
-                          cy={entry.y}
-                          r={systemOrbitRadius}
-                          className="topology-ring orbital-overview-vault-ring"
-                        />
-                        {innerOrbitRadius > 0 ? (
-                          <circle
-                            cx={entry.x}
-                            cy={entry.y}
-                            r={innerOrbitRadius}
-                            className="topology-ring topology-ring-inner orbital-overview-vault-ring-inner"
-                          />
-                        ) : null}
-                        <circle
-                          cx={entry.x}
-                          cy={entry.y}
-                          r={entry.isActive ? 6.5 : 5.5}
-                          fill={entry.project.color}
-                          className="topology-core orbital-overview-vault-core"
-                        />
-
-                        {entry.rootFolders.map((branch, index) => {
-                          const angle =
-                            ((Math.PI * 2) / Math.max(entry.rootFolders.length, 1)) * index -
-                            Math.PI / 2 +
-                            projectIndex * 0.23;
-                          const radius = 13 + index * 4;
-                          const x = entry.x + Math.cos(angle) * radius;
-                          const y = entry.y + Math.sin(angle) * radius;
-
-                          return (
-                            <g key={branch.folder.id}>
-                              <line
-                                x1={entry.x}
-                                y1={entry.y}
-                                x2={x}
-                                y2={y}
-                                className="topology-link topology-link-soft orbital-overview-vault-link"
-                                stroke={`url(#${vaultOverviewLineGradientId})`}
-                              />
-                              <circle
-                                cx={x}
-                                cy={y}
-                                r={3.2}
-                                fill={branch.folder.color}
-                                className="topology-node orbital-overview-vault-node-folder"
-                              />
-                            </g>
-                          );
-                        })}
-
-                        {entry.looseEntries.map((note, index) => {
-                          const angle =
-                            ((Math.PI * 2) / Math.max(entry.looseEntries.length, 1)) * index -
-                            Math.PI / 3 -
-                            projectIndex * 0.18;
-                          const radius = 9 + index * 4;
-                          const x = entry.x + Math.cos(angle) * radius;
-                          const y = entry.y + Math.sin(angle) * radius;
-
-                          return (
-                            <g key={note.id}>
-                              <line
-                                x1={entry.x}
-                                y1={entry.y}
-                                x2={x}
-                                y2={y}
-                                className="topology-link topology-link-soft orbital-overview-vault-link"
-                                stroke={`url(#${vaultOverviewLineGradientId})`}
-                              />
-                              {note.contentType === "canvas" ? (
-                                <rect
-                                  x={x - 3.3}
-                                  y={y - 3.3}
-                                  width={6.6}
-                                  height={6.6}
-                                  rx={1.8}
-                                  fill={note.color}
-                                  className="topology-node orbital-overview-vault-node-canvas"
-                                />
-                              ) : (
-                                <circle
-                                  cx={x}
-                                  cy={y}
-                                  r={2.8}
-                                  fill={note.color}
-                                  className="topology-node orbital-overview-vault-node-note"
-                                />
-                              )}
-                            </g>
-                          );
-                        })}
-
-                        {projectIndex < 4 ? (
-                          <text
-                            x={entry.x}
-                            y={entry.y + systemOrbitRadius + 13}
-                            textAnchor="middle"
-                            className="topology-label orbital-overview-vault-label"
-                          >
-                            {getDisplayProjectName(
-                              entry.project,
-                              language,
-                              orbitalData.projects.findIndex((project) => project.id === entry.project.id)
-                            )}
-                          </text>
-                        ) : null}
-                      </g>
-                    );
-                  })}
-                </svg>
-              </button>
-
-              <div className="orbital-overview-statrow orbital-overview-statrow-vault" aria-hidden="true">
-                {vaultOverviewStats.map((stat) => (
-                  <div
-                    key={stat.id}
-                    className={`orbital-overview-statpill orbital-overview-statpill-${stat.tone}`}
-                  >
-                    <span className="orbital-overview-statvalue">{stat.value}</span>
-                    <span className="orbital-overview-statlabel">{stat.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="orbital-overview-chiprow">
-            <div className="orbital-overview-actionrow">
-              <div className="orbital-overview-actioncluster">
-                <button
-                  type="button"
-                  className="toolbar-action orbital-toolbar-action orbital-icon-action orbital-inspector-create-action orbital-overview-mini-action"
-                  onClick={() => {
-                    if (!currentProjectId) {
-                      return;
-                    }
-
-                    beginFolderDraft(null, currentProjectId);
-                  }}
-                  disabled={!currentProjectId}
-                  aria-label={labels.addRootFolder}
-                  title={labels.addRootFolder}
-                >
-                  {renderInspectorCreateActionIcon("folder")}
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-action orbital-toolbar-action orbital-icon-action orbital-inspector-create-action orbital-overview-mini-action"
-                  onClick={() => {
-                    if (!currentProjectId) {
-                      return;
-                    }
-
-                    void handleCreateNote(null, currentProjectId);
-                  }}
-                  disabled={!currentProjectId}
-                  aria-label={labels.addNote}
-                  title={labels.addNote}
-                >
-                  {renderInspectorCreateActionIcon("note")}
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-action orbital-toolbar-action orbital-icon-action orbital-inspector-create-action orbital-overview-mini-action"
-                  onClick={() => {
-                    if (!currentProjectId) {
-                      return;
-                    }
-
-                    void handleCreateCanvas(null, currentProjectId);
-                  }}
-                  disabled={!currentProjectId}
-                  aria-label={labels.addCanvas}
-                  title={labels.addCanvas}
-                >
-                  {renderInspectorCreateActionIcon("canvas")}
-                </button>
-              </div>
-
-              <div className="orbital-overview-actioncluster is-trailing">
-                <button
-                  ref={overviewColorTriggerRef}
-                  type="button"
-                  className={`toolbar-action orbital-toolbar-action orbital-icon-action orbital-overview-mini-action orbital-overview-mini-action-color ${currentProject ? "" : "is-disabled"} ${
-                    isOverviewColorPanelOpen ? "is-active" : ""
-                  }`}
-                  onClick={() => {
-                    if (!currentProjectId) {
-                      return;
-                    }
-
-                    setIsOverviewColorPanelOpen((current) => !current);
-                  }}
-                  disabled={!currentProjectId}
-                  aria-label={labels.projectColor}
-                  title={labels.projectColor}
-                >
-                  <span
-                    className="orbital-overview-mini-colorswatch"
-                    style={{ "--swatch-color": currentProject?.color ?? DEFAULT_PROJECT_COLOR } as CSSProperties}
-                    aria-hidden="true"
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  className="toolbar-action orbital-toolbar-action orbital-icon-action orbital-overview-mini-action orbital-overview-mini-action-danger"
-                  onClick={() => {
-                    if (!currentProjectId) {
-                      return;
-                    }
-
-                    void onDeleteProject(currentProjectId);
-                  }}
-                  disabled={!currentProjectId}
-                  aria-label={labels.deleteSystem}
-                  title={labels.deleteSystem}
-                >
-                  <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                    <path d="M7.8 8.5v8.3M12 8.5v8.3M16.2 8.5v8.3" />
-                    <path d="M4.9 6.2h14.2M9 6.2v-1c0-.9.7-1.6 1.6-1.6h2.8c.9 0 1.6.7 1.6 1.6v1" />
-                    <path d="M6.4 6.2l.7 11c.1 1 .9 1.8 1.9 1.8h6c1 0 1.8-.8 1.9-1.8l.7-11" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-          <div
-            className="orbital-overview-switcher orbital-overview-systemcard"
-            style={{ "--preview-accent": currentProject?.color ?? DEFAULT_PROJECT_COLOR } as CSSProperties}
-          >
-            <button
-              type="button"
-              className="orbital-overview-nav"
-              onClick={() => cycleProject(-1)}
-              disabled={!canNavigateProjects}
-              aria-label={labels.previousProject}
-              title={labels.previousProject}
-            >
-              ←
-            </button>
-
-            <div key={currentProjectId ?? "no-project"} className="orbital-overview-preview-stage">
-              <div className="orbital-overview-preview-head">
-                <div className="orbital-overview-preview-kicker">
-                  <span className="orbital-overview-preview-dot" aria-hidden="true" />
-                  <span>{labels.system}</span>
-                </div>
-                <span className="orbital-overview-preview-index">
-                  {activeProjectIndex >= 0 ? activeProjectIndex + 1 : 0}/{orbitalData.projects.length}
-                </span>
-              </div>
-
-              <button
-                className="topology-activator orbit-preview-trigger orbital-overview-trigger"
-                onClick={() => {
-                  if (!currentProjectId) {
-                    return;
-                  }
-
-                  setSelectedEntityId(getProjectEntityId(currentProjectId));
-                  setInspectorHierarchyScope("project");
-                  openInspectorMenu("overview");
-                  centerOnProject(currentProjectId);
-                }}
-              >
-                <svg viewBox="0 0 360 260" className="topology-map" role="img" aria-label={labels.overview}>
-                  <defs>
-                    <linearGradient id={overviewLineGradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#ffe08a" stopOpacity="0.95" />
-                      <stop offset="100%" stopColor="#73f7ff" stopOpacity="0.4" />
-                    </linearGradient>
-                    <radialGradient id={overviewAuraGradientId}>
-                      <stop offset="0%" stopColor={currentProject?.color ?? DEFAULT_PROJECT_COLOR} stopOpacity="0.26" />
-                      <stop offset="72%" stopColor={currentProject?.color ?? DEFAULT_PROJECT_COLOR} stopOpacity="0.08" />
-                      <stop offset="100%" stopColor={currentProject?.color ?? DEFAULT_PROJECT_COLOR} stopOpacity="0" />
-                    </radialGradient>
-                  </defs>
-
-                  <circle cx="180" cy="130" r="44" className="orbital-overview-core-aura" fill={`url(#${overviewAuraGradientId})`} />
-                  <circle cx="180" cy="130" r="30" className="orbital-overview-core-pulse" />
-                  <circle cx="180" cy="130" r="84" className="topology-ring topology-ring-outer" />
-                  <circle cx="180" cy="130" r="56" className="topology-ring topology-ring-inner" />
-                  <g transform={`rotate(${coreFlareRotation} 180 130)`}>
-                    <path
-                      d="M180 101 L184 117 L200 121 L184 125 L180 141 L176 125 L160 121 L176 117 Z"
-                      className="orbital-overview-core-flare"
-                    />
-                  </g>
-                  <circle cx="180" cy="130" r="25" className="topology-core" />
-
-                  {topFolders.map((folder, index) => {
-                    const angle = ((Math.PI * 2) / Math.max(topFolders.length, 1)) * index - Math.PI / 2;
-                    const x = 180 + Math.cos(angle) * 84;
-                    const y = 130 + Math.sin(angle) * 84;
-
-                    return (
-                      <g key={folder.id}>
-                        <line x1="180" y1="130" x2={x} y2={y} className="topology-link" stroke={`url(#${overviewLineGradientId})`} />
-                        <circle cx={x} cy={y} r="10" fill={folder.color} className="topology-node" />
-                        {index < 3 ? (
-                          <text x={x} y={y + 22} textAnchor="middle" className="topology-label">
-                            {folder.name.length > 11 ? `${folder.name.slice(0, 10)}…` : folder.name}
-                          </text>
-                        ) : null}
-                      </g>
-                    );
-                  })}
-
-                  {topLooseEntries.map((note, index) => {
-                    const angle = ((Math.PI * 2) / Math.max(topLooseEntries.length, 1)) * index - Math.PI / 3;
-                    const x = 180 + Math.cos(angle) * 56;
-                    const y = 130 + Math.sin(angle) * 56;
-                    const isCanvas = note.contentType === "canvas";
-
-                    return (
-                      <g key={note.id}>
-                        <line
-                          x1="180"
-                          y1="130"
-                          x2={x}
-                          y2={y}
-                          className="topology-link topology-link-soft"
-                          stroke={`url(#${overviewLineGradientId})`}
-                        />
-                        {isCanvas ? (
-                          <rect
-                            x={x - 6}
-                            y={y - 6}
-                            width={12}
-                            height={12}
-                            rx={3}
-                            fill={note.color}
-                            className="topology-node topology-node-small orbital-overview-node-canvas"
-                          />
-                        ) : (
-                          <circle
-                            cx={x}
-                            cy={y}
-                            r="6"
-                            fill={note.color}
-                            className="topology-node topology-node-small orbital-overview-node-note"
-                          />
-                        )}
-                      </g>
-                    );
-                  })}
-                </svg>
-              </button>
-
-              <div className="orbital-overview-statrow" aria-hidden="true">
-                {systemOverviewStats.map((stat) => (
-                  <div
-                    key={stat.id}
-                    className={`orbital-overview-statpill orbital-overview-statpill-${stat.tone}`}
-                  >
-                    <span className="orbital-overview-statvalue">{stat.value}</span>
-                    <span className="orbital-overview-statlabel">{stat.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="orbital-overview-nav"
-              onClick={() => cycleProject(1)}
-              disabled={!canNavigateProjects}
-              aria-label={labels.nextProject}
-              title={labels.nextProject}
-            >
-              →
-            </button>
-          </div>
-        </>
-      )}
-
-      <div className="orbital-overview-grid">
-        {overviewLinks.map((entry) => (
-          <button
-            key={`${isVaultOverview ? "vault" : "system"}:${entry.menu}`}
-            className="orbital-overview-link"
-            onClick={() => openOverviewMenu(entry.menu)}
-          >
-            <span className="orbital-overview-link-main">
-              <span className="orbital-overview-link-icon">
-                {renderInspectorItemIcon(entry.iconKind, getOverviewLinkColor(entry.menu))}
-              </span>
-              <span className="orbital-overview-link-copy">
-                <span className="orbital-overview-link-label">{entry.label}</span>
-                <span className="orbital-overview-link-meta">
-                  {isVaultOverview ? overviewTitle : currentProject?.name ?? labels.system}
-                </span>
-              </span>
-            </span>
-            <strong className="orbital-overview-link-count">{entry.count}</strong>
-          </button>
-        ))}
-      </div>
+          setIsOverviewColorPanelOpen((current) => !current);
+        }}
+      />
     </>
   );
   const inspectorMenuBody =
@@ -8144,6 +7958,28 @@ export default function OrbitalMapView({
                       closeSelectionHoverPreview();
                       onOpenNote(note.id);
                     },
+                    onPointerEnter: isMobilePreviewMode
+                      ? undefined
+                      : (event) => {
+                          openSelectionHoverPreview(
+                            note.id,
+                            event.clientX,
+                            event.clientY,
+                            "inspector",
+                            {
+                              anchorRect: toHoverPreviewAnchorRect(event.currentTarget.getBoundingClientRect())
+                            }
+                          );
+                        },
+                    onPointerMove: isMobilePreviewMode
+                      ? undefined
+                      : (event) => {
+                          updateSelectionHoverPreviewCursor(event.clientX, event.clientY, {
+                            anchorRect: toHoverPreviewAnchorRect(event.currentTarget.getBoundingClientRect())
+                          });
+                        },
+                    onPointerLeave: isMobilePreviewMode ? undefined : scheduleSelectionHoverPreviewClose,
+                    onPointerCancel: isMobilePreviewMode ? undefined : scheduleSelectionHoverPreviewClose,
                     title: getNoteInspectorTitle(note),
                     kindLabel: note.contentType === "canvas" ? labels.canvas : labels.note,
                     contextMenuTarget: buildInspectorNoteContextTarget(note),
@@ -8483,7 +8319,7 @@ export default function OrbitalMapView({
 
       <div className="orbital-layout">
         <aside className="orbital-inspector panel" ref={inspectorPanelRef}>
-          {isVaultOverview || isSystemOverview ? (
+          {effectiveInspectorMenu === "overview" ? (
             overviewBody
           ) : !selectedNode ||
             selectedNode.kind === "core" ||

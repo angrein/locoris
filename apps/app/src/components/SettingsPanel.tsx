@@ -45,6 +45,12 @@ type SyncFeedbackState = {
   text: string;
 } | null;
 
+type AiModelCheckFeedbackState = {
+  tone: "success" | "error";
+  text: string;
+  modelId?: string;
+} | null;
+
 interface SettingsPanelProps {
   settings: AppSettings;
   accentThemeId: AppAccentThemeId;
@@ -248,12 +254,14 @@ export default function SettingsPanel({
   const [aiModelId, setAiModelId] = useState(() => readStoredGeminiModel());
   const [aiModelDraft, setAiModelDraft] = useState(() => readStoredGeminiModel());
   const [aiFeedback, setAiFeedback] = useState<SyncFeedbackState>(null);
+  const [aiModelCheckFeedback, setAiModelCheckFeedback] =
+    useState<AiModelCheckFeedbackState>(null);
   const [aiBusy, setAiBusy] = useState<
     "saving" | "testing" | "checkingModel" | "disconnecting" | null
   >(null);
   const [aiKeyLoaded, setAiKeyLoaded] = useState(false);
   const [aiInstructionsOpen, setAiInstructionsOpen] = useState(false);
-  const [aiAdvancedModelOpen, setAiAdvancedModelOpen] = useState(false);
+  const [aiModelPickerOpen, setAiModelPickerOpen] = useState(false);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopUpdatesEnabled = supportsDesktopUpdates();
 
@@ -269,19 +277,20 @@ export default function SettingsPanel({
   }, []);
 
   useEffect(() => {
-    if (!aiInstructionsOpen) {
+    if (!aiInstructionsOpen && !aiModelPickerOpen) {
       return;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setAiInstructionsOpen(false);
+        setAiModelPickerOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [aiInstructionsOpen]);
+  }, [aiInstructionsOpen, aiModelPickerOpen]);
 
   useEffect(() => {
     if (!desktopUpdatesEnabled) {
@@ -431,34 +440,126 @@ export default function SettingsPanel({
   const hasGeminiKey = aiKeyDraft.trim().length > 0;
   const selectedAiModelOption =
     GEMINI_MODEL_OPTIONS.find((model) => model.id === aiModelId) ?? null;
-  const customAiModelActive = selectedAiModelOption === null;
+  const selectedAiModelLabel = selectedAiModelOption?.label ?? aiModelId;
+  const selectedAiModelDescription = selectedAiModelOption
+    ? t(selectedAiModelOption.descriptionKey)
+    : t("settings.aiModelCustomDescription");
   const normalizedAiModelDraft = sanitizeGeminiModelId(aiModelDraft);
   const aiModelDraftInvalid =
     normalizedAiModelDraft.length > 0 && !isValidGeminiModelId(normalizedAiModelDraft);
+  const advancedAiModelVerified =
+    aiModelCheckFeedback?.tone === "success" &&
+    aiModelCheckFeedback.modelId === normalizedAiModelDraft;
   const aiConnectionLabel = hasGeminiKey
     ? t("settings.aiConnected")
     : t("settings.aiNotConnected");
 
-  const selectAiModel = (modelId: string) => {
+  const getAiModelFeatureChip = (modelId: string) => {
+    if (modelId === "gemini-3.1-flash-lite") {
+      return { key: "settings.aiModelChipHighLimits", tone: "is-quota" };
+    }
+
+    if (modelId === "gemini-2.5-flash") {
+      return { key: "settings.aiModelChipStable", tone: "is-balanced" };
+    }
+
+    if (modelId === "gemma-4-31b-it") {
+      return { key: "settings.aiModelChipOpen", tone: "is-open" };
+    }
+
+    if (modelId === "gemma-4-26b-a4b-it") {
+      return { key: "settings.aiModelChipLean", tone: "is-fast" };
+    }
+
+    if (modelId === "gemini-2.5-flash-lite") {
+      return { key: "settings.aiModelChipEconomy", tone: "is-quota" };
+    }
+
+    return { key: "settings.aiModelChipLowLimits", tone: "is-warning" };
+  };
+
+  const getAiModelBadgeTone = (modelId: string) => {
+    if (modelId === "gemini-2.5-pro") {
+      return "is-smart";
+    }
+
+    if (modelId.startsWith("gemma-")) {
+      return "is-open";
+    }
+
+    if (modelId.includes("lite")) {
+      return "is-fast";
+    }
+
+    return "is-balanced";
+  };
+
+  const selectAiModel = (modelId: string, closePicker = false) => {
     const normalizedModelId = sanitizeGeminiModelId(modelId);
 
     setAiModelId(normalizedModelId);
     setAiModelDraft(normalizedModelId);
     setAiFeedback(null);
+    setAiModelCheckFeedback(null);
+
+    if (closePicker) {
+      setAiModelPickerOpen(false);
+    }
   };
 
-  const renderAiModelMeter = (label: string, value: number) => (
-    <span className="settings-ai-model-meter">
-      <span>
-        {label}
-        <b>{value}/5</b>
+  const renderAiModelChips = (
+    model: (typeof GEMINI_MODEL_OPTIONS)[number] | null
+  ) => {
+    if (!model) {
+      return (
+        <span className="settings-ai-model-chip-row">
+          <span className="settings-ai-model-chip is-live">
+            {t("settings.aiModelCustomActive")}
+          </span>
+          <span className="settings-ai-model-chip is-quota">
+            {t("settings.aiModelLiveCheckChip")}
+          </span>
+        </span>
+      );
+    }
+
+    const featureChip = getAiModelFeatureChip(model.id);
+
+    return (
+      <span className="settings-ai-model-chip-row">
+        <span className={`settings-ai-model-chip ${getAiModelBadgeTone(model.id)}`}>
+          {t(model.badgeKey)}
+        </span>
+        <span className={`settings-ai-model-chip ${featureChip.tone}`}>
+          {t(featureChip.key)}
+        </span>
       </span>
-      <i
-        aria-hidden="true"
-        style={{ "--ai-model-meter": `${Math.max(0, Math.min(value, 5)) * 20}%` } as CSSProperties}
-      />
-    </span>
-  );
+    );
+  };
+
+  const handleUseAdvancedAiModel = () => {
+    if (!isValidGeminiModelId(normalizedAiModelDraft)) {
+      setAiModelCheckFeedback({
+        tone: "error",
+        text: t("settings.aiModelInvalid")
+      });
+      return;
+    }
+
+    if (!advancedAiModelVerified) {
+      setAiModelCheckFeedback({
+        tone: "error",
+        text: t("settings.aiModelSelectRequiresCheck")
+      });
+      return;
+    }
+
+    selectAiModel(normalizedAiModelDraft, true);
+    setAiFeedback({
+      tone: "success",
+      text: t("settings.aiModelSelectedAfterCheck", { model: normalizedAiModelDraft })
+    });
+  };
 
   const handleSaveAiIntegration = async () => {
     const apiKey = aiKeyDraft.trim();
@@ -543,7 +644,7 @@ export default function SettingsPanel({
     const modelId = sanitizeGeminiModelId(aiModelDraft);
 
     if (!apiKey) {
-      setAiFeedback({
+      setAiModelCheckFeedback({
         tone: "error",
         text: t("settings.aiKeyRequired")
       });
@@ -551,7 +652,7 @@ export default function SettingsPanel({
     }
 
     if (!isValidGeminiModelId(modelId)) {
-      setAiFeedback({
+      setAiModelCheckFeedback({
         tone: "error",
         text: t("settings.aiModelInvalid")
       });
@@ -560,20 +661,20 @@ export default function SettingsPanel({
 
     setAiBusy("checkingModel");
     setAiFeedback(null);
+    setAiModelCheckFeedback(null);
 
     try {
       await testGeminiConnection(apiKey, modelId);
-      setAiModelId(modelId);
-      setAiModelDraft(modelId);
-      writeStoredGeminiModel(modelId);
-      setAiFeedback({
+      setAiModelCheckFeedback({
         tone: "success",
-        text: t("settings.aiModelAvailable", { model: modelId })
+        text: t("settings.aiModelCheckSuccess", { model: modelId }),
+        modelId
       });
     } catch {
-      setAiFeedback({
+      setAiModelCheckFeedback({
         tone: "error",
-        text: t("settings.aiModelUnavailable", { model: modelId })
+        text: t("settings.aiModelCheckFailed", { model: modelId }),
+        modelId
       });
     } finally {
       setAiBusy(null);
@@ -759,101 +860,27 @@ export default function SettingsPanel({
                   <span>{t("settings.aiModelLabel")}</span>
                   <span>{t("settings.aiModelHint")}</span>
                 </div>
-                <div className="settings-ai-selected-model">
-                  <span>{t("settings.aiModelSelected")}</span>
-                  <code>{selectedAiModelOption?.label ?? aiModelId}</code>
-                  {customAiModelActive ? (
-                    <em>{t("settings.aiModelCustomActive")}</em>
-                  ) : null}
-                </div>
-                <div
-                  className="settings-ai-model-grid"
-                  role="radiogroup"
-                  aria-label={t("settings.aiModelLabel")}
+                <button
+                  type="button"
+                  className="settings-ai-selected-model-card"
+                  onClick={() => setAiModelPickerOpen(true)}
+                  aria-haspopup="dialog"
                 >
-                  {GEMINI_MODEL_OPTIONS.map((model) => {
-                    const active = aiModelId === model.id;
-
-                    return (
-                      <button
-                        type="button"
-                        key={model.id}
-                        className={`settings-ai-model-card ${active ? "is-active" : ""}`}
-                        onClick={() => selectAiModel(model.id)}
-                        role="radio"
-                        aria-checked={active}
-                        title={`${t(model.bestForKey)} ${t(model.limitKey)}`}
-                      >
-                        <span className="settings-ai-model-card-head">
-                          <span>{model.label}</span>
-                          <em>{t(model.badgeKey)}</em>
-                        </span>
-                        <code>{model.id}</code>
-                        <small>{t(model.descriptionKey)}</small>
-                        <span className="settings-ai-model-best">
-                          {t(model.bestForKey)}
-                        </span>
-                        <span className="settings-ai-model-meters" aria-hidden="true">
-                          {renderAiModelMeter(t("settings.aiModelMetricSpeed"), model.speed)}
-                          {renderAiModelMeter(t("settings.aiModelMetricQuality"), model.quality)}
-                          {renderAiModelMeter(t("settings.aiModelMetricQuota"), model.quota)}
-                        </span>
-                        <span className="settings-ai-model-limit">{t(model.limitKey)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="settings-ai-model-note">
-                  {t("settings.aiModelLimitsDisclaimer")}
-                </p>
-
-                <div className={`settings-ai-advanced-model ${aiAdvancedModelOpen ? "is-open" : ""}`}>
-                  <button
-                    type="button"
-                    className="settings-ai-advanced-toggle"
-                    onClick={() => setAiAdvancedModelOpen((open) => !open)}
-                    aria-expanded={aiAdvancedModelOpen}
-                  >
+                  <span className="settings-ai-selected-model-head">
                     <span>
-                      <strong>{t("settings.aiModelAdvancedTitle")}</strong>
-                      <small>{t("settings.aiModelAdvancedDescription")}</small>
+                      <small>{t("settings.aiModelSelected")}</small>
+                      <strong>{selectedAiModelLabel}</strong>
                     </span>
-                    <em aria-hidden="true">{aiAdvancedModelOpen ? "-" : "+"}</em>
-                  </button>
-
-                  {aiAdvancedModelOpen ? (
-                    <div className="settings-ai-advanced-body">
-                      <label className="settings-ai-field">
-                        <span>{t("settings.aiModelIdLabel")}</span>
-                        <input
-                          type="text"
-                          value={aiModelDraft}
-                          onChange={(event) => {
-                            setAiModelDraft(event.target.value);
-                            setAiFeedback(null);
-                          }}
-                          placeholder={t("settings.aiModelIdPlaceholder")}
-                          autoComplete="off"
-                          spellCheck={false}
-                          className={aiModelDraftInvalid ? "is-invalid" : ""}
-                        />
-                      </label>
-                      <div className="settings-ai-advanced-actions">
-                        <button
-                          type="button"
-                          className="settings-row-action"
-                          onClick={() => void handleCheckAdvancedAiModel()}
-                          disabled={aiBusy !== null || normalizedAiModelDraft.length === 0}
-                        >
-                          {aiBusy === "checkingModel"
-                            ? t("settings.aiModelChecking")
-                            : t("settings.aiModelCheckAndUse")}
-                        </button>
-                        <span>{t("settings.aiModelAdvancedHint")}</span>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
+                    {renderAiModelChips(selectedAiModelOption)}
+                  </span>
+                  <code>{aiModelId}</code>
+                  <span className="settings-ai-selected-model-copy">
+                    {selectedAiModelDescription}
+                  </span>
+                  <span className="settings-ai-selected-model-foot">
+                    <em>{t("settings.aiModelChange")}</em>
+                  </span>
+                </button>
               </div>
 
               <div className="settings-ai-actions">
@@ -887,11 +914,6 @@ export default function SettingsPanel({
                 ) : null}
               </div>
 
-              {aiFeedback ? (
-                <p className={`settings-ai-feedback is-${aiFeedback.tone}`}>
-                  {aiFeedback.text}
-                </p>
-              ) : null}
             </div>
           </section>
 
@@ -904,8 +926,139 @@ export default function SettingsPanel({
               <span>{t("settings.aiFlowTitle")}</span>
               <p>{t("settings.aiFlowDescription")}</p>
             </div>
+            {aiFeedback ? (
+              <p className={`settings-ai-feedback is-${aiFeedback.tone}`}>
+                {aiFeedback.text}
+              </p>
+            ) : null}
           </section>
         </div>
+
+        {aiModelPickerOpen ? (
+          <div
+            className="settings-ai-model-layer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-ai-model-picker-title"
+          >
+            <button
+              type="button"
+              className="settings-ai-model-dim"
+              aria-label={t("orbit.closeModal")}
+              onClick={() => setAiModelPickerOpen(false)}
+            />
+            <section className="settings-ai-model-modal">
+              <div className="settings-ai-model-modal-head">
+                <div>
+                  <p className="panel-kicker settings-panel-block-kicker">
+                    {t("settings.aiModelPresetGroup")}
+                  </p>
+                  <h3 id="settings-ai-model-picker-title">{t("settings.aiModelPickerTitle")}</h3>
+                  <p>{t("settings.aiModelPickerCaption")}</p>
+                </div>
+                <button
+                  type="button"
+                  className="settings-panel-nav-button"
+                  onClick={() => setAiModelPickerOpen(false)}
+                  aria-label={t("orbit.closeModal")}
+                  title={t("orbit.closeModal")}
+                >
+                  <span className="settings-panel-close-icon" aria-hidden="true">
+                    <CloseGlyph />
+                  </span>
+                </button>
+              </div>
+
+              <div className="settings-ai-model-modal-body">
+                <div className="settings-ai-model-preset-panel">
+                  <div
+                    className="settings-ai-model-option-list"
+                    role="radiogroup"
+                    aria-label={t("settings.aiModelLabel")}
+                  >
+                    {GEMINI_MODEL_OPTIONS.map((model) => {
+                      const active = aiModelId === model.id;
+
+                      return (
+                        <button
+                          type="button"
+                          key={model.id}
+                          className={`settings-ai-model-option ${active ? "is-active" : ""}`}
+                          onClick={() => selectAiModel(model.id, true)}
+                          role="radio"
+                          aria-checked={active}
+                        >
+                          <span className="settings-ai-model-option-head">
+                            <span>
+                              <strong>{model.label}</strong>
+                              <code>{model.id}</code>
+                            </span>
+                            {renderAiModelChips(model)}
+                          </span>
+                          <small>{t(model.descriptionKey)}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <aside className="settings-ai-model-advanced-panel">
+                  <div className="settings-ai-model-advanced-head">
+                    <span>{t("settings.aiModelAdvancedTitle")}</span>
+                    <p>{t("settings.aiModelAdvancedDescription")}</p>
+                  </div>
+                  <label className="settings-ai-field">
+                    <span>{t("settings.aiModelIdLabel")}</span>
+                    <input
+                      type="text"
+                      value={aiModelDraft}
+                      onChange={(event) => {
+                        setAiModelDraft(event.target.value);
+                        setAiFeedback(null);
+                        setAiModelCheckFeedback(null);
+                      }}
+                      placeholder={t("settings.aiModelIdPlaceholder")}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className={aiModelDraftInvalid ? "is-invalid" : ""}
+                    />
+                  </label>
+                  <div className="settings-ai-model-advanced-actions">
+                    <button
+                      type="button"
+                      className="settings-row-action settings-row-action-secondary"
+                      onClick={() => void handleCheckAdvancedAiModel()}
+                      disabled={aiBusy !== null || normalizedAiModelDraft.length === 0}
+                    >
+                      {aiBusy === "checkingModel"
+                        ? t("settings.aiModelChecking")
+                        : t("settings.aiModelCheck")}
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-row-action"
+                      onClick={handleUseAdvancedAiModel}
+                      disabled={aiBusy !== null || !advancedAiModelVerified}
+                    >
+                      {t("settings.aiModelUse")}
+                    </button>
+                  </div>
+                  {aiModelCheckFeedback ? (
+                    <p className={`settings-ai-model-check-status is-${aiModelCheckFeedback.tone}`}>
+                      {aiModelCheckFeedback.text}
+                    </p>
+                  ) : null}
+                  <p className="settings-ai-model-note">
+                    {t("settings.aiModelAdvancedHint")}
+                  </p>
+                  <p className="settings-ai-model-note settings-ai-model-limit-note">
+                    {t("settings.aiModelLimitsDisclaimer")}
+                  </p>
+                </aside>
+              </div>
+            </section>
+          </div>
+        ) : null}
 
         {aiInstructionsOpen ? (
           <div className="settings-ai-guide-layer" role="dialog" aria-modal="true">
