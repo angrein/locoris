@@ -37,6 +37,9 @@
   top: var(--context-menu-top, 12px);
   border-radius: 22px;
   padding: 12px;
+  max-height: var(--context-menu-max-height, calc(100vh - 24px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .orbital-context-menu-card.is-sheet {

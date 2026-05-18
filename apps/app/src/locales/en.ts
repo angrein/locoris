@@ -872,6 +872,7 @@ const en = {
     vaultSync: "Sync",
     vaultActivity: "Activity",
     vaultStructure: "Structure",
+    overviewSections: "Sections",
     lastUpdated: "Last updated",
     trashStat: "In trash",
     vaultRegular: "Regular",

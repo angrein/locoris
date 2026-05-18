@@ -587,6 +587,7 @@
   display: flex;
   gap: 10px;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   align-items: stretch;
 }
@@ -600,12 +601,15 @@
 
 .editor-stage-frame {
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 
 .editor-stage-shell {
   position: relative;
   height: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 100%;
   overflow: auto;
   overflow-x: hidden;
@@ -632,11 +636,15 @@
   --bn-colors-hovered-text: var(--text);
   --bn-colors-side-menu: color-mix(in srgb, var(--editor-accent) 38%, rgb(var(--line-rgb) / 0.18));
   height: auto;
+  max-width: 100%;
+  min-width: 0;
   min-height: 100%;
   background: transparent;
 }
 
 .editor-stage-shell .bn-editor {
+  max-width: 100%;
+  min-width: 0;
   min-height: 100%;
   height: auto;
   padding:
@@ -758,11 +766,34 @@
   border-color: rgb(var(--line-rgb) / 0.14);
 }
 
-.editor-stage-shell .bn-editor img,
-.editor-stage-shell .bn-editor video,
+.editor-stage-shell .bn-editor img:not(.bn-visual-media),
+.editor-stage-shell .bn-editor video:not(.bn-visual-media),
 .editor-stage-shell .bn-editor audio {
+  width: auto;
+  height: auto;
   max-width: 100%;
   border-radius: 16px;
+}
+
+.editor-stage-shell .bn-editor .bn-visual-media {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  border-radius: 16px;
+}
+
+.editor-stage-shell .bn-editor [data-file-block],
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="image"],
+.editor-stage-shell .bn-editor .bn-block-content[data-content-type="video"],
+.editor-stage-shell .bn-editor [data-file-block] .bn-file-block-content-wrapper,
+.editor-stage-shell .bn-editor [data-file-block] .bn-visual-media-wrapper {
+  max-width: 100% !important;
+  min-width: 0;
+}
+
+.editor-stage-shell .bn-editor [data-file-block] .bn-visual-media {
+  max-width: 100% !important;
+  object-fit: contain;
 }
 
 .editor-stage-shell .bn-editor [data-file-block],

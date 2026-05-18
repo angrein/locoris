@@ -1,7 +1,11 @@
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -34,20 +38,12 @@ export interface OrbitalOverviewRecentItem {
   updatedAt: number;
 }
 
-export interface OrbitalOverviewMetric {
-  id: string;
-  label: string;
-  value: number;
-  tone: "project" | "folder" | "note" | "canvas" | "asset";
-}
-
 export type OrbitalOverviewLinkIcon = "project" | "folder" | "note" | "tag" | "file" | "color";
 export type OrbitalOverviewLinkId = "notes" | "folders" | "tags" | "files" | "pinned" | "colors";
 
 export interface OrbitalOverviewLinkItem {
   id: OrbitalOverviewLinkId;
   label: string;
-  meta: string;
   count: number;
   icon: OrbitalOverviewLinkIcon;
   color: string;
@@ -64,7 +60,6 @@ interface OrbitalInspectorOverviewCardProps {
   projectCount: number;
   canNavigateProjects: boolean;
   projects: OrbitalOverviewProjectItem[];
-  metrics: OrbitalOverviewMetric[];
   links: OrbitalOverviewLinkItem[];
   recentItems: OrbitalOverviewRecentItem[];
   lastUpdatedLabel: string;
@@ -77,6 +72,8 @@ interface OrbitalInspectorOverviewCardProps {
     addCanvas: string;
     back: string;
     deleteSystem: string;
+    create: string;
+    project: string;
     folder: string;
     note: string;
     canvas: string;
@@ -84,10 +81,13 @@ interface OrbitalInspectorOverviewCardProps {
     nextProject: string;
     projectColor: string;
     projectsStat: string;
+    overviewSections: string;
   };
   colorButtonRef?: Ref<HTMLButtonElement>;
   isColorPanelOpen: boolean;
-  onAddProject: () => void;
+  editingProjectId?: string | null;
+  renderProjectRenameField?: (project: OrbitalOverviewProjectItem) => ReactNode;
+  onAddProject: (name: string) => void | Promise<void>;
   onAddFolder: () => void;
   onAddNote: () => void;
   onAddCanvas: () => void;
@@ -95,7 +95,10 @@ interface OrbitalInspectorOverviewCardProps {
   onCycleProject: (direction: -1 | 1) => void;
   onDeleteProject: () => void;
   onOpenLink: (linkId: OrbitalOverviewLinkId) => void;
-  onSelectProject: (projectId: string) => void;
+  onFocusProject: (projectId: string) => void;
+  onOpenProject: (projectId: string) => void;
+  onMoveProject: (draggedProjectId: string, targetProjectId: string, placement: "before" | "after") => void;
+  onProjectContextMenu: (projectId: string, event: ReactMouseEvent<HTMLButtonElement>) => void;
   onSelectRecentItem: (item: OrbitalOverviewRecentItem) => void;
   onOpenRecentItem: (item: OrbitalOverviewRecentItem) => void;
   onRecentContextMenu: (item: OrbitalOverviewRecentItem, event: ReactMouseEvent<HTMLButtonElement>) => void;
@@ -234,31 +237,37 @@ function Icon({
 
 function LinkGrid({
   links,
+  title,
   onOpenLink
 }: {
   links: OrbitalOverviewLinkItem[];
+  title: string;
   onOpenLink: (linkId: OrbitalOverviewLinkId) => void;
 }) {
   return (
     <div className="orbital-inspector-overview-link-grid">
-      {links.map((entry) => (
-        <button
-          key={entry.id}
-          type="button"
-          className="orbital-inspector-overview-link"
-          style={{ "--overview-card-accent": entry.color } as CSSProperties}
-          onClick={() => onOpenLink(entry.id)}
-        >
-          <span className="orbital-inspector-overview-link-icon">
-            <Icon kind={entry.icon} />
-          </span>
-          <span className="orbital-inspector-overview-link-copy">
-            <span className="orbital-inspector-overview-link-label">{entry.label}</span>
-            <span className="orbital-inspector-overview-link-meta">{entry.meta}</span>
-          </span>
-          <strong className="orbital-inspector-overview-link-count">{formatCompactCount(entry.count)}</strong>
-        </button>
-      ))}
+      <div className="orbital-inspector-overview-sectionhead">
+        <span className="orbital-inspector-overview-sectiontitle">{title}</span>
+      </div>
+      <div className="orbital-inspector-overview-link-list">
+        {links.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            className="orbital-inspector-overview-link"
+            style={{ "--overview-card-accent": entry.color } as CSSProperties}
+            onClick={() => onOpenLink(entry.id)}
+          >
+            <span className="orbital-inspector-overview-link-icon">
+              <Icon kind={entry.icon} />
+            </span>
+            <span className="orbital-inspector-overview-link-copy">
+              <span className="orbital-inspector-overview-link-label">{entry.label}</span>
+            </span>
+            <strong className="orbital-inspector-overview-link-count">{formatCompactCount(entry.count)}</strong>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -280,48 +289,260 @@ function MiniGlyph({ accentColor, mode }: { accentColor: string; mode: OrbitalOv
 function ProjectRail({
   projects,
   labels,
-  onSelectProject
+  editingProjectId,
+  renderProjectRenameField,
+  onAddProject,
+  onFocusProject,
+  onOpenProject,
+  onMoveProject,
+  onProjectContextMenu
 }: {
   projects: OrbitalOverviewProjectItem[];
   labels: OrbitalInspectorOverviewCardProps["labels"];
-  onSelectProject: (projectId: string) => void;
+  editingProjectId?: string | null;
+  renderProjectRenameField?: (project: OrbitalOverviewProjectItem) => ReactNode;
+  onAddProject: (name: string) => void | Promise<void>;
+  onFocusProject: (projectId: string) => void;
+  onOpenProject: (projectId: string) => void;
+  onMoveProject: (draggedProjectId: string, targetProjectId: string, placement: "before" | "after") => void;
+  onProjectContextMenu: (projectId: string, event: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isDraftOpen, setIsDraftOpen] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    projectId: string;
+    placement: "before" | "after";
+  } | null>(null);
+  const draftInputRef = useRef<HTMLInputElement | null>(null);
+  const isSubmittingDraftRef = useRef(false);
+  const isCancellingDraftRef = useRef(false);
+
+  useEffect(() => {
+    if (!isDraftOpen) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      draftInputRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isDraftOpen]);
+
   const visibleProjects = useMemo(() => {
-    const activeProject = projects.find((project) => project.isActive) ?? null;
-    const recentProjects = [...projects]
-      .filter((project) => project.id !== activeProject?.id)
-      .sort((left, right) => right.updatedAt - left.updatedAt);
-    return [activeProject, ...recentProjects].filter(Boolean).slice(0, 5) as OrbitalOverviewProjectItem[];
-  }, [projects]);
+    const collapsedSlots = 6;
+
+    if (isExpanded || projects.length <= collapsedSlots) {
+      return projects;
+    }
+
+    return projects.slice(0, collapsedSlots - 1);
+  }, [isExpanded, projects]);
   const hiddenCount = Math.max(projects.length - visibleProjects.length, 0);
 
-  if (projects.length === 0) {
-    return null;
-  }
+  const resolveDropPlacement = (
+    event: ReactDragEvent<HTMLButtonElement>
+  ): "before" | "after" => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const horizontalRatio = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
+    const verticalRatio = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+    const isHorizontalIntent = Math.abs(horizontalRatio - 0.5) > Math.abs(verticalRatio - 0.5);
+    return (isHorizontalIntent ? horizontalRatio : verticalRatio) < 0.5 ? "before" : "after";
+  };
+
+  const resetDragState = () => {
+    setDraggedProjectId(null);
+    setDropTarget(null);
+  };
+
+  const beginDraft = () => {
+    isCancellingDraftRef.current = false;
+    setIsExpanded(true);
+    setDraftName("");
+    setIsDraftOpen(true);
+  };
+
+  const cancelDraft = () => {
+    isCancellingDraftRef.current = true;
+    isSubmittingDraftRef.current = false;
+    setDraftName("");
+    setIsDraftOpen(false);
+  };
+
+  const submitDraft = async () => {
+    if (isSubmittingDraftRef.current) {
+      return;
+    }
+
+    if (isCancellingDraftRef.current) {
+      isCancellingDraftRef.current = false;
+      return;
+    }
+
+    const normalizedName = draftName.trim();
+
+    if (!normalizedName) {
+      cancelDraft();
+      return;
+    }
+
+    isSubmittingDraftRef.current = true;
+    setIsDraftOpen(false);
+    setDraftName("");
+
+    try {
+      await onAddProject(normalizedName);
+    } finally {
+      isSubmittingDraftRef.current = false;
+    }
+  };
+
+  const handleDraftKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void submitDraft();
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelDraft();
+    }
+  };
 
   return (
-    <div className="orbital-inspector-overview-projects" aria-label={labels.projectsStat}>
-      {visibleProjects.map((project) => (
+    <div className="orbital-inspector-overview-project-panel">
+      <div className="orbital-inspector-overview-project-head">
+        <span className="orbital-inspector-overview-sectiontitle">{labels.projectsStat}</span>
         <button
-          key={project.id}
           type="button"
-          className={`orbital-inspector-overview-project ${project.isActive ? "is-active" : ""}`}
-          style={{ "--overview-card-accent": project.color } as CSSProperties}
-          onClick={() => onSelectProject(project.id)}
-          title={project.name}
+          className="orbital-inspector-overview-project-add"
+          onClick={beginDraft}
         >
-          <span className="orbital-inspector-overview-project-dot" aria-hidden="true" />
-          <span className="orbital-inspector-overview-project-copy">
-            <span className="orbital-inspector-overview-project-name">{project.name}</span>
-            <span className="orbital-inspector-overview-project-meta">
-              {formatCompactCount(project.documentCount)} / {formatCompactCount(project.folderCount)}
-            </span>
-          </span>
+          <Icon kind="project" />
+          <span>{labels.addProject}</span>
         </button>
-      ))}
-      {hiddenCount > 0 ? (
-        <span className="orbital-inspector-overview-project-more">+{hiddenCount}</span>
-      ) : null}
+      </div>
+      <div className="orbital-inspector-overview-projects" aria-label={labels.projectsStat}>
+        {visibleProjects.map((project) => {
+          const projectDropTarget = dropTarget?.projectId === project.id ? dropTarget.placement : null;
+          const isEditingProject = editingProjectId === project.id;
+
+          return isEditingProject && renderProjectRenameField ? (
+            <div
+              key={project.id}
+              className={`orbital-inspector-overview-project is-editing ${project.isActive ? "is-active" : ""}`}
+              style={{ "--overview-card-accent": project.color } as CSSProperties}
+            >
+              <span className="orbital-inspector-overview-project-dot" aria-hidden="true" />
+              <span className="orbital-inspector-overview-project-copy">
+                {renderProjectRenameField(project)}
+                <span className="orbital-inspector-overview-project-meta">
+                  {formatCompactCount(project.documentCount)} / {formatCompactCount(project.folderCount)}
+                </span>
+              </span>
+            </div>
+          ) : (
+            <button
+              key={project.id}
+              type="button"
+              className={`orbital-inspector-overview-project ${project.isActive ? "is-active" : ""} ${
+                projectDropTarget ? `is-drop-${projectDropTarget}` : ""
+              }`}
+              style={{ "--overview-card-accent": project.color } as CSSProperties}
+              draggable
+              onClick={() => onFocusProject(project.id)}
+              onDoubleClick={() => onOpenProject(project.id)}
+              onContextMenu={(event) => onProjectContextMenu(project.id, event)}
+              onDragStart={(event) => {
+                setDraggedProjectId(project.id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("application/x-locoris-project-id", project.id);
+                event.dataTransfer.setData("text/plain", project.id);
+              }}
+              onDragOver={(event) => {
+                const sourceProjectId =
+                  draggedProjectId ||
+                  event.dataTransfer.getData("application/x-locoris-project-id") ||
+                  event.dataTransfer.getData("text/plain");
+
+                if (!sourceProjectId || sourceProjectId === project.id) {
+                  return;
+                }
+
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDropTarget({
+                  projectId: project.id,
+                  placement: resolveDropPlacement(event)
+                });
+              }}
+              onDrop={(event) => {
+                const sourceProjectId =
+                  draggedProjectId ||
+                  event.dataTransfer.getData("application/x-locoris-project-id") ||
+                  event.dataTransfer.getData("text/plain");
+
+                if (!sourceProjectId || sourceProjectId === project.id) {
+                  resetDragState();
+                  return;
+                }
+
+                event.preventDefault();
+                onMoveProject(sourceProjectId, project.id, dropTarget?.placement ?? resolveDropPlacement(event));
+                resetDragState();
+              }}
+              onDragEnd={resetDragState}
+              title={project.name}
+            >
+              <span className="orbital-inspector-overview-project-dot" aria-hidden="true" />
+              <span className="orbital-inspector-overview-project-copy">
+                <span className="orbital-inspector-overview-project-name">{project.name}</span>
+                <span className="orbital-inspector-overview-project-meta">
+                  {formatCompactCount(project.documentCount)} / {formatCompactCount(project.folderCount)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+        {isDraftOpen ? (
+          <div
+            className="orbital-inspector-overview-project is-draft"
+            style={{ "--overview-card-accent": "var(--accent-theme-primary, var(--gold))" } as CSSProperties}
+          >
+            <span className="orbital-inspector-overview-project-dot" aria-hidden="true" />
+            <span className="orbital-inspector-overview-project-copy">
+              <input
+                ref={draftInputRef}
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                onBlur={() => {
+                  void submitDraft();
+                }}
+                onKeyDown={handleDraftKeyDown}
+                className="orbital-inspector-overview-project-input"
+                placeholder={labels.project}
+                aria-label={labels.addProject}
+              />
+              <span className="orbital-inspector-overview-project-meta">{labels.create}</span>
+            </span>
+          </div>
+        ) : null}
+        {hiddenCount > 0 ? (
+          <button
+            type="button"
+            className="orbital-inspector-overview-project-more"
+            onClick={() => setIsExpanded(true)}
+            aria-label={`${labels.projectsStat}: +${hiddenCount}`}
+            title={`${labels.projectsStat}: +${hiddenCount}`}
+          >
+            +{hiddenCount}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -337,7 +558,6 @@ export default function OrbitalInspectorOverviewCard({
   projectCount,
   canNavigateProjects,
   projects,
-  metrics,
   links,
   recentItems,
   lastUpdatedLabel,
@@ -346,6 +566,8 @@ export default function OrbitalInspectorOverviewCard({
   labels,
   colorButtonRef,
   isColorPanelOpen,
+  editingProjectId,
+  renderProjectRenameField,
   onAddProject,
   onAddFolder,
   onAddNote,
@@ -354,7 +576,10 @@ export default function OrbitalInspectorOverviewCard({
   onCycleProject,
   onDeleteProject,
   onOpenLink,
-  onSelectProject,
+  onFocusProject,
+  onOpenProject,
+  onMoveProject,
+  onProjectContextMenu,
   onSelectRecentItem,
   onOpenRecentItem,
   onRecentContextMenu,
@@ -377,7 +602,17 @@ export default function OrbitalInspectorOverviewCard({
     >
       <div className="orbital-inspector-overview-card-main">
         <div className="orbital-inspector-overview-card-head">
-          <MiniGlyph accentColor={accentColor} mode={mode} />
+          {isProjectMode ? (
+            <button
+              type="button"
+              className="orbital-inspector-overview-icon-action"
+              onClick={onBackToVault}
+              aria-label={labels.back}
+              title={labels.back}
+            >
+              <Icon kind="back" />
+            </button>
+          ) : null}
           <div className="orbital-inspector-overview-titleblock">
             <span className="orbital-inspector-overview-kicker">{kicker}</span>
             <div className="orbital-inspector-overview-title" title={title}>
@@ -385,37 +620,8 @@ export default function OrbitalInspectorOverviewCard({
             </div>
           </div>
           <div className="orbital-inspector-overview-card-actions">
-            {isProjectMode ? (
-              <button
-                type="button"
-                className="orbital-inspector-overview-icon-action"
-                onClick={onBackToVault}
-                aria-label={labels.back}
-                title={labels.back}
-              >
-                <Icon kind="back" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="orbital-inspector-overview-icon-action is-primary"
-                onClick={onAddProject}
-                aria-label={labels.addProject}
-                title={labels.addProject}
-              >
-                <Icon kind="project" />
-              </button>
-            )}
+            <MiniGlyph accentColor={accentColor} mode={mode} />
           </div>
-        </div>
-
-        <div className="orbital-inspector-overview-metrics">
-          {metrics.map((metric) => (
-            <span key={metric.id} className={`orbital-inspector-overview-metric is-${metric.tone}`}>
-              <strong>{formatCompactCount(metric.value)}</strong>
-              <span>{metric.label}</span>
-            </span>
-          ))}
         </div>
 
         {isProjectMode ? (
@@ -470,11 +676,21 @@ export default function OrbitalInspectorOverviewCard({
             </div>
           </div>
         ) : (
-          <ProjectRail projects={projects} labels={labels} onSelectProject={onSelectProject} />
+          <ProjectRail
+            projects={projects}
+            labels={labels}
+            editingProjectId={editingProjectId}
+            renderProjectRenameField={renderProjectRenameField}
+            onAddProject={onAddProject}
+            onFocusProject={onFocusProject}
+            onOpenProject={onOpenProject}
+            onMoveProject={onMoveProject}
+            onProjectContextMenu={onProjectContextMenu}
+          />
         )}
       </div>
 
-      <LinkGrid links={links} onOpenLink={onOpenLink} />
+      <LinkGrid links={links} title={labels.overviewSections} onOpenLink={onOpenLink} />
 
       <div className={`orbital-inspector-overview-recent ${isRecentExpanded ? "is-expanded" : ""}`}>
         <div className="orbital-inspector-overview-sectionhead">

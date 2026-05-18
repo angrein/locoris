@@ -18,7 +18,6 @@ import LocalVaultSwitcher, { type LocalVaultSwitcherItem } from "./LocalVaultSwi
 import OrbitalInspectorOverviewCard, {
   type OrbitalOverviewLinkId,
   type OrbitalOverviewLinkItem,
-  type OrbitalOverviewMetric,
   type OrbitalOverviewProjectItem,
   type OrbitalOverviewRecentItem
 } from "./OrbitalInspectorOverviewCard";
@@ -105,9 +104,10 @@ interface OrbitalMapViewProps {
   }) => string | void | Promise<string | void>;
   onRenameLocalVault?: (localVaultId: string, name: string) => Promise<void> | void;
   onCloseEditor: () => void;
-  onCreateProject: (x: number, y: number) => Promise<Project>;
+  onCreateProject: (x: number, y: number, name?: string) => Promise<Project>;
   onRenameProject: (projectId: string, name: string) => Promise<void> | void;
   onUpdateProjectPosition: (projectId: string, x: number, y: number) => void;
+  onUpdateProjectSortOrder: (projectId: string, sortOrder: number) => void;
   onUpdateProjectColor: (projectId: string, color: string) => void;
   onDeleteProject: (projectId: string) => Promise<boolean | void> | boolean | void;
   onCreateFolder: (
@@ -213,6 +213,7 @@ interface OrbitalMapViewProps {
     vaultSync: string;
     vaultActivity: string;
     vaultStructure: string;
+    overviewSections: string;
     lastUpdated: string;
     trashStat: string;
     vaultRegular: string;
@@ -625,7 +626,7 @@ function getHierarchyItemSortOrder(item: InspectorHierarchyItem) {
     return getHierarchySortOrder(item.note);
   }
 
-  return item.project?.createdAt ?? 0;
+  return item.project ? getHierarchySortOrder(item.project) : 0;
 }
 
 function getNoteMass(note: Note) {
@@ -872,7 +873,7 @@ function buildOrbitalData(projects: Project[], folders: Folder[], notes: Note[])
   const visibleNotes = notes
     .filter((note) => note.trashedAt === null)
     .sort(noteSorter);
-  const orderedProjects = [...projects].sort((left, right) => left.createdAt - right.createdAt);
+  const orderedProjects = [...projects].sort(compareHierarchyRecords);
   const rootFoldersByProject = new Map<string, FolderBranch[]>();
   const looseNotesByProject = new Map<string, Note[]>();
   const foldersByParent = new Map<string | null, Folder[]>();
@@ -1001,6 +1002,28 @@ function collectFolderSubtreeEntityIds(folderId: string, data: OrbitalData) {
   };
 
   visit(folderId);
+  return related;
+}
+
+function collectProjectEntityIds(projectId: string, data: OrbitalData) {
+  const related = new Set<string>();
+
+  if (!data.projectById.has(projectId)) {
+    return related;
+  }
+
+  related.add(`project:${projectId}`);
+
+  (data.rootFoldersByProject.get(projectId) ?? []).forEach((branch) => {
+    collectFolderSubtreeEntityIds(branch.folder.id, data).forEach((entityId) => {
+      related.add(entityId);
+    });
+  });
+
+  (data.looseNotesByProject.get(projectId) ?? []).forEach((note) => {
+    related.add(`note:${note.id}`);
+  });
+
   return related;
 }
 
@@ -1773,7 +1796,8 @@ function materializeOrbitalScene(
   layout: OrbitalLayout,
   timeMs: number,
   toneByEntityId?: Map<string, OrbitalVisualTone>,
-  motionCalmFactor = 1
+  motionCalmFactor = 1,
+  movingEntityIds?: ReadonlySet<string>
 ): OrbitalScene {
   const nodes: OrbitalSceneNode[] = [];
   const orbits: OrbitalSceneOrbit[] = [];
@@ -1792,6 +1816,9 @@ function materializeOrbitalScene(
 
     if (parent && layoutNode.orbit) {
       const tone = toneByEntityId?.get(layoutNode.entityId) ?? "muted";
+      const isMotionEnabled = !movingEntityIds || movingEntityIds.has(layoutNode.entityId);
+      const nodeTimeMs = isMotionEnabled ? timeMs : 0;
+      const nodeMotionCalmFactor = isMotionEnabled ? motionCalmFactor : 0;
       const presentationMotionAmplitude =
         tone === "primary"
           ? 3.4
@@ -1804,7 +1831,7 @@ function materializeOrbitalScene(
         tone === "primary" ? 16 : tone === "direct" ? 9 : tone === "secondary" ? 4 : 0;
       const angle =
         layoutNode.orbit.baseAngle +
-        timeMs * layoutNode.orbit.speed * layoutNode.orbit.direction * motionCalmFactor +
+        nodeTimeMs * layoutNode.orbit.speed * layoutNode.orbit.direction * nodeMotionCalmFactor +
         layoutNode.orbit.wobble;
       const localX = Math.cos(angle) * layoutNode.orbit.rx;
       const localY = Math.sin(angle) * layoutNode.orbit.ry;
@@ -1825,17 +1852,17 @@ function materializeOrbitalScene(
       const tangentUnitX = -radialUnitY;
       const tangentUnitY = radialUnitX;
       const motionPhase =
-        timeMs * (layoutNode.orbit.speed * 26 + 0.00042) +
+        nodeTimeMs * (layoutNode.orbit.speed * 26 + 0.00042) +
         layoutNode.orbit.baseAngle * 1.85 +
         layoutNode.depth * 0.38;
-      const radialLift = orbitExpansion * 0.56 * motionCalmFactor;
+      const radialLift = orbitExpansion * 0.56 * nodeMotionCalmFactor;
       const radialOffset =
-        radialLift + Math.sin(motionPhase) * presentationMotionAmplitude * motionCalmFactor;
+        radialLift + Math.sin(motionPhase) * presentationMotionAmplitude * nodeMotionCalmFactor;
       const tangentOffset =
         Math.cos(motionPhase * 0.72) *
         presentationMotionAmplitude *
         0.16 *
-        motionCalmFactor;
+        nodeMotionCalmFactor;
 
       x = orbitalX + radialUnitX * radialOffset + tangentUnitX * tangentOffset;
       y = orbitalY + radialUnitY * radialOffset + tangentUnitY * tangentOffset;
@@ -2097,6 +2124,7 @@ export default function OrbitalMapView({
   onCreateProject,
   onRenameProject,
   onUpdateProjectPosition,
+  onUpdateProjectSortOrder,
   onUpdateProjectColor,
   onDeleteProject,
   onCreateFolder,
@@ -2476,7 +2504,8 @@ export default function OrbitalMapView({
     () => localVaultOptions.findIndex((item) => item.id === activeLocalVaultId),
     [activeLocalVaultId, localVaultOptions]
   );
-  const currentProjectId = activeProjectId ?? orbitalData.projects[0]?.id ?? null;
+  const currentProjectId =
+    activeProjectId && orbitalData.projectById.has(activeProjectId) ? activeProjectId : null;
   const currentProjectEntityId = currentProjectId ? getProjectEntityId(currentProjectId) : null;
   const currentProject = currentProjectId
     ? orbitalData.projectById.get(currentProjectId) ?? null
@@ -2540,14 +2569,6 @@ export default function OrbitalMapView({
   const vaultVisibleAssets = useMemo(
     () => assets.filter((asset) => orbitalData.noteById.has(asset.noteId)),
     [assets, orbitalData.noteById]
-  );
-  const vaultTextNoteCount = useMemo(
-    () => visibleNotes.filter((note) => note.contentType !== "canvas").length,
-    [visibleNotes]
-  );
-  const vaultCanvasCount = useMemo(
-    () => visibleNotes.filter((note) => note.contentType === "canvas").length,
-    [visibleNotes]
   );
   const vaultPinnedCount = useMemo(
     () => visibleNotes.filter((note) => isEntryFavorite(note)).length,
@@ -2926,15 +2947,41 @@ export default function OrbitalMapView({
     () => buildOrbitalLayout(orbitalData, sceneVisibleEntityIds, language),
     [language, orbitalData, sceneVisibleEntityIds]
   );
+  const sceneMovingEntityIds = useMemo(() => {
+    const movingEntityIds = new Set<string>();
+    const selectedProjectId = getEntityProjectId(selectedEntityId, orbitalData);
+
+    const addProject = (projectId: string | null | undefined) => {
+      if (!projectId) {
+        return;
+      }
+
+      collectProjectEntityIds(projectId, orbitalData).forEach((entityId) => {
+        movingEntityIds.add(entityId);
+      });
+    };
+
+    addProject(currentProjectId);
+    addProject(selectedProjectId);
+
+    orbitalData.noteById.forEach((note) => {
+      if (isEntryFavorite(note)) {
+        movingEntityIds.add(`note:${note.id}`);
+      }
+    });
+
+    return movingEntityIds;
+  }, [currentProjectId, orbitalData, selectedEntityId]);
   const scene = useMemo(
     () =>
       materializeOrbitalScene(
         sceneLayout,
         timeMs,
         sceneToneByEntityId,
-        isMobilePreviewMode ? 0.82 : 1
+        isMobilePreviewMode ? 0.82 : 1,
+        sceneMovingEntityIds
       ),
-    [isMobilePreviewMode, sceneLayout, sceneToneByEntityId, timeMs]
+    [isMobilePreviewMode, sceneLayout, sceneMovingEntityIds, sceneToneByEntityId, timeMs]
   );
   const isLowDensityDisplay = devicePixelRatio < LOW_DENSITY_DPR_THRESHOLD;
 
@@ -3436,14 +3483,6 @@ export default function OrbitalMapView({
     selectedNode || currentProjectNode || renderedScene.nodes.find((node) => node.kind === "core");
   const visibleBodies = Math.max(renderedScene.nodes.filter((node) => node.kind !== "core").length, 0);
   const hiddenBodies = Math.max(orbitalData.totalEntities - renderedScene.nodes.length, 0);
-  const currentProjectTextNoteCount = useMemo(
-    () => currentProjectNotes.filter((note) => note.contentType !== "canvas").length,
-    [currentProjectNotes]
-  );
-  const currentProjectCanvasCount = useMemo(
-    () => currentProjectNotes.filter((note) => note.contentType === "canvas").length,
-    [currentProjectNotes]
-  );
   const pinnedCount = useMemo(
     () => currentProjectNotes.filter((note) => isEntryFavorite(note)).length,
     [currentProjectNotes]
@@ -3459,7 +3498,12 @@ export default function OrbitalMapView({
       ? ORBIT_IDLE_FRAME_MS_LARGE
       : ORBIT_IDLE_FRAME_MS;
   const isOrbitAnimationSuspended =
-    isPaused || editorOpen || activeModal !== null || !isDocumentVisible || prefersReducedMotion;
+    isPaused ||
+    editorOpen ||
+    activeModal !== null ||
+    !isDocumentVisible ||
+    prefersReducedMotion ||
+    sceneMovingEntityIds.size === 0;
   useEffect(() => {
     const shouldSnapImmediately =
       prefersReducedMotion ||
@@ -3543,8 +3587,8 @@ export default function OrbitalMapView({
       return;
     }
 
-    if (!activeProjectId || !orbitalData.projectById.has(activeProjectId)) {
-      setActiveProjectId(orbitalData.projects[0]?.id ?? null);
+    if (activeProjectId && !orbitalData.projectById.has(activeProjectId)) {
+      setActiveProjectId(null);
     }
   }, [activeProjectId, orbitalData.projectById, orbitalData.projects]);
 
@@ -4019,6 +4063,20 @@ export default function OrbitalMapView({
 
     closeSelectionHoverPreview();
     setSelectedEntityId(null);
+    setActiveFolderFilters([]);
+    setActiveNoteFilters([]);
+
+    if (effectiveInspectorMenu !== "overview") {
+      if (isVaultInspectorScope) {
+        setActiveProjectId(null);
+        setInspectorHierarchyScope("vault");
+      }
+
+      return;
+    }
+
+    setActiveProjectId(null);
+    setInspectorHierarchyScope("vault");
     openInspectorMenu("overview");
   };
 
@@ -4116,12 +4174,18 @@ export default function OrbitalMapView({
     onOpenNote(createdCanvas.id);
   };
 
-  const handleCreateProject = async () => {
+  const handleCreateProject = async (name: string) => {
+    const normalizedName = name.trim();
+
+    if (!normalizedName) {
+      return;
+    }
+
     const position = findOpenProjectPosition(projectsWithDraftPositions);
-    const project = await onCreateProject(position.x, position.y);
-    setActiveProjectId(project.id);
+    const project = await onCreateProject(position.x, position.y, normalizedName);
+    setActiveProjectId(null);
     setSelectedEntityId(getProjectEntityId(project.id));
-    setInspectorHierarchyScope("project");
+    setInspectorHierarchyScope("vault");
     setInspectorMenu("overview");
     animateCameraTo({
       x: -position.x,
@@ -5116,8 +5180,8 @@ export default function OrbitalMapView({
     ? orbitalData.projects.findIndex((project) => project.id === currentProjectId)
     : -1;
   const canNavigateProjects = orbitalData.projects.length > 1;
-  const isSystemOverview = effectiveInspectorMenu === "overview" && selectedNode?.kind === "core";
-  const isVaultOverview = effectiveInspectorMenu === "overview" && !selectedNode;
+  const isSystemOverview = effectiveInspectorMenu === "overview" && Boolean(currentProjectId);
+  const isVaultOverview = effectiveInspectorMenu === "overview" && !currentProjectId;
   const overviewProjectItems = useMemo<OrbitalOverviewProjectItem[]>(() => {
     const folderCounts = new Map<string, number>();
     const documentCounts = new Map<string, number>();
@@ -5152,9 +5216,9 @@ export default function OrbitalMapView({
       documentCount: documentCounts.get(project.id) ?? 0,
       folderCount: folderCounts.get(project.id) ?? 0,
       updatedAt: updatedAtByProject.get(project.id) ?? project.updatedAt,
-      isActive: project.id === currentProjectId
+      isActive: project.id === currentProjectId || selectedEntityId === getProjectEntityId(project.id)
     }));
-  }, [currentProjectId, folders, language, orbitalData.projects, visibleNotes]);
+  }, [currentProjectId, folders, language, orbitalData.projects, selectedEntityId, visibleNotes]);
   const vaultOverviewRecentItems = useMemo<OrbitalOverviewRecentItem[]>(() => {
     const folderItems = folders.map((folder) => ({
       id: folder.id,
@@ -5205,25 +5269,22 @@ export default function OrbitalMapView({
     : labels.empty;
   const currentSystemOverviewLinks: OrbitalOverviewLinkItem[] = [
     {
-      id: "notes",
-      label: labels.documentsMenu,
-      meta: currentProject?.name ?? labels.system,
-      count: currentProjectNotes.length,
-      icon: "note",
-      color: DEFAULT_NOTE_COLOR
-    },
-    {
       id: "folders",
       label: labels.foldersStat,
-      meta: currentProject?.name ?? labels.system,
       count: currentProjectFolders.length,
       icon: "folder",
       color: DEFAULT_FOLDER_COLOR
     },
     {
+      id: "notes",
+      label: labels.documentsMenu,
+      count: currentProjectNotes.length,
+      icon: "note",
+      color: DEFAULT_NOTE_COLOR
+    },
+    {
       id: "tags",
       label: labels.tagsStat,
-      meta: currentProject?.name ?? labels.system,
       count: currentProjectTagCounts.size,
       icon: "tag",
       color: "#73f7ff"
@@ -5231,7 +5292,6 @@ export default function OrbitalMapView({
     {
       id: "files",
       label: labels.assetsStat,
-      meta: currentProject?.name ?? labels.system,
       count: currentProjectAssets.length,
       icon: "file",
       color: "#74f1b6"
@@ -5239,7 +5299,6 @@ export default function OrbitalMapView({
     {
       id: "colors",
       label: labels.colorsStat,
-      meta: currentProject?.name ?? labels.system,
       count: colorCounts.size,
       icon: "color",
       color: "#ffd57e"
@@ -5247,7 +5306,6 @@ export default function OrbitalMapView({
     {
       id: "pinned",
       label: labels.pinnedStat,
-      meta: currentProject?.name ?? labels.system,
       count: pinnedCount,
       icon: "note",
       color: "#ffd57e"
@@ -5256,16 +5314,14 @@ export default function OrbitalMapView({
   const vaultOverviewLinks: OrbitalOverviewLinkItem[] = [
     {
       id: "folders",
-      label: labels.projectsStat,
-      meta: labels.localVault,
-      count: orbitalData.projects.length,
-      icon: "project",
-      color: DEFAULT_PROJECT_COLOR
+      label: labels.foldersStat,
+      count: folders.length,
+      icon: "folder",
+      color: DEFAULT_FOLDER_COLOR
     },
     {
       id: "notes",
       label: labels.documentsMenu,
-      meta: labels.localVault,
       count: visibleNotes.length,
       icon: "note",
       color: DEFAULT_NOTE_COLOR
@@ -5273,7 +5329,6 @@ export default function OrbitalMapView({
     {
       id: "tags",
       label: labels.tagsStat,
-      meta: labels.localVault,
       count: vaultTagCounts.size,
       icon: "tag",
       color: "#73f7ff"
@@ -5281,7 +5336,6 @@ export default function OrbitalMapView({
     {
       id: "files",
       label: labels.assetsStat,
-      meta: labels.localVault,
       count: vaultVisibleAssets.length,
       icon: "file",
       color: "#74f1b6"
@@ -5289,7 +5343,6 @@ export default function OrbitalMapView({
     {
       id: "colors",
       label: labels.colorsStat,
-      meta: labels.localVault,
       count: vaultColorCounts.size,
       icon: "color",
       color: "#ffd57e"
@@ -5297,56 +5350,9 @@ export default function OrbitalMapView({
     {
       id: "pinned",
       label: labels.pinnedStat,
-      meta: labels.localVault,
       count: vaultPinnedCount,
       icon: "note",
       color: "#ffd57e"
-    }
-  ];
-  const systemOverviewStats: OrbitalOverviewMetric[] = [
-    {
-      id: "folders",
-      label: labels.foldersStat,
-      value: currentProjectFolders.length,
-      tone: "folder"
-    },
-    {
-      id: "notes",
-      label: labels.notesStat,
-      value: currentProjectTextNoteCount,
-      tone: "note"
-    },
-    {
-      id: "canvas",
-      label: labels.canvas,
-      value: currentProjectCanvasCount,
-      tone: "canvas"
-    }
-  ];
-  const vaultOverviewStats: OrbitalOverviewMetric[] = [
-    {
-      id: "projects",
-      label: labels.projectsStat,
-      value: orbitalData.projects.length,
-      tone: "project"
-    },
-    {
-      id: "notes",
-      label: labels.notesStat,
-      value: vaultTextNoteCount,
-      tone: "note"
-    },
-    {
-      id: "canvas",
-      label: labels.canvas,
-      value: vaultCanvasCount,
-      tone: "canvas"
-    },
-    {
-      id: "assets",
-      label: labels.assetsStat,
-      value: vaultVisibleAssets.length,
-      tone: "asset"
     }
   ];
   const preferredHierarchyContextEntityId = useMemo(() => {
@@ -6265,7 +6271,12 @@ export default function OrbitalMapView({
     item: InspectorHierarchyItem,
     event: ReactPointerEvent<HTMLButtonElement>
   ) => {
-    if (event.button !== 0 || event.pointerType === "touch" || item.kind === "core") {
+    if (
+      event.button !== 0 ||
+      event.pointerType === "mouse" ||
+      event.pointerType === "touch" ||
+      item.kind === "core"
+    ) {
       return;
     }
 
@@ -7259,12 +7270,13 @@ export default function OrbitalMapView({
               }`}
               ref={(node) => registerInspectorHierarchyItemRef(item.entityId, node)}
               title={metaLabel}
-              draggable={false}
+              draggable={item.kind !== "core"}
               onDragStart={(event) => handleHierarchyDragStart(item, event)}
               onDragOver={(event) => handleHierarchyDragOver(item, event)}
               onDrop={(event) => handleHierarchyDrop(item, event)}
               onDragEnd={() => {
                 inspectorDragItemsRef.current = [];
+                inspectorPointerDragRef.current = null;
                 setInspectorDropIntent(null);
               }}
               onClick={(event) => {
@@ -7590,7 +7602,16 @@ export default function OrbitalMapView({
     setInspectorHierarchyScope(isVaultOverview ? "vault" : "project");
     openInspectorMenu(menu);
   };
-  const handleOverviewSelectProject = (projectId: string) => {
+  const handleOverviewFocusProject = (projectId: string) => {
+    setSelectedEntityId(getProjectEntityId(projectId));
+    setActiveProjectId(null);
+    setInspectorHierarchyScope("vault");
+    setActiveFolderFilters([]);
+    setActiveNoteFilters([]);
+    openInspectorMenu("overview");
+    centerOnProject(projectId, 760);
+  };
+  const handleOverviewOpenProject = (projectId: string) => {
     setActiveProjectId(projectId);
     setSelectedEntityId(getProjectEntityId(projectId));
     setInspectorHierarchyScope("project");
@@ -7599,8 +7620,99 @@ export default function OrbitalMapView({
     openInspectorMenu("overview");
     centerOnProject(projectId, 760);
   };
+  const handleOverviewMoveProject = (
+    draggedProjectId: string,
+    targetProjectId: string,
+    placement: "before" | "after"
+  ) => {
+    if (draggedProjectId === targetProjectId) {
+      return;
+    }
+
+    const reorderedProjects = orbitalData.projects.filter((project) => project.id !== draggedProjectId);
+    const targetIndex = reorderedProjects.findIndex((project) => project.id === targetProjectId);
+
+    if (targetIndex < 0) {
+      return;
+    }
+
+    const previousProject =
+      placement === "before"
+        ? reorderedProjects[targetIndex - 1] ?? null
+        : reorderedProjects[targetIndex] ?? null;
+    const nextProject =
+      placement === "before"
+        ? reorderedProjects[targetIndex] ?? null
+        : reorderedProjects[targetIndex + 1] ?? null;
+    const [sortOrder] = getDropSortOrders(
+      previousProject ? getHierarchySortOrder(previousProject) : null,
+      nextProject ? getHierarchySortOrder(nextProject) : null,
+      1
+    );
+
+    if (typeof sortOrder === "number") {
+      onUpdateProjectSortOrder(draggedProjectId, sortOrder);
+    }
+  };
+  const buildOverviewProjectContextTarget = (
+    projectId: string
+  ): InspectorContextMenuTarget | null => {
+    const project = orbitalData.projectById.get(projectId);
+
+    if (!project) {
+      return null;
+    }
+
+    return {
+      kind: "core",
+      project,
+      label: getDisplayProjectName(
+        project,
+        language,
+        orbitalData.projects.findIndex((entry) => entry.id === project.id)
+      ),
+      color: project.color || DEFAULT_PROJECT_COLOR
+    };
+  };
+  const handleOverviewProjectContextMenu = (
+    projectId: string,
+    event: ReactMouseEvent<HTMLButtonElement>
+  ) => {
+    event.preventDefault();
+    const target = buildOverviewProjectContextTarget(projectId);
+
+    if (!target) {
+      return;
+    }
+
+    setSelectedEntityId(getProjectEntityId(projectId));
+    setActiveProjectId(null);
+    setInspectorHierarchyScope("vault");
+    setActiveFolderFilters([]);
+    setActiveNoteFilters([]);
+    openInspectorMenu("overview");
+    openInspectorContextMenu(
+      target,
+      "popover",
+      {
+        x: event.clientX,
+        y: event.clientY
+      },
+      {
+        selectTarget: false
+      }
+    );
+  };
+  const renderOverviewProjectRenameField = (project: OrbitalOverviewProjectItem) => {
+    const target = buildOverviewProjectContextTarget(project.id);
+
+    return target
+      ? renderInspectorRenameField(target, "orbital-inspector-overview-project-input")
+      : null;
+  };
   const handleOverviewBackToVault = () => {
     setSelectedEntityId(null);
+    setActiveProjectId(null);
     setInspectorHierarchyScope("vault");
     setActiveFolderFilters([]);
     setActiveNoteFilters([]);
@@ -7611,7 +7723,8 @@ export default function OrbitalMapView({
     const projectId = getEntityProjectId(item.entityId, orbitalData);
 
     selectInspectorEntity(item.entityId, projectId, {
-      centerInScene: true
+      centerInScene: true,
+      preserveProjectContext: isVaultOverview
     });
   };
   const buildOverviewRecentContextTarget = (
@@ -7729,7 +7842,6 @@ export default function OrbitalMapView({
         projectCount={orbitalData.projects.length}
         canNavigateProjects={canNavigateProjects}
         projects={overviewProjectItems}
-        metrics={isVaultOverview ? vaultOverviewStats : systemOverviewStats}
         links={overviewLinks}
         recentItems={overviewRecentItems}
         lastUpdatedLabel={labels.lastUpdated}
@@ -7738,7 +7850,9 @@ export default function OrbitalMapView({
         labels={labels}
         colorButtonRef={overviewColorTriggerRef}
         isColorPanelOpen={isOverviewColorPanelOpen}
-        onAddProject={() => void handleCreateProject()}
+        editingProjectId={inspectorRenameState?.kind === "core" ? inspectorRenameState.id : null}
+        renderProjectRenameField={renderOverviewProjectRenameField}
+        onAddProject={(name) => void handleCreateProject(name)}
         onAddFolder={() => {
           if (!currentProjectId) {
             return;
@@ -7770,7 +7884,10 @@ export default function OrbitalMapView({
           void onDeleteProject(currentProjectId);
         }}
         onOpenLink={openOverviewMenu}
-        onSelectProject={handleOverviewSelectProject}
+        onFocusProject={handleOverviewFocusProject}
+        onOpenProject={handleOverviewOpenProject}
+        onMoveProject={handleOverviewMoveProject}
+        onProjectContextMenu={handleOverviewProjectContextMenu}
         onSelectRecentItem={handleOverviewRecentItemSelect}
         onOpenRecentItem={handleOverviewRecentItemOpen}
         onRecentContextMenu={handleOverviewRecentItemContextMenu}
@@ -8744,6 +8861,7 @@ export default function OrbitalMapView({
                 const isRootEntry = node.kind === "note" && !node.note?.folderId;
                 const labelText = truncateLabel(node.label, 24);
                 const labelWidth = estimateLabelWidth(labelText) + (node.kind === "core" ? 0 : 16);
+                const nodeCoreFlareRotation = sceneMovingEntityIds.has(node.entityId) ? coreFlareRotation : 0;
                 const showLabel =
                   node.kind === "core" ||
                   isSelected ||
@@ -8870,7 +8988,7 @@ export default function OrbitalMapView({
                       <>
                         <circle r={node.radius * 1.72} className="orbital-core-halo" />
                         <circle r={node.radius * 2.24} className="orbital-core-corona" />
-                        <g transform={`rotate(${coreFlareRotation})`}>
+                        <g transform={`rotate(${nodeCoreFlareRotation})`}>
                           <polygon
                             points={buildStarburstPoints(node.radius * 1.06, node.radius * 1.82, 10)}
                             className="orbital-core-flare"

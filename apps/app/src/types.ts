@@ -59,6 +59,7 @@ export interface Project {
   color: string;
   x: number;
   y: number;
+  sortOrder?: number;
   createdAt: number;
   updatedAt: number;
 }

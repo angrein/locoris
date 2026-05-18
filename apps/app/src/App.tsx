@@ -47,6 +47,7 @@ import {
   updateFolderColor,
   updateProjectColor,
   updateProjectPosition,
+  updateProjectSortOrder,
   updateNoteMeta
 } from "./data/db";
 import { createEncryptionDescriptor, verifyEncryptionPassphrase } from "./lib/e2ee";
@@ -1486,8 +1487,8 @@ export default function App() {
     return canvas;
   };
 
-  const handleCreateProjectNode = async (x: number, y: number) => {
-    const project = await createProject("", x, y);
+  const handleCreateProjectNode = async (x: number, y: number, name = "") => {
+    const project = await createProject(name.trim(), x, y);
     requestAutoSync({
       delayMs: 1500
     });
@@ -1510,6 +1511,16 @@ export default function App() {
     if (changed) {
       requestAutoSync({
         delayMs: 2600
+      });
+    }
+  };
+
+  const handleUpdateProjectSortOrder = async (projectId: string, sortOrder: number) => {
+    const changed = await updateProjectSortOrder(projectId, sortOrder);
+
+    if (changed) {
+      requestAutoSync({
+        delayMs: 1800
       });
     }
   };
@@ -3273,6 +3284,9 @@ export default function App() {
         onUpdateProjectPosition={(projectId, x, y) =>
           void handleUpdateProjectPosition(projectId, x, y)
         }
+        onUpdateProjectSortOrder={(projectId, sortOrder) =>
+          void handleUpdateProjectSortOrder(projectId, sortOrder)
+        }
         onUpdateProjectColor={(projectId, color) =>
           void handleUpdateProjectColor(projectId, color)
         }
@@ -3373,6 +3387,7 @@ export default function App() {
           vaultSync: t("orbit.vaultSync"),
           vaultActivity: t("orbit.vaultActivity"),
           vaultStructure: t("orbit.vaultStructure"),
+          overviewSections: t("orbit.overviewSections"),
           lastUpdated: t("orbit.lastUpdated"),
           trashStat: t("orbit.trashStat"),
           vaultRegular: t("orbit.vaultRegular"),

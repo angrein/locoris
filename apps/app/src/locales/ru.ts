@@ -875,6 +875,7 @@ const ru = {
     vaultSync: "Синхронизация",
     vaultActivity: "Активность",
     vaultStructure: "Структура",
+    overviewSections: "Разделы",
     lastUpdated: "Последнее изменение",
     trashStat: "В корзине",
     vaultRegular: "Обычный",

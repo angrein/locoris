@@ -964,6 +964,42 @@ export class ZenNotesDatabase extends Dexie {
             note.sortOrder ??= note.createdAt ?? now();
           });
       });
+
+    this.version(15)
+      .stores({
+        projects: "id,updatedAt",
+        folders: "id,projectId,parentId,sortOrder,updatedAt",
+        tags: "id,name,updatedAt",
+        notes:
+          "id,projectId,contentType,folderId,sortOrder,*tagIds,updatedAt,createdAt,pinned,favorite,archived,trashedAt,syncState,conflictOriginId,color",
+        assets: "id,noteId,updatedAt",
+        settings:
+          "id,syncProvider,syncStatus,syncCursor,selfHostedVaultId,hostedVaultId,hostedUserId,encryptionKeyId",
+        syncDirtyEntries: "key,entityType,entityId,updatedAt,deleted",
+        syncShadows: "key,entityType,entityId",
+        syncTombstones: "key,entityType,entityId,deletedAt"
+      })
+      .upgrade(async (transaction) => {
+        const projects = await transaction.table("projects").toArray();
+        const orderedProjects = [...projects].sort(
+          (left, right) =>
+            (left.createdAt ?? 0) - (right.createdAt ?? 0) ||
+            String(left.id).localeCompare(String(right.id))
+        );
+        const sortOrderById = new Map(
+          orderedProjects.map((project, index) => [
+            project.id,
+            SORT_ORDER_STEP * (index + 1)
+          ])
+        );
+
+        await transaction
+          .table("projects")
+          .toCollection()
+          .modify((project) => {
+            project.sortOrder ??= sortOrderById.get(project.id) ?? project.createdAt ?? SORT_ORDER_STEP;
+          });
+      });
   }
 }
 
@@ -1270,6 +1306,7 @@ export async function ensureSeedData() {
     color: DEFAULT_PROJECT_COLOR,
     x: 0,
     y: 0,
+    sortOrder: SORT_ORDER_STEP,
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -1667,13 +1704,15 @@ export async function sanitizePersistedLocalVaultSecrets(localVaultIds: readonly
 
 export async function createProject(name: string, x: number, y: number, color?: string) {
   const timestamp = now();
-  const count = await db.projects.count();
+  const projects = await db.projects.toArray();
+  const count = projects.length;
   const project: Project = {
     id: crypto.randomUUID(),
     name,
     color: color ?? createColor(NODE_COLORS, count + 5),
     x,
     y,
+    sortOrder: getNextSortOrder(projects),
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -1698,6 +1737,25 @@ export async function updateProjectPosition(projectId: string, x: number, y: num
     await db.projects.update(projectId, {
       x,
       y,
+      updatedAt: timestamp
+    });
+    await putSyncDirtyEntry("project", projectId, timestamp);
+  });
+  scheduleActiveLocalVaultDesktopBackup();
+  return true;
+}
+
+export async function updateProjectSortOrder(projectId: string, sortOrder: number) {
+  const project = await db.projects.get(projectId);
+
+  if (!project || project.sortOrder === sortOrder) {
+    return false;
+  }
+
+  const timestamp = now();
+  await db.transaction("rw", [db.projects, db.syncDirtyEntries], async () => {
+    await db.projects.update(projectId, {
+      sortOrder,
       updatedAt: timestamp
     });
     await putSyncDirtyEntry("project", projectId, timestamp);

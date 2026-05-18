@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { BlockNoteView } from "@blocknote/mantine";
 import { en, ru } from "@blocknote/core/locales";
 import {
+  FilePanelController,
   FormattingToolbarController,
   LinkToolbarController,
   useCreateBlockNote
@@ -1889,7 +1890,7 @@ export default function EditorPane({
                 linkToolbar={false}
                 slashMenu
                 sideMenu
-                filePanel
+                filePanel={false}
                 tableHandles
                 emojiPicker
                 comments={false}
@@ -1903,6 +1904,9 @@ export default function EditorPane({
                     elementProps: {
                       style: {
                         zIndex: 60
+                      },
+                      onMouseDown: (event) => {
+                        event.preventDefault();
                       }
                     }
                   }}
@@ -1915,6 +1919,24 @@ export default function EditorPane({
                     elementProps: {
                       style: {
                         zIndex: 62
+                      },
+                      onPointerDown: (event) => {
+                        event.stopPropagation();
+                      }
+                    }
+                  }}
+                />
+                <FilePanelController
+                  floatingUIOptions={{
+                    useFloatingOptions: {
+                      strategy: "fixed"
+                    },
+                    elementProps: {
+                      style: {
+                        zIndex: 64
+                      },
+                      onPointerDown: (event) => {
+                        event.stopPropagation();
                       }
                     }
                   }}

@@ -44,10 +44,10 @@
 .orbital-inspector-overview-glyph {
   position: relative;
   flex: none;
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   display: block;
-  border-radius: 16px;
+  border-radius: 14px;
   background:
     linear-gradient(145deg, color-mix(in srgb, var(--overview-card-accent) 18%, rgba(255, 255, 255, 0.04)), rgba(255, 255, 255, 0.02)),
     rgba(8, 12, 26, 0.72);
@@ -59,18 +59,18 @@
 .orbital-inspector-overview-glyph-ring,
 .orbital-inspector-overview-glyph-core {
   position: absolute;
-  inset: 9px;
+  inset: 7px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--overview-card-accent) 45%, rgba(255, 255, 255, 0.12));
 }
 
 .orbital-inspector-overview-glyph-ring.is-inner {
-  inset: 14px;
+  inset: 12px;
   opacity: 0.58;
 }
 
 .orbital-inspector-overview-glyph-core {
-  inset: 18px;
+  inset: 15px;
   border: 0;
   background: var(--overview-card-accent);
   box-shadow: 0 0 16px color-mix(in srgb, var(--overview-card-accent) 45%, transparent);
@@ -130,7 +130,8 @@
 }
 
 .orbital-inspector-overview-title .orbital-inline-title-button {
-  flex: 1;
+  flex: 0 1 auto;
+  max-width: calc(100% - 29px);
 }
 
 .orbital-inspector-overview-title .orbital-inline-title-edit {
@@ -214,6 +215,7 @@
 .orbital-inspector-overview-icon-action svg,
 .orbital-inspector-overview-tool svg,
 .orbital-inspector-overview-step svg,
+.orbital-inspector-overview-project-add svg,
 .orbital-inspector-overview-link-icon svg,
 .orbital-inspector-overview-recent-icon svg {
   width: 17px;
@@ -224,6 +226,7 @@
 .orbital-inspector-overview-icon-action svg *,
 .orbital-inspector-overview-tool svg *,
 .orbital-inspector-overview-step svg *,
+.orbital-inspector-overview-project-add svg *,
 .orbital-inspector-overview-link-icon svg *,
 .orbital-inspector-overview-recent-icon svg * {
   fill: none;
@@ -231,64 +234,6 @@
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.orbital-inspector-overview-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-}
-
-.orbital-inspector-overview-card.is-vault .orbital-inspector-overview-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.orbital-inspector-overview-metric {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-  padding: 7px 8px;
-  border-radius: 14px;
-  border: 1px solid rgb(var(--line-rgb) / 0.1);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
-    rgba(255, 255, 255, 0.018);
-}
-
-.orbital-inspector-overview-metric.is-project,
-.orbital-inspector-overview-metric.is-folder {
-  border-color: color-mix(in srgb, rgb(var(--gold-rgb) / 0.27) 60%, rgb(var(--line-rgb) / 0.12));
-}
-
-.orbital-inspector-overview-metric.is-note {
-  border-color: color-mix(in srgb, rgb(var(--cyan-rgb) / 0.24) 60%, rgb(var(--line-rgb) / 0.12));
-}
-
-.orbital-inspector-overview-metric.is-canvas {
-  border-color: color-mix(in srgb, rgb(var(--violet-rgb) / 0.27) 60%, rgb(var(--line-rgb) / 0.12));
-}
-
-.orbital-inspector-overview-metric.is-asset {
-  border-color: color-mix(in srgb, rgb(var(--green-rgb) / 0.27) 60%, rgb(var(--line-rgb) / 0.12));
-}
-
-.orbital-inspector-overview-metric strong {
-  min-width: 0;
-  color: rgba(241, 244, 255, 0.94);
-  font-size: 0.82rem;
-  line-height: 1.05;
-  letter-spacing: 0;
-}
-
-.orbital-inspector-overview-metric span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: rgba(181, 188, 216, 0.7);
-  font-size: 0.6rem;
-  line-height: 1.18;
-  letter-spacing: 0.02em;
 }
 
 .orbital-inspector-overview-project-tools {
@@ -354,6 +299,54 @@
   background: rgba(255, 103, 140, 0.07);
 }
 
+.orbital-inspector-overview-project-panel {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.orbital-inspector-overview-project-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.orbital-inspector-overview-project-add {
+  flex: none;
+  min-height: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--overview-card-accent) 22%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--overview-card-accent) 10%, rgba(255, 255, 255, 0.026)), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.018);
+  color: color-mix(in srgb, var(--overview-card-accent) 36%, rgba(240, 244, 255, 0.88));
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.orbital-inspector-overview-project-add:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--overview-card-accent) 36%, rgba(255, 255, 255, 0.16));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--overview-card-accent) 14%, rgba(255, 255, 255, 0.03)), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.024);
+}
+
+.orbital-inspector-overview-project-add svg {
+  width: 13px;
+  height: 13px;
+}
+
 .orbital-inspector-overview-projects {
   min-width: 0;
   display: grid;
@@ -362,6 +355,7 @@
 }
 
 .orbital-inspector-overview-project {
+  position: relative;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -378,6 +372,14 @@
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
+.orbital-inspector-overview-project[draggable="true"] {
+  cursor: grab;
+}
+
+.orbital-inspector-overview-project[draggable="true"]:active {
+  cursor: grabbing;
+}
+
 .orbital-inspector-overview-project:hover,
 .orbital-inspector-overview-project.is-active {
   transform: translateY(-1px);
@@ -385,6 +387,44 @@
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--overview-card-accent) 12%, rgba(255, 255, 255, 0.018)), rgba(255, 255, 255, 0.01)),
     rgba(255, 255, 255, 0.022);
+}
+
+.orbital-inspector-overview-project.is-drop-before,
+.orbital-inspector-overview-project.is-drop-after {
+  border-color: color-mix(in srgb, var(--overview-card-accent) 52%, rgba(255, 255, 255, 0.16));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--overview-card-accent) 26%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--overview-card-accent) 18%, transparent);
+}
+
+.orbital-inspector-overview-project.is-drop-before::before,
+.orbital-inspector-overview-project.is-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--overview-card-accent) 72%, #ffffff);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--overview-card-accent) 34%, transparent);
+  pointer-events: none;
+}
+
+.orbital-inspector-overview-project.is-drop-before::before {
+  top: 2px;
+}
+
+.orbital-inspector-overview-project.is-drop-after::after {
+  bottom: 2px;
+}
+
+.orbital-inspector-overview-project.is-draft,
+.orbital-inspector-overview-project.is-editing {
+  border-color: color-mix(in srgb, var(--overview-card-accent) 38%, rgba(255, 255, 255, 0.16));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--overview-card-accent) 11%, rgba(255, 255, 255, 0.02)), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.024);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--overview-card-accent) 16%, transparent);
 }
 
 .orbital-inspector-overview-project-dot {
@@ -419,6 +459,24 @@
   line-height: 1.1;
 }
 
+.orbital-inspector-overview-project-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0 0 2px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--overview-card-accent) 36%, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: rgba(242, 245, 255, 0.92);
+  outline: none;
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1.18;
+}
+
+.orbital-inspector-overview-project-input::placeholder {
+  color: rgba(184, 193, 226, 0.58);
+}
+
 .orbital-inspector-overview-project-more {
   display: inline-flex;
   align-items: center;
@@ -427,13 +485,25 @@
   padding: 6px 8px;
   border-radius: 14px;
   border: 1px dashed rgb(var(--line-rgb) / 0.16);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--overview-card-accent) 9%, rgba(255, 255, 255, 0.02)), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.018);
   color: rgba(198, 206, 237, 0.68);
   font-size: 0.66rem;
+  transition: transform 160ms ease, border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.orbital-inspector-overview-project-more:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--overview-card-accent) 32%, rgba(255, 255, 255, 0.16));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--overview-card-accent) 13%, rgba(255, 255, 255, 0.024)), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.024);
+  color: rgba(236, 241, 255, 0.84);
 }
 
 .orbital-inspector-overview-link-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
   padding: 9px;
   border-radius: 20px;
@@ -442,13 +512,21 @@
     rgba(7, 10, 24, 0.54);
 }
 
+.orbital-inspector-overview-link-list {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
 .orbital-inspector-overview-link {
   min-width: 0;
-  min-height: 42px;
-  display: flex;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
-  padding: 7px 8px;
+  gap: 6px;
+  padding: 7px;
   border-radius: 14px;
   border: 1px solid rgb(var(--line-rgb) / 0.1);
   background:
@@ -472,9 +550,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 9px;
   border: 1px solid color-mix(in srgb, var(--overview-card-accent) 23%, rgb(var(--line-rgb) / 0.12));
   background: color-mix(in srgb, var(--overview-card-accent) 10%, rgba(255, 255, 255, 0.018));
   color: color-mix(in srgb, var(--overview-card-accent) 52%, rgba(239, 244, 255, 0.9));
@@ -482,28 +560,15 @@
 
 .orbital-inspector-overview-link-copy {
   min-width: 0;
-  display: grid;
-  gap: 1px;
-  flex: 1;
-}
-
-.orbital-inspector-overview-link-label,
-.orbital-inspector-overview-link-meta {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
 }
 
 .orbital-inspector-overview-link-label {
+  min-width: 0;
+  display: block;
+  overflow-wrap: anywhere;
   color: rgba(240, 243, 255, 0.88);
-  font-size: 0.66rem;
-  line-height: 1.14;
-}
-
-.orbital-inspector-overview-link-meta {
-  color: rgba(176, 185, 216, 0.58);
-  font-size: 0.56rem;
+  font-size: 0.64rem;
   line-height: 1.12;
 }
 
@@ -536,6 +601,16 @@
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+.orbital-inspector-overview-sectiontitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(235, 239, 255, 0.82);
+  font-size: 0.68rem;
+  line-height: 1.15;
 }
 
 .orbital-inspector-overview-sectionbutton {
@@ -692,15 +767,9 @@
   }
 
   .orbital-inspector-overview-glyph {
-    width: 38px;
-    height: 38px;
-    border-radius: 15px;
-  }
-
-  .orbital-inspector-overview-metrics,
-  .orbital-inspector-overview-card.is-vault .orbital-inspector-overview-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: 13px;
   }
 
   .orbital-inspector-overview-project-tools {
@@ -716,7 +785,7 @@
     grid-template-columns: 1fr;
   }
 
-  .orbital-inspector-overview-link-grid {
+  .orbital-inspector-overview-link-list {
     grid-template-columns: 1fr;
   }
 }

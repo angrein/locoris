@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import "./OrbitalInspectorContextMenu.css";
 
@@ -62,6 +62,18 @@ type AnchoredRect = {
 };
 
 type ColorPanelPlacement = "right" | "left" | "bottom" | "top";
+type PopoverSize = {
+  width: number;
+  height: number;
+};
+
+function clampNumber(value: number, min: number, max: number) {
+  if (max < min) {
+    return min;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
 
 function toAnchoredRect(rect: DOMRect): AnchoredRect {
   return {
@@ -202,7 +214,9 @@ export default function OrbitalInspectorContextMenu({
   const [showColorPanel, setShowColorPanel] = useState(false);
   const previousOpenRef = useRef(open);
   const colorTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuCardRef = useRef<HTMLDivElement | null>(null);
   const [colorPanelAnchorRect, setColorPanelAnchorRect] = useState<AnchoredRect | null>(null);
+  const [popoverSize, setPopoverSize] = useState<PopoverSize | null>(null);
   const style = useMemo(() => {
     if (presentation !== "popover" || !position) {
       return undefined;
@@ -210,16 +224,66 @@ export default function OrbitalInspectorContextMenu({
 
     const viewportWidth = typeof window === "undefined" ? 1440 : window.innerWidth;
     const viewportHeight = typeof window === "undefined" ? 900 : window.innerHeight;
-    const width = Math.min(300, viewportWidth - 24);
-    const approximateHeight = 320;
-    const left = Math.min(Math.max(12, position.x), viewportWidth - width - 12);
-    const top = Math.min(Math.max(12, position.y), viewportHeight - approximateHeight - 12);
+    const viewportPadding = 12;
+    const maxWidth = viewportWidth - viewportPadding * 2;
+    const maxHeight = viewportHeight - viewportPadding * 2;
+    const width = Math.min(popoverSize?.width ?? 300, maxWidth);
+    const height = Math.min(popoverSize?.height ?? 320, maxHeight);
+    const left = clampNumber(position.x, viewportPadding, viewportWidth - width - viewportPadding);
+    const top = clampNumber(position.y, viewportPadding, viewportHeight - height - viewportPadding);
 
     return {
       "--context-menu-left": `${left}px`,
-      "--context-menu-top": `${top}px`
+      "--context-menu-top": `${top}px`,
+      "--context-menu-max-height": `${maxHeight}px`
     } as CSSProperties;
-  }, [position, presentation]);
+  }, [popoverSize, position, presentation]);
+
+  useLayoutEffect(() => {
+    if (!open || presentation !== "popover") {
+      setPopoverSize(null);
+      return undefined;
+    }
+
+    const measure = () => {
+      const rect = menuCardRef.current?.getBoundingClientRect();
+
+      if (!rect) {
+        return;
+      }
+
+      const nextSize = {
+        width: rect.width,
+        height: rect.height
+      };
+
+      setPopoverSize((current) =>
+        current &&
+        Math.abs(current.width - nextSize.width) < 1 &&
+        Math.abs(current.height - nextSize.height) < 1
+          ? current
+          : nextSize
+      );
+    };
+
+    measure();
+    const frameId = window.requestAnimationFrame(measure);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", measure);
+    };
+  }, [
+    actions.length,
+    colorOptions.length,
+    kindLabel,
+    open,
+    presentation,
+    quickActions.length,
+    showColorPanel,
+    title
+  ]);
 
   useEffect(() => {
     if (open && !previousOpenRef.current) {
@@ -269,10 +333,6 @@ export default function OrbitalInspectorContextMenu({
     };
   }, [open, presentation, showColorPanel]);
 
-  if (!open) {
-    return null;
-  }
-
   const menuClassName =
     presentation === "sheet"
       ? "orbital-context-menu-card is-sheet"
@@ -298,34 +358,33 @@ export default function OrbitalInspectorContextMenu({
       top: colorPanelAnchorRect.top - viewportPadding - gap
     };
 
-    const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
     const candidates = [
       {
         placement: "right" as const,
         fits: room.right >= width,
         score: room.right,
         left: colorPanelAnchorRect.right + gap,
-        top: clamp(colorPanelAnchorRect.top - 6, viewportPadding, viewportHeight - height - viewportPadding)
+        top: clampNumber(colorPanelAnchorRect.top - 6, viewportPadding, viewportHeight - height - viewportPadding)
       },
       {
         placement: "left" as const,
         fits: room.left >= width,
         score: room.left,
         left: colorPanelAnchorRect.left - gap - width,
-        top: clamp(colorPanelAnchorRect.top - 6, viewportPadding, viewportHeight - height - viewportPadding)
+        top: clampNumber(colorPanelAnchorRect.top - 6, viewportPadding, viewportHeight - height - viewportPadding)
       },
       {
         placement: "bottom" as const,
         fits: room.bottom >= height,
         score: room.bottom,
-        left: clamp(colorPanelAnchorRect.left, viewportPadding, viewportWidth - width - viewportPadding),
+        left: clampNumber(colorPanelAnchorRect.left, viewportPadding, viewportWidth - width - viewportPadding),
         top: colorPanelAnchorRect.bottom + gap
       },
       {
         placement: "top" as const,
         fits: room.top >= height,
         score: room.top,
-        left: clamp(colorPanelAnchorRect.left, viewportPadding, viewportWidth - width - viewportPadding),
+        left: clampNumber(colorPanelAnchorRect.left, viewportPadding, viewportWidth - width - viewportPadding),
         top: colorPanelAnchorRect.top - gap - height
       }
     ];
@@ -338,13 +397,17 @@ export default function OrbitalInspectorContextMenu({
       [...candidates].sort((left, right) => right.score - left.score)[0];
 
     return {
-      left: clamp(chosen.left, viewportPadding, viewportWidth - width - viewportPadding),
-      top: clamp(chosen.top, viewportPadding, viewportHeight - height - viewportPadding),
+      left: clampNumber(chosen.left, viewportPadding, viewportWidth - width - viewportPadding),
+      top: clampNumber(chosen.top, viewportPadding, viewportHeight - height - viewportPadding),
       width,
       maxHeight: height,
       placement: chosen.placement as ColorPanelPlacement
     };
   }, [colorPanelAnchorRect, isFloatingColorPanel, showColorPanel]);
+
+  if (!open) {
+    return null;
+  }
 
   const renderColorPanel = (className: string) => (
     <div
@@ -453,6 +516,7 @@ export default function OrbitalInspectorContextMenu({
         onClick={onClose}
       />
       <div
+        ref={menuCardRef}
         className={menuClassName}
         style={{ "--menu-accent": accentColor } as CSSProperties}
         onPointerDown={(event) => event.stopPropagation()}
