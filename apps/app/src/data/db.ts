@@ -66,6 +66,7 @@ import type {
 import type { BinaryFileData, BinaryFiles } from "@excalidraw/excalidraw/types";
 
 const assetUrlCache = new Map<string, string>();
+const NEWLY_UPLOADED_ASSET_PRUNE_GRACE_MS = 12_000;
 
 function getSyncEntityKey(entityType: SyncEntityKind, entityId: string) {
   return `${entityType}:${entityId}`;
@@ -2754,7 +2755,11 @@ export async function saveNoteContent(noteId: string, content: NoteContent) {
     }
 
     const noteAssets = await db.assets.where("noteId").equals(noteId).toArray();
-    const staleAssets = noteAssets.filter((asset) => !activeAssetIds.has(asset.id));
+    const staleAssets = noteAssets.filter(
+      (asset) =>
+        !activeAssetIds.has(asset.id) &&
+        timestamp - Math.max(asset.createdAt, asset.updatedAt) > NEWLY_UPLOADED_ASSET_PRUNE_GRACE_MS
+    );
 
     const contentChanged =
       hasStableValueChanged(normalizeNoteContent(existingNote.content), normalizedContent) ||

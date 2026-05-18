@@ -4,7 +4,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -174,7 +173,8 @@ function Icon({
   if (kind === "back") {
     return (
       <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-        <path d="M14.8 6.5 9.3 12l5.5 5.5" />
+        <path d="M14.6 6.2 8.8 12l5.8 5.8" />
+        <path d="M9.4 12h9" />
       </svg>
     );
   }
@@ -316,6 +316,15 @@ function ProjectRail({
     placement: "before" | "after";
   } | null>(null);
   const draftInputRef = useRef<HTMLInputElement | null>(null);
+  const projectItemRefs = useRef(new Map<string, HTMLButtonElement>());
+  const projectPointerDragRef = useRef<{
+    pointerId: number;
+    projectId: string;
+    startX: number;
+    startY: number;
+    active: boolean;
+  } | null>(null);
+  const suppressProjectClickRef = useRef(false);
   const isSubmittingDraftRef = useRef(false);
   const isCancellingDraftRef = useRef(false);
 
@@ -342,12 +351,22 @@ function ProjectRail({
   }, [isExpanded, projects]);
   const hiddenCount = Math.max(projects.length - visibleProjects.length, 0);
 
-  const resolveDropPlacement = (
-    event: ReactDragEvent<HTMLButtonElement>
+  const registerProjectItemRef = (projectId: string, node: HTMLButtonElement | null) => {
+    if (node) {
+      projectItemRefs.current.set(projectId, node);
+      return;
+    }
+
+    projectItemRefs.current.delete(projectId);
+  };
+
+  const resolveDropPlacementFromRect = (
+    rect: DOMRect,
+    clientX: number,
+    clientY: number
   ): "before" | "after" => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const horizontalRatio = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
-    const verticalRatio = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+    const horizontalRatio = rect.width > 0 ? (clientX - rect.left) / rect.width : 0.5;
+    const verticalRatio = rect.height > 0 ? (clientY - rect.top) / rect.height : 0.5;
     const isHorizontalIntent = Math.abs(horizontalRatio - 0.5) > Math.abs(verticalRatio - 0.5);
     return (isHorizontalIntent ? horizontalRatio : verticalRatio) < 0.5 ? "before" : "after";
   };
@@ -355,6 +374,146 @@ function ProjectRail({
   const resetDragState = () => {
     setDraggedProjectId(null);
     setDropTarget(null);
+  };
+
+  const getProjectDropCandidate = (clientX: number, clientY: number) => {
+    if (typeof document === "undefined") {
+      return null;
+    }
+
+    const element = document.elementFromPoint(clientX, clientY);
+    const targetElement = element?.closest("[data-orbital-overview-project-id]") as
+      | HTMLButtonElement
+      | null;
+    const projectId = targetElement?.dataset.orbitalOverviewProjectId;
+
+    if (!projectId) {
+      return null;
+    }
+
+    const node = projectItemRefs.current.get(projectId);
+
+    if (!node) {
+      return null;
+    }
+
+    return {
+      projectId,
+      element: node
+    };
+  };
+
+  const updateProjectPointerDropTarget = (clientX: number, clientY: number) => {
+    const dragState = projectPointerDragRef.current;
+    const candidate = getProjectDropCandidate(clientX, clientY);
+
+    if (!dragState || !candidate || candidate.projectId === dragState.projectId) {
+      setDropTarget(null);
+      return null;
+    }
+
+    const placement = resolveDropPlacementFromRect(
+      candidate.element.getBoundingClientRect(),
+      clientX,
+      clientY
+    );
+
+    setDropTarget({
+      projectId: candidate.projectId,
+      placement
+    });
+
+    return {
+      ...candidate,
+      placement
+    };
+  };
+
+  const clearProjectPointerDrag = () => {
+    projectPointerDragRef.current = null;
+    resetDragState();
+  };
+
+  const handleProjectPointerDown = (
+    projectId: string,
+    event: ReactPointerEvent<HTMLButtonElement>
+  ) => {
+    if (event.button !== 0 || event.pointerType === "touch") {
+      return;
+    }
+
+    projectPointerDragRef.current = {
+      pointerId: event.pointerId,
+      projectId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleProjectPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const dragState = projectPointerDragRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const distance = Math.hypot(
+      event.clientX - dragState.startX,
+      event.clientY - dragState.startY
+    );
+
+    if (!dragState.active && distance < 5) {
+      return;
+    }
+
+    if (!dragState.active) {
+      dragState.active = true;
+      suppressProjectClickRef.current = true;
+      setDraggedProjectId(dragState.projectId);
+    }
+
+    event.preventDefault();
+    updateProjectPointerDropTarget(event.clientX, event.clientY);
+  };
+
+  const handleProjectPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const dragState = projectPointerDragRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (!dragState.active) {
+      clearProjectPointerDrag();
+      return;
+    }
+
+    event.preventDefault();
+    suppressProjectClickRef.current = true;
+    const candidate = updateProjectPointerDropTarget(event.clientX, event.clientY);
+    clearProjectPointerDrag();
+
+    if (candidate) {
+      onMoveProject(dragState.projectId, candidate.projectId, candidate.placement);
+    }
+  };
+
+  const handleProjectPointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const dragState = projectPointerDragRef.current;
+
+    if (dragState?.pointerId === event.pointerId) {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+
+      clearProjectPointerDrag();
+    }
   };
 
   const beginDraft = () => {
@@ -446,58 +605,34 @@ function ProjectRail({
               </span>
             </div>
           ) : (
-            <button
-              key={project.id}
-              type="button"
-              className={`orbital-inspector-overview-project ${project.isActive ? "is-active" : ""} ${
-                projectDropTarget ? `is-drop-${projectDropTarget}` : ""
-              }`}
-              style={{ "--overview-card-accent": project.color } as CSSProperties}
-              draggable
-              onClick={() => onFocusProject(project.id)}
-              onDoubleClick={() => onOpenProject(project.id)}
-              onContextMenu={(event) => onProjectContextMenu(project.id, event)}
-              onDragStart={(event) => {
-                setDraggedProjectId(project.id);
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("application/x-locoris-project-id", project.id);
-                event.dataTransfer.setData("text/plain", project.id);
-              }}
-              onDragOver={(event) => {
-                const sourceProjectId =
-                  draggedProjectId ||
-                  event.dataTransfer.getData("application/x-locoris-project-id") ||
-                  event.dataTransfer.getData("text/plain");
+              <button
+                key={project.id}
+                type="button"
+                className={`orbital-inspector-overview-project is-draggable ${
+                  project.isActive ? "is-active" : ""
+                } ${draggedProjectId === project.id ? "is-dragging" : ""} ${
+                  projectDropTarget ? `is-drop-${projectDropTarget}` : ""
+                }`}
+                data-orbital-overview-project-id={project.id}
+                ref={(node) => registerProjectItemRef(project.id, node)}
+                style={{ "--overview-card-accent": project.color } as CSSProperties}
+                onClick={(event) => {
+                  if (suppressProjectClickRef.current) {
+                    suppressProjectClickRef.current = false;
+                    event.preventDefault();
+                    return;
+                  }
 
-                if (!sourceProjectId || sourceProjectId === project.id) {
-                  return;
-                }
-
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-                setDropTarget({
-                  projectId: project.id,
-                  placement: resolveDropPlacement(event)
-                });
-              }}
-              onDrop={(event) => {
-                const sourceProjectId =
-                  draggedProjectId ||
-                  event.dataTransfer.getData("application/x-locoris-project-id") ||
-                  event.dataTransfer.getData("text/plain");
-
-                if (!sourceProjectId || sourceProjectId === project.id) {
-                  resetDragState();
-                  return;
-                }
-
-                event.preventDefault();
-                onMoveProject(sourceProjectId, project.id, dropTarget?.placement ?? resolveDropPlacement(event));
-                resetDragState();
-              }}
-              onDragEnd={resetDragState}
-              title={project.name}
-            >
+                  onFocusProject(project.id);
+                }}
+                onDoubleClick={() => onOpenProject(project.id)}
+                onContextMenu={(event) => onProjectContextMenu(project.id, event)}
+                onPointerDown={(event) => handleProjectPointerDown(project.id, event)}
+                onPointerMove={handleProjectPointerMove}
+                onPointerUp={handleProjectPointerUp}
+                onPointerCancel={handleProjectPointerCancel}
+                title={project.name}
+              >
               <span className="orbital-inspector-overview-project-dot" aria-hidden="true" />
               <span className="orbital-inspector-overview-project-copy">
                 <span className="orbital-inspector-overview-project-name">{project.name}</span>
@@ -603,9 +738,9 @@ export default function OrbitalInspectorOverviewCard({
       <div className="orbital-inspector-overview-card-main">
         <div className="orbital-inspector-overview-card-head">
           {isProjectMode ? (
-            <button
-              type="button"
-              className="orbital-inspector-overview-icon-action"
+              <button
+                type="button"
+                className="orbital-inspector-overview-icon-action is-back"
               onClick={onBackToVault}
               aria-label={labels.back}
               title={labels.back}
