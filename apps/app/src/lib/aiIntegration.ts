@@ -1,6 +1,13 @@
 import { isTauri } from "@tauri-apps/api/core";
 
-import type { AppLanguage } from "../types";
+import type { AppLanguage, NoteContent } from "../types";
+import {
+  AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA,
+  prepareBlocksForAiPrompt,
+  supportsStructuredEditorOutput,
+  type AiStructuredEditPayload,
+  type AiStructuredEditIntent
+} from "./aiEditorSchema";
 import {
   deleteSecureSecret,
   readSecureSecret,
@@ -114,6 +121,11 @@ type GenerateGeminiMarkdownInput = {
   customPrompt?: string;
   customMode?: GeminiCustomMode;
   targetLanguage?: string;
+};
+
+type GenerateGeminiStructuredEditInput = GenerateGeminiMarkdownInput & {
+  editorBlocks: NoteContent;
+  intent: AiStructuredEditIntent;
 };
 
 type GeminiGenerateResponse = {
@@ -257,6 +269,57 @@ function buildActionInstruction(input: GenerateGeminiMarkdownInput) {
   ].join("\n");
 }
 
+function buildStructuredActionInstruction(input: GenerateGeminiStructuredEditInput) {
+  const scopeLabel = input.scope === "selection" ? "selected content" : "whole note";
+  const customMode = input.customMode ?? "edit";
+
+  if (input.action === "beautify") {
+    return [
+      `Transform the ${scopeLabel} into a polished premium Locoris note.`,
+      "Use the editor block types, text styles, tables, checklists, quotes, headings, lists, links, and tasteful emoji when they improve clarity.",
+      "Preserve the input language exactly unless the user explicitly asked for a different language.",
+      "Keep meaning faithful. Do not invent facts."
+    ].join("\n");
+  }
+
+  if (input.action === "improve") {
+    return [
+      `Improve the writing of the ${scopeLabel}.`,
+      "Make it clearer, smoother, and more premium in tone while preserving structure, intent, language, links, tables, and useful styles."
+    ].join("\n");
+  }
+
+  if (input.action === "fix") {
+    return [
+      `Fix spelling, grammar, punctuation, and obvious typos in the ${scopeLabel}.`,
+      "Preserve wording, language, structure, block types, styles, links, tables, and checklist states as much as possible."
+    ].join("\n");
+  }
+
+  if (input.action === "translate") {
+    return [
+      `Translate the ${scopeLabel} to: ${input.targetLanguage?.trim() || "the requested target language"}.`,
+      "Preserve the rich editor structure, tables, checklists, links, media blocks, and useful styles."
+    ].join("\n");
+  }
+
+  if (customMode === "generate") {
+    return [
+      "Create new rich note content from this user instruction:",
+      input.customPrompt?.trim() || "",
+      "Use the editor block types that best fit the request.",
+      "Do not replace the existing note unless the instruction explicitly asks for that."
+    ].join("\n");
+  }
+
+  return [
+    `Apply this user instruction to the ${scopeLabel}:`,
+    input.customPrompt?.trim() || "",
+    "Preserve the input language unless the instruction explicitly asks for another language.",
+    "Return the best resulting rich editor content."
+  ].join("\n");
+}
+
 function buildGeminiPrompt(input: GenerateGeminiMarkdownInput) {
   const uiLanguage =
     input.appLanguage === "ru"
@@ -300,6 +363,69 @@ function buildGeminiPrompt(input: GenerateGeminiMarkdownInput) {
     ...basePrompt,
     "",
     "Input Markdown:",
+    input.markdown.trim()
+  ].join("\n");
+}
+
+function buildGeminiStructuredPrompt(input: GenerateGeminiStructuredEditInput) {
+  const uiLanguage =
+    input.appLanguage === "ru"
+      ? "The Locoris interface language is Russian."
+      : "The Locoris interface language is English.";
+  const title = input.noteTitle?.trim()
+    ? `Note title: ${input.noteTitle.trim()}`
+    : "Note title: untitled";
+  const editorBlocks = JSON.stringify(prepareBlocksForAiPrompt(input.editorBlocks));
+
+  return [
+    "You are an AI writing assistant built into Locoris, a premium dark-themed local-first rich notes editor.",
+    `${uiLanguage} This is UI context only and must not determine the output language.`,
+    title,
+    "",
+    "Return a single JSON object matching the provided response schema.",
+    "Do not wrap JSON in Markdown fences. Do not add prose outside JSON.",
+    "",
+    "Supported editor block types:",
+    "- paragraph, heading, quote, codeBlock",
+    "- bulletListItem, numberedListItem, checkListItem, toggleListItem",
+    "- table, divider",
+    "- image, file, audio, video",
+    "",
+    "Supported inline content:",
+    "- text nodes: { type: \"text\", text: string, styles: { bold, italic, underline, strike, code, textColor, backgroundColor, font } }",
+    "- links: { type: \"link\", href: string, content: text[] }",
+    "",
+    "Supported block props:",
+    "- textColor, backgroundColor, textAlignment",
+    "- heading: level 1-6 and optional isToggleable",
+    "- codeBlock: language",
+    "- numberedListItem: start",
+    "- checkListItem: checked",
+    "- media blocks: url, name, caption, showPreview, previewWidth",
+    "- table blocks: put tableContent on the block instead of content",
+    "- table cells: textColor, backgroundColor, textAlignment, colspan, rowspan",
+    "",
+    "Style rules:",
+    "- Use font only with one of: onest, ibmPlexSans, golosText, ibmPlexSerif, ibmPlexMono, unbounded.",
+    "- Use textColor/backgroundColor as default color names or hex colors.",
+    "- Preserve existing media block URLs. Do not invent downloadable file or media URLs.",
+    "- Preserve links unless changing them is explicitly requested.",
+    "- Preserve checklist checked states unless the task explicitly changes checklist semantics.",
+    "- Use tables only when the information benefits from rows and columns.",
+    "",
+    `Requested edit intent: ${input.intent}.`,
+    "",
+    "Task:",
+    buildStructuredActionInstruction(input),
+    "",
+    input.action === "custom" && input.customMode === "generate"
+      ? "Context editor blocks for tone and continuity. Do not replace these unless explicitly requested:"
+      : "Input editor blocks:",
+    editorBlocks,
+    "",
+    input.markdown.trim()
+      ? "Input Markdown/plain-text reference:"
+      : "No Markdown/plain-text reference was provided.",
     input.markdown.trim()
   ].join("\n");
 }
@@ -369,6 +495,69 @@ export async function generateGeminiMarkdown(input: GenerateGeminiMarkdownInput)
   }
 
   return extractGeminiText(payload);
+}
+
+export async function generateGeminiStructuredEdit(
+  input: GenerateGeminiStructuredEditInput
+): Promise<AiStructuredEditPayload> {
+  const apiKey = input.apiKey.trim();
+  const model = resolveModelId(input.model);
+  const markdown = input.markdown.trim();
+
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY_MISSING");
+  }
+
+  if (!supportsStructuredEditorOutput(model)) {
+    throw new Error("GEMINI_STRUCTURED_UNSUPPORTED");
+  }
+
+  if (!markdown && input.editorBlocks.length === 0 && !(input.action === "custom" && input.customMode === "generate")) {
+    throw new Error("GEMINI_INPUT_EMPTY");
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: buildGeminiStructuredPrompt(input)
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: input.action === "beautify" || input.action === "custom" ? 0.38 : 0.15,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+          responseSchema: AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA
+        }
+      })
+    }
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as GeminiGenerateResponse;
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message || `GEMINI_HTTP_${response.status}`);
+  }
+
+  const text = extractGeminiText(payload);
+
+  try {
+    return JSON.parse(text) as AiStructuredEditPayload;
+  } catch {
+    throw new Error("GEMINI_STRUCTURED_PARSE_FAILED");
+  }
 }
 
 export async function testGeminiConnection(apiKey: string, model: string) {

@@ -161,6 +161,24 @@ const en = {
     aiGenerating: "Gemini is preparing a version...",
     aiApplying: "Applying result...",
     aiPreview: "Markdown preview",
+    aiPreviewKicker: "AI diff",
+    aiPreviewTitle: "Review changes",
+    aiPreviewSummaryDefault: "Gemini prepared a new rich-text version.",
+    aiPreviewMarkdownFallback:
+      "Strict rich output did not pass, so the result was assembled through Markdown fallback.",
+    aiPreviewFallbackBadge: "Markdown fallback",
+    aiPreviewReplaceMode: "Replaces the selected content",
+    aiPreviewInsertMode: "Inserts new blocks below",
+    aiPreviewInlineMode: "Replaces selected text",
+    aiPreviewStats:
+      "{{beforeBlocks}} -> {{afterBlocks}} blocks, {{beforeWords}} -> {{afterWords}} words",
+    aiPreviewBefore: "Current",
+    aiPreviewAfter: "After AI",
+    aiPreviewBlocksCount: "{{count}} blocks",
+    aiPreviewEmptyBefore: "No new text yet.",
+    aiPreviewEmptyAfter: "AI did not return visible text.",
+    aiPreviewCancel: "Cancel",
+    aiPreviewApply: "Apply",
     aiReplace: "Replace",
     aiInsertBelow: "Insert below",
     aiCopy: "Copy",
@@ -362,7 +380,7 @@ const en = {
     googleDriveSdkFailed:
       "Google authorization could not be prepared on this device. Check your network and try again.",
     googleDriveRedirectTimeout:
-      "Google authorization took too long to return to Locoris. Try again and complete the browser step sooner.",
+      "Google authorization was not completed in the browser. Start the connection again and grant Google Drive access.",
     googleDriveRedirectFailed:
       "Locoris received an invalid Google authorization response. Try the connection flow again.",
     googleDriveAuthInProgress:
@@ -887,6 +905,8 @@ const en = {
     foldersMenu: "Folders",
     hierarchyScopeVault: "Vault",
     hierarchyScopeProject: "Project",
+    expandHierarchy: "Expand all",
+    collapseHierarchy: "Collapse all",
     tagsMenu: "Tags",
     filesMenu: "Files",
     pinnedMenu: "Favorites",

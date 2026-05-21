@@ -16,8 +16,11 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
   {
     id: "classic",
     labelKey: "settings.accentThemeClassic",
-    preview: ["#ffe08a", "#73f7ff", "#d189ff"],
+    preview: ["#73f7ff", "#d189ff", "#ffe08a"],
     cssVars: {
+      "--accent-theme-primary": "#73f7ff",
+      "--accent-theme-secondary": "#d189ff",
+      "--accent-theme-tertiary": "#ffe08a",
       "--bg": "#161338",
       "--bg-deep": "#0d0a24",
       "--panel": "rgba(26, 21, 64, 0.88)",
@@ -50,8 +53,11 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
   {
     id: "graphite",
     labelKey: "settings.accentThemeGraphite",
-    preview: ["#f0c96a", "#9aa7b8", "#e8edf4"],
+    preview: ["#e8edf4", "#9aa7b8", "#f0c96a"],
     cssVars: {
+      "--accent-theme-primary": "#e8edf4",
+      "--accent-theme-secondary": "#9aa7b8",
+      "--accent-theme-tertiary": "#f0c96a",
       "--bg": "#111216",
       "--bg-deep": "#07080b",
       "--panel": "rgba(22, 24, 29, 0.9)",
@@ -84,8 +90,11 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
   {
     id: "verdant",
     labelKey: "settings.accentThemeVerdant",
-    preview: ["#d9c47b", "#55d8b0", "#91f29a"],
+    preview: ["#55d8b0", "#91f29a", "#d9c47b"],
     cssVars: {
+      "--accent-theme-primary": "#55d8b0",
+      "--accent-theme-secondary": "#91f29a",
+      "--accent-theme-tertiary": "#d9c47b",
       "--bg": "#0e221b",
       "--bg-deep": "#06110d",
       "--panel": "rgba(16, 43, 33, 0.9)",
@@ -118,8 +127,11 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
   {
     id: "ember",
     labelKey: "settings.accentThemeEmber",
-    preview: ["#ffb36b", "#ff6f91", "#d6a2ff"],
+    preview: ["#ff6f91", "#d6a2ff", "#ffb36b"],
     cssVars: {
+      "--accent-theme-primary": "#ff6f91",
+      "--accent-theme-secondary": "#d6a2ff",
+      "--accent-theme-tertiary": "#ffb36b",
       "--bg": "#28131c",
       "--bg-deep": "#12070d",
       "--panel": "rgba(48, 22, 34, 0.9)",

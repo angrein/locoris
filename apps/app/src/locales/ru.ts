@@ -161,6 +161,24 @@ const ru = {
     aiGenerating: "Gemini готовит вариант...",
     aiApplying: "Применяю результат...",
     aiPreview: "Предпросмотр Markdown",
+    aiPreviewKicker: "AI diff",
+    aiPreviewTitle: "Проверить изменения",
+    aiPreviewSummaryDefault: "Gemini подготовил новую rich-версию текста.",
+    aiPreviewMarkdownFallback:
+      "Строгий rich-формат не прошел, поэтому результат собран через Markdown fallback.",
+    aiPreviewFallbackBadge: "Markdown fallback",
+    aiPreviewReplaceMode: "Заменит выбранный фрагмент",
+    aiPreviewInsertMode: "Вставит новый блок ниже",
+    aiPreviewInlineMode: "Заменит выделенный текст",
+    aiPreviewStats:
+      "{{beforeBlocks}} -> {{afterBlocks}} блоков, {{beforeWords}} -> {{afterWords}} слов",
+    aiPreviewBefore: "Сейчас",
+    aiPreviewAfter: "После AI",
+    aiPreviewBlocksCount: "{{count}} блоков",
+    aiPreviewEmptyBefore: "Нового текста пока нет.",
+    aiPreviewEmptyAfter: "AI не вернул видимый текст.",
+    aiPreviewCancel: "Отменить",
+    aiPreviewApply: "Применить",
     aiReplace: "Заменить",
     aiInsertBelow: "Вставить ниже",
     aiCopy: "Копировать",
@@ -364,7 +382,7 @@ const ru = {
     googleDriveSdkFailed:
       "Не удалось подготовить авторизацию Google на этом устройстве. Проверь сеть и попробуй снова.",
     googleDriveRedirectTimeout:
-      "Google слишком долго возвращал авторизацию в Locoris. Попробуй снова и заверши шаг в браузере чуть быстрее.",
+      "Авторизация Google не была завершена в браузере. Запусти подключение снова и выдай доступ Google Drive.",
     googleDriveRedirectFailed:
       "Locoris получил некорректный ответ авторизации Google. Запусти подключение ещё раз.",
     googleDriveAuthInProgress:
@@ -890,6 +908,8 @@ const ru = {
     foldersMenu: "Папки",
     hierarchyScopeVault: "Хранилище",
     hierarchyScopeProject: "Проект",
+    expandHierarchy: "Раскрыть все",
+    collapseHierarchy: "Свернуть все",
     tagsMenu: "Теги",
     filesMenu: "Файлы",
     pinnedMenu: "Избранное",

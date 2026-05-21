@@ -29,6 +29,8 @@ import {
 } from "../lib/blocknoteSchema";
 import { EDITOR_AI_OPEN_EVENT } from "../lib/aiIntegration";
 
+const AI_TEXT_BLOCK_UNSUPPORTED_TYPES = new Set(["image", "file", "audio", "video"]);
+
 function AiToolbarIcon() {
   return (
     <span className="editor-formatting-ai-icon" aria-hidden="true">
@@ -113,7 +115,30 @@ function FontStyleSelect() {
 
 function AiSelectionButton() {
   const Components = useComponentsContext()!;
+  const editor = useBlockNoteEditor(editorBlockNoteSchema);
   const { t } = useTranslation();
+
+  const canUseAiForSelection = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      if (!editor.isEditable) {
+        return false;
+      }
+
+      const selectedBlocks =
+        editor.getSelection()?.blocks ?? [editor.getTextCursorPosition().block];
+
+      return (
+        selectedBlocks.length > 0 &&
+        selectedBlocks.every((block) => !AI_TEXT_BLOCK_UNSUPPORTED_TYPES.has(block.type)) &&
+        selectedBlocks.some((block) => block.content !== undefined)
+      );
+    }
+  });
+
+  if (!canUseAiForSelection) {
+    return null;
+  }
 
   return (
     <Components.FormattingToolbar.Button

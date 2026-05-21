@@ -40,6 +40,7 @@ import type {
   SyncVaultBinding,
   VaultEncryptionSummary
 } from "../types";
+import ConfirmDialog from "./ConfirmDialog";
 import "./SyncSettingsPanel.css";
 
 type SyncFeedbackState = {
@@ -3725,55 +3726,21 @@ export default function SyncSettingsPanel({
         </div>
       ) : null}
 
-      {confirmState ? (
-        <div className="sync-settings-modal-layer" role="dialog" aria-modal="true">
-          <button className="sync-settings-modal-dim" aria-label={t("orbit.closeModal")} onClick={closeModal} />
-          <div className="sync-settings-modal-card is-compact">
-            <div className="sync-settings-modal-head">
-              <div className="sync-settings-modal-heading">
-                <p className="panel-kicker">{t("dialog.kicker")}</p>
-                <h3>{confirmState.title}</h3>
-              </div>
-              <button type="button" className="sync-settings-icon-button" onClick={closeModal} title={t("orbit.closeModal")}>
-                <CloseGlyph />
-              </button>
-            </div>
-            <div className="sync-settings-modal-body">
-              <p className="sync-settings-modal-copy">{confirmState.description}</p>
-              {confirmState.details && confirmState.details.length > 0 ? (
-                <div className="sync-settings-confirm-details">
-                  {confirmState.details.map((detail) => (
-                    <span key={detail} className="sync-settings-confirm-detail">
-                      {detail}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              <div className="sync-settings-modal-actions">
-                <button type="button" className="sync-settings-inline-action" onClick={closeModal}>
-                  {t("dialog.cancel")}
-                </button>
-                {confirmState.secondaryAction && confirmState.secondaryLabel ? (
-                  <button
-                    type="button"
-                    className={`sync-settings-inline-action ${confirmState.secondaryTone === "danger" ? "is-danger" : ""}`}
-                    onClick={() => void confirmState.secondaryAction?.()}
-                  >
-                    {confirmState.secondaryLabel}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className={`sync-settings-primary-action ${confirmState.tone === "danger" ? "is-danger" : ""}`}
-                  onClick={() => void confirmState.action()}
-                >
-                  {confirmState.confirmLabel}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        open={Boolean(confirmState)}
+        kicker={t("dialog.kicker")}
+        title={confirmState?.title ?? ""}
+        message={confirmState?.description ?? ""}
+        details={confirmState?.details}
+        cancelLabel={t("dialog.cancel")}
+        confirmLabel={confirmState?.confirmLabel ?? ""}
+        tone={confirmState?.tone ?? "default"}
+        secondaryLabel={confirmState?.secondaryLabel}
+        secondaryTone={confirmState?.secondaryTone ?? "default"}
+        onCancel={closeModal}
+        onSecondary={() => void confirmState?.secondaryAction?.()}
+        onConfirm={() => void confirmState?.action()}
+      />
     </section>
   );
 }

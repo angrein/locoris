@@ -673,7 +673,7 @@ fn desktop_google_oauth_prepare_loopback(
 }
 
 #[tauri::command]
-fn desktop_google_oauth_wait_for_callback(
+async fn desktop_google_oauth_wait_for_callback(
   state: State<'_, DesktopGoogleOauthState>,
   timeout_ms: Option<u64>,
 ) -> Result<DesktopGoogleOauthCallbackPayload, String> {
@@ -685,11 +685,13 @@ fn desktop_google_oauth_wait_for_callback(
     .take()
     .ok_or_else(|| "GOOGLE_OAUTH_NOT_READY".to_string())?;
 
-  match receiver.recv_timeout(timeout) {
+  tauri::async_runtime::spawn_blocking(move || match receiver.recv_timeout(timeout) {
     Ok(payload) => Ok(payload),
     Err(mpsc::RecvTimeoutError::Timeout) => Err("GOOGLE_OAUTH_REDIRECT_TIMEOUT".into()),
     Err(mpsc::RecvTimeoutError::Disconnected) => Err("GOOGLE_OAUTH_CALLBACK_FAILED".into()),
-  }
+  })
+  .await
+  .map_err(|error| format!("Desktop Google OAuth callback wait failed: {error}"))?
 }
 
 #[tauri::command]

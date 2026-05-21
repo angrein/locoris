@@ -10,7 +10,8 @@ const GOOGLE_DRIVE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about";
 const GOOGLE_OAUTH_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_DESKTOP_LOOPBACK_PATH = "/";
 const GOOGLE_DESKTOP_LEGACY_LOOPBACK_PATH = "/oauth/google-drive";
-const GOOGLE_DESKTOP_CALLBACK_TIMEOUT_MS = 180_000;
+const GOOGLE_DESKTOP_NATIVE_CALLBACK_TIMEOUT_MS = 180_000;
+const GOOGLE_DESKTOP_USER_CALLBACK_TIMEOUT_MS = 90_000;
 
 type GoogleDriveAboutResponse = {
   user?: {
@@ -313,12 +314,36 @@ async function prepareDesktopLoopbackSession() {
   return invoke<GoogleDesktopLoopbackSession>("desktop_google_oauth_prepare_loopback");
 }
 
+function rejectAfterGoogleOauthTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  errorCode: string
+) {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(errorCode));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
+}
+
 async function waitForDesktopLoopbackCallback() {
-  const payload = await invoke<GoogleDesktopLoopbackCallback>(
-    "desktop_google_oauth_wait_for_callback",
-    {
-      timeoutMs: GOOGLE_DESKTOP_CALLBACK_TIMEOUT_MS
-    }
+  const payload = await rejectAfterGoogleOauthTimeout(
+    invoke<GoogleDesktopLoopbackCallback>("desktop_google_oauth_wait_for_callback", {
+      timeoutMs: GOOGLE_DESKTOP_NATIVE_CALLBACK_TIMEOUT_MS
+    }),
+    GOOGLE_DESKTOP_USER_CALLBACK_TIMEOUT_MS,
+    "GOOGLE_OAUTH_REDIRECT_TIMEOUT"
   );
   const callback = parseDesktopOAuthCallback(payload.url);
 

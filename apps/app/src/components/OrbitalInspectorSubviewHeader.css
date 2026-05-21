@@ -71,6 +71,7 @@
 
 .orbital-inspector-subview-back svg,
 .orbital-inspector-subview-action svg,
+.orbital-inspector-subview-hierarchy-toggle svg,
 .orbital-inspector-subview-search-icon svg,
 .orbital-inspector-subview-filter-icon svg {
   width: 16px;
@@ -80,6 +81,7 @@
 
 .orbital-inspector-subview-back svg *,
 .orbital-inspector-subview-action svg *,
+.orbital-inspector-subview-hierarchy-toggle svg *,
 .orbital-inspector-subview-search-icon svg *,
 .orbital-inspector-subview-filter-icon svg * {
   fill: none;
@@ -183,6 +185,17 @@
   min-height: 26px;
   border-radius: 10px;
   box-shadow: none;
+}
+
+.orbital-inspector-subview-actions .orbital-inspector-subview-hierarchy-toggle {
+  color: color-mix(in srgb, var(--inspector-subview-accent) 54%, rgba(244, 247, 255, 0.88));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--inspector-subview-accent) 11%, transparent), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.018);
+}
+
+.orbital-inspector-subview-actions .orbital-inspector-subview-hierarchy-toggle.is-expanded {
+  color: rgba(238, 243, 255, 0.92);
 }
 
 .orbital-inspector-subview-scope {

@@ -17,6 +17,9 @@
   --surface-deep-rgb: 9 10 28;
   --line-rgb: 147 173 255;
   --line-strong-rgb: 149 179 255;
+  --accent-theme-primary: #73f7ff;
+  --accent-theme-secondary: #d189ff;
+  --accent-theme-tertiary: #ffe08a;
   --gold-rgb: 255 224 138;
   --orange-rgb: 255 164 92;
   --red-rgb: 255 103 140;

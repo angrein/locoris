@@ -3400,6 +3400,8 @@ export default function App() {
           foldersMenu: t("orbit.foldersMenu"),
           hierarchyScopeVault: t("orbit.hierarchyScopeVault"),
           hierarchyScopeProject: t("orbit.hierarchyScopeProject"),
+          expandHierarchy: t("orbit.expandHierarchy"),
+          collapseHierarchy: t("orbit.collapseHierarchy"),
           tagsMenu: t("orbit.tagsMenu"),
           filesMenu: t("orbit.filesMenu"),
           pinnedMenu: t("orbit.pinnedMenu"),

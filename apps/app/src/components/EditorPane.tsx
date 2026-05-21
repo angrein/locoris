@@ -1,5 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent
+} from "react";
 import { BlockNoteView } from "@blocknote/mantine";
+import { FormattingToolbarExtension } from "@blocknote/core/extensions";
 import { en, ru } from "@blocknote/core/locales";
 import {
   FilePanelController,
@@ -7,12 +16,14 @@ import {
   LinkToolbarController,
   useCreateBlockNote
 } from "@blocknote/react";
+import { TextSelection } from "prosemirror-state";
 import { useTranslation } from "react-i18next";
 
 import "./EditorPane.css";
 import ConfirmDialog from "./ConfirmDialog";
 import EditorFormattingToolbar from "./EditorFormattingToolbar";
 import FolderPicker from "./FolderPicker";
+import NoteStaticPreview from "./NoteStaticPreview";
 import TagInputField from "./TagInputField";
 import { getDisplayNoteTitle } from "../lib/displayNames";
 import { COLOR_PALETTE, DEFAULT_NOTE_COLOR } from "../lib/palette";
@@ -32,12 +43,18 @@ import {
 import {
   EDITOR_AI_OPEN_EVENT,
   generateGeminiMarkdown,
+  generateGeminiStructuredEdit,
   readGeminiApiKey,
   readStoredGeminiModel,
   type GeminiAiAction,
   type GeminiAiScope,
   type GeminiCustomMode
 } from "../lib/aiIntegration";
+import {
+  collectAiContentStats,
+  sanitizeAiStructuredEditPayload,
+  type AiContentStats
+} from "../lib/aiEditorSchema";
 import {
   openTextFileWithDialog,
   saveTextFileWithDialog
@@ -59,11 +76,37 @@ type AiPanelState = {
   error: string | null;
   targetBlockIds: string[];
   sourceMarkdown: string;
+  sourceBlocks: NoteContent;
+  targetBlocks: NoteContent;
+  inlineRange: AiInlineRange | null;
   anchor: {
     top: number;
     left: number;
     placement: "top" | "bottom" | "left" | "right";
   } | null;
+};
+type AiInlineRange = {
+  from: number;
+  to: number;
+};
+type AiPreviewApplyMode = "replaceBlocks" | "insertBlocks" | "replaceInline";
+type AiPreviewState = {
+  status: "idle" | "applying" | "error";
+  action: GeminiAiAction;
+  scope: GeminiAiScope;
+  applyMode: AiPreviewApplyMode;
+  summary: string;
+  warnings: string[];
+  beforeBlocks: NoteContent;
+  afterBlocks: NoteContent;
+  beforeStats: AiContentStats;
+  afterStats: AiContentStats;
+  targetBlockIds: string[];
+  referenceBlockId: string | null;
+  inlineRange: AiInlineRange | null;
+  inlineText: string | null;
+  error: string | null;
+  fallbackUsed: boolean;
 };
 
 const EDITOR_TYPOGRAPHY_MODE_STORAGE_KEY = "zen:editor-typography-mode";
@@ -92,6 +135,11 @@ const LIST_CONTINUATION_BLOCK_PROP_KEYS = [
   "backgroundColor",
   "textAlignment"
 ] as const;
+const FLOATING_MEDIA_BLOCK_TYPES = new Set(["image", "file", "audio", "video"]);
+const FLOATING_MEDIA_POPOVER_SELECTOR =
+  ".editor-floating-toolbar-popover, .bn-formatting-toolbar, .bn-form-popover, .bn-panel-popover, .bn-menu-dropdown";
+const FLOATING_MEDIA_BLOCK_SELECTOR =
+  "[data-file-block], .bn-block-content[data-content-type='image'], .bn-block-content[data-content-type='video'], .bn-block-content[data-content-type='audio'], .bn-block-content[data-content-type='file']";
 const INLINE_AI_REPLACE_ACTIONS = new Set<GeminiAiAction>([
   "fix",
   "improve",
@@ -117,6 +165,9 @@ type ListContinuationStyleSeed = {
   sourceBlockType: string;
   styles: Record<string, unknown>;
   props: Record<string, unknown>;
+};
+type FloatingMediaSelectionSnapshot = {
+  blockId: string;
 };
 
 function clampNumber(value: number, min: number, max: number) {
@@ -199,6 +250,20 @@ function AiArrowGlyph() {
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeWidth="1.9"
+      />
+    </svg>
+  );
+}
+
+function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="m7.25 7.25 9.5 9.5m0-9.5-9.5 9.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
         strokeWidth="1.9"
       />
     </svg>
@@ -702,6 +767,7 @@ export default function EditorPane({
   const [pendingMarkdownImport, setPendingMarkdownImport] =
     useState<PendingMarkdownImport | null>(null);
   const [aiPanel, setAiPanel] = useState<AiPanelState | null>(null);
+  const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
   const aiPanelRef = useRef<HTMLDivElement | null>(null);
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
@@ -711,6 +777,8 @@ export default function EditorPane({
   const pendingEmptyInlinePasteRestoreRef =
     useRef<EmptyInlinePasteRestoreSnapshot | null>(null);
   const checklistStableOrderRef = useRef(new Map<string, number>());
+  const floatingMediaSelectionRef = useRef<FloatingMediaSelectionSnapshot | null>(null);
+  const floatingMediaSelectionGraceUntilRef = useRef(0);
   const latestTitleDraftRef = useRef(titleDraft);
   const latestStoredTitleRef = useRef(note.title);
   const latestEditorRef = useRef<ReturnType<typeof useCreateBlockNote> | null>(null);
@@ -740,6 +808,7 @@ export default function EditorPane({
   useEffect(() => {
     setPendingMarkdownImport(null);
     setAiPanel(null);
+    setAiPreview(null);
     checklistStableOrderRef.current = new Map();
   }, [note.id]);
 
@@ -786,6 +855,117 @@ export default function EditorPane({
     },
     [note.id, language]
   );
+
+  const readActiveFloatingMediaBlock = (): FloatingMediaSelectionSnapshot | null => {
+    try {
+      const block = editor.getTextCursorPosition().block as StoredBlock & { id?: string };
+      const blockId = typeof block.id === "string" ? block.id : null;
+      const blockType = typeof block.type === "string" ? block.type : "";
+
+      if (!blockId || !FLOATING_MEDIA_BLOCK_TYPES.has(blockType)) {
+        return null;
+      }
+
+      return {
+        blockId
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const rememberFloatingMediaSelection = () => {
+    const mediaBlock = readActiveFloatingMediaBlock();
+
+    if (mediaBlock) {
+      floatingMediaSelectionRef.current = mediaBlock;
+      floatingMediaSelectionGraceUntilRef.current = Date.now() + 3000;
+      return;
+    }
+
+    if (Date.now() > floatingMediaSelectionGraceUntilRef.current) {
+      floatingMediaSelectionRef.current = null;
+    }
+  };
+
+  const restoreFloatingMediaSelection = () => {
+    const snapshot = floatingMediaSelectionRef.current;
+
+    if (!snapshot || Date.now() > floatingMediaSelectionGraceUntilRef.current) {
+      return;
+    }
+
+    try {
+      const activeMediaBlock = readActiveFloatingMediaBlock();
+
+      if (activeMediaBlock?.blockId !== snapshot.blockId) {
+        editor.setTextCursorPosition(snapshot.blockId);
+      }
+
+      editor.getExtension(FormattingToolbarExtension)?.store.setState(true);
+      floatingMediaSelectionGraceUntilRef.current = Date.now() + 3000;
+    } catch {
+      floatingMediaSelectionRef.current = null;
+    }
+  };
+
+  const preserveFloatingMediaSelection = (
+    event?: ReactMouseEvent<HTMLDivElement> | ReactPointerEvent<HTMLDivElement>
+  ) => {
+    restoreFloatingMediaSelection();
+    event?.preventDefault();
+  };
+
+  useEffect(() => {
+    rememberFloatingMediaSelection();
+
+    const unsubscribeSelection = editor.onSelectionChange(() => {
+      rememberFloatingMediaSelection();
+    });
+
+    const handleFloatingPointerMove = (event: PointerEvent) => {
+      if (!floatingMediaSelectionRef.current) {
+        return;
+      }
+
+      const target = event.target;
+
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      if (target.closest(FLOATING_MEDIA_POPOVER_SELECTOR)) {
+        restoreFloatingMediaSelection();
+      }
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      if (
+        target.closest(FLOATING_MEDIA_POPOVER_SELECTOR) ||
+        target.closest(FLOATING_MEDIA_BLOCK_SELECTOR)
+      ) {
+        return;
+      }
+
+      floatingMediaSelectionRef.current = null;
+      floatingMediaSelectionGraceUntilRef.current = 0;
+    };
+
+    window.addEventListener("pointermove", handleFloatingPointerMove, true);
+    window.addEventListener("pointerdown", handlePointerDown, true);
+
+    return () => {
+      unsubscribeSelection();
+      window.removeEventListener("pointermove", handleFloatingPointerMove, true);
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+    };
+  }, [editor]);
 
   const buildAiPanelAnchor = (
     scope: GeminiAiScope,
@@ -873,28 +1053,83 @@ export default function EditorPane({
     };
   };
 
+  const cloneNoteContent = (blocks: NoteContent): NoteContent =>
+    normalizeNoteContent(JSON.parse(JSON.stringify(blocks)) as NoteContent);
+
+  const readEditorDocumentBlocks = () =>
+    cloneNoteContent(editor.document as unknown as NoteContent);
+
+  const createPlainPreviewBlocks = (text: string): NoteContent =>
+    text.trim()
+      ? [
+          {
+            id: crypto.randomUUID(),
+            type: "paragraph",
+            props: {},
+            content: [
+              {
+                type: "text",
+                text,
+                styles: {}
+              }
+            ],
+            children: []
+          }
+        ]
+      : [];
+
+  const getRootBlockIds = () =>
+    (editor.document as unknown as StoredBlock[])
+      .map((block) => block.id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+
   const getAiSourceSnapshot = (scope: GeminiAiScope) => {
     if (scope === "note") {
+      const documentBlocks = readEditorDocumentBlocks();
+
       return {
         markdown: editor.blocksToMarkdownLossy(editor.document as any).trim(),
-        targetBlockIds: (editor.document as StoredBlock[])
+        targetBlockIds: documentBlocks
           .map((block) => block.id)
-          .filter((id): id is string => typeof id === "string" && id.length > 0)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+        sourceBlocks: documentBlocks,
+        targetBlocks: documentBlocks,
+        inlineRange: null
       };
     }
 
     const selection = editor.getSelection();
     const selectedText = editor.getSelectedText().trim();
+    const selectedBlocks = cloneNoteContent((selection?.blocks ?? []) as unknown as NoteContent);
     const targetBlockIds =
-      selection?.blocks
+      selectedBlocks
         .map((block) => block.id)
         .filter((id): id is string => typeof id === "string" && id.length > 0) ?? [];
-
+    let sourceBlocks = selectedBlocks;
+    let inlineRange: AiInlineRange | null = null;
     let markdown = selectedText;
 
     try {
-      const cutBlocks = editor.getSelectionCutBlocks(true).blocks as unknown as StoredBlock[];
+      const cutSelection = editor.getSelectionCutBlocks(false);
+      const cutBlocks = cloneNoteContent(cutSelection.blocks as unknown as NoteContent);
       const cutMarkdown = editor.blocksToMarkdownLossy(cutBlocks as any).trim();
+
+      if (cutBlocks.length > 0) {
+        sourceBlocks = cutBlocks;
+      }
+
+      if (
+        selectedText &&
+        selectedBlocks.length === 1 &&
+        cutBlocks.length === 1 &&
+        targetBlockIds.length <= 1 &&
+        (cutSelection.blockCutAtStart || cutSelection.blockCutAtEnd)
+      ) {
+        inlineRange = {
+          from: cutSelection._meta.startPos,
+          to: cutSelection._meta.endPos
+        };
+      }
 
       if (cutMarkdown) {
         markdown = cutMarkdown;
@@ -905,7 +1140,10 @@ export default function EditorPane({
 
     return {
       markdown,
-      targetBlockIds
+      targetBlockIds,
+      sourceBlocks,
+      targetBlocks: selectedBlocks,
+      inlineRange
     };
   };
 
@@ -921,6 +1159,9 @@ export default function EditorPane({
       error: null,
       targetBlockIds: snapshot.targetBlockIds,
       sourceMarkdown: snapshot.markdown,
+      sourceBlocks: snapshot.sourceBlocks,
+      targetBlocks: snapshot.targetBlocks,
+      inlineRange: snapshot.inlineRange,
       anchor: buildAiPanelAnchor(scope, triggerRect)
     });
   };
@@ -963,6 +1204,21 @@ export default function EditorPane({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [aiPanel]);
+
+  useEffect(() => {
+    if (!aiPreview) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && aiPreview.status !== "applying") {
+        setAiPreview(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [aiPreview]);
 
   const persistEditorDocument = (state: SaveState = "saved") => {
     const nextDocument = normalizeNoteContent(editor.document as unknown as NoteContent);
@@ -1013,8 +1269,8 @@ export default function EditorPane({
     return blocks as unknown as NoteContent;
   };
 
-  const getAiInsertReferenceBlockId = (panelState: AiPanelState) => {
-    const targetBlockId = panelState.targetBlockIds.at(-1);
+  const getAiInsertReferenceBlockId = (targetBlockIds: string[]) => {
+    const targetBlockId = targetBlockIds.at(-1);
 
     if (targetBlockId) {
       return targetBlockId;
@@ -1026,92 +1282,128 @@ export default function EditorPane({
     return typeof lastBlockId === "string" ? lastBlockId : null;
   };
 
-  const applyAiMarkdownResult = async (
-    panelState: AiPanelState,
-    resultMarkdown: string,
-    mode: "replace" | "insert",
-    action: GeminiAiAction
-  ) => {
-    setAiPanel((previous) =>
-      previous
-        ? {
-            ...previous,
-            status: "applying",
-            error: null
-          }
-        : previous
+  const isFatalAiRequestError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+
+    return (
+      message === "GEMINI_API_KEY_MISSING" ||
+      message === "GEMINI_INPUT_EMPTY" ||
+      message.includes("API key not valid") ||
+      message.includes("API_KEY_INVALID") ||
+      message.includes("PERMISSION_DENIED") ||
+      message.includes("RESOURCE_EXHAUSTED") ||
+      message.toLowerCase().includes("quota")
     );
+  };
+
+  const openAiPreview = (
+    panelState: AiPanelState,
+    blocks: NoteContent,
+    intent: "replace" | "insert",
+    action: GeminiAiAction,
+    summary: string,
+    warnings: string[],
+    fallbackUsed: boolean
+  ) => {
+    const canReplaceInline =
+      intent === "replace" &&
+      panelState.scope === "selection" &&
+      Boolean(panelState.inlineRange) &&
+      INLINE_AI_REPLACE_ACTIONS.has(action) &&
+      panelState.targetBlockIds.length <= 1 &&
+      blocks.length === 1;
+    const inlineText = canReplaceInline ? extractPlainText(blocks).trim() : "";
+    const shouldReplaceInline = canReplaceInline && inlineText.length > 0 && !inlineText.includes("\n");
+    const applyMode: AiPreviewApplyMode =
+      shouldReplaceInline ? "replaceInline" : intent === "insert" ? "insertBlocks" : "replaceBlocks";
+    const beforeBlocks =
+      applyMode === "replaceInline"
+        ? createPlainPreviewBlocks(panelState.sourceMarkdown)
+        : intent === "insert"
+          ? []
+          : panelState.targetBlocks.length > 0
+            ? panelState.targetBlocks
+            : panelState.sourceBlocks;
+    const afterBlocks =
+      applyMode === "replaceInline" && inlineText
+        ? createPlainPreviewBlocks(inlineText)
+        : blocks;
+
+    setAiPreview({
+      status: "idle",
+      action,
+      scope: panelState.scope,
+      applyMode,
+      summary: summary || t("note.aiPreviewSummaryDefault"),
+      warnings,
+      beforeBlocks,
+      afterBlocks,
+      beforeStats: collectAiContentStats(beforeBlocks),
+      afterStats: collectAiContentStats(afterBlocks),
+      targetBlockIds: panelState.targetBlockIds,
+      referenceBlockId:
+        applyMode === "insertBlocks" ? getAiInsertReferenceBlockId(panelState.targetBlockIds) : null,
+      inlineRange: applyMode === "replaceInline" ? panelState.inlineRange : null,
+      inlineText: applyMode === "replaceInline" ? inlineText : null,
+      error: null,
+      fallbackUsed
+    });
+    setAiPanel(null);
+  };
+
+  const applyAiPreviewResult = () => {
+    const preview = aiPreview;
+
+    if (!preview || preview.status === "applying") {
+      return;
+    }
+
+    setAiPreview({
+      ...preview,
+      status: "applying",
+      error: null
+    });
 
     try {
-      const blocks = await parseAiMarkdownToBlocks(resultMarkdown);
+      editor.focus();
+      editor.transact((tr) => {
+        if (preview.applyMode === "replaceInline") {
+          if (!preview.inlineRange || !preview.inlineText) {
+            throw new Error("GEMINI_EMPTY_RESPONSE");
+          }
 
-      if (mode === "insert") {
-        const referenceBlockId = getAiInsertReferenceBlockId(panelState);
-
-        if (referenceBlockId) {
-          editor.insertBlocks(blocks as any, referenceBlockId, "after");
-        } else {
-          editor.replaceBlocks(editor.document as any, blocks as any);
+          tr.setSelection(
+            TextSelection.create(tr.doc, preview.inlineRange.from, preview.inlineRange.to)
+          );
+          editor.insertInlineContent(preview.inlineText, {
+            updateSelection: true
+          });
+          return;
         }
 
-        persistEditorDocument("saved");
-        setAiPanel(null);
-        return;
-      }
+        if (preview.applyMode === "insertBlocks") {
+          if (preview.referenceBlockId) {
+            editor.insertBlocks(preview.afterBlocks as any, preview.referenceBlockId, "after");
+          } else {
+            editor.replaceBlocks(editor.document as any, preview.afterBlocks as any);
+          }
+          return;
+        }
 
-      if (panelState.scope === "note") {
-        const rootBlockIds = (editor.document as unknown as StoredBlock[])
-          .map((block) => block.id)
-          .filter((id): id is string => typeof id === "string" && id.length > 0);
-
-        const blocksToReplace = rootBlockIds.length > 0 ? rootBlockIds : (editor.document as any);
-
-        editor.replaceBlocks(blocksToReplace, blocks as any);
-        persistEditorDocument("saved");
-        setAiPanel(null);
-        return;
-      }
-
-      const shouldReplaceInline =
-        panelState.sourceMarkdown.trim().length > 0 &&
-        INLINE_AI_REPLACE_ACTIONS.has(action) &&
-        panelState.targetBlockIds.length <= 1 &&
-        blocks.length === 1;
-      const inlineText = shouldReplaceInline
-        ? extractPlainText(blocks as unknown as NoteContent).trim()
-        : "";
-
-      if (shouldReplaceInline && inlineText && !inlineText.includes("\n")) {
-        editor.focus();
-        editor.insertInlineContent(inlineText, {
-          updateSelection: true
-        });
-      } else {
         const targetBlockIds =
-          panelState.targetBlockIds.length > 0
-            ? panelState.targetBlockIds
-            : editor
-                .getSelection()
-                ?.blocks.map((block) => block.id)
-                .filter((id): id is string => typeof id === "string" && id.length > 0) ?? [];
+          preview.targetBlockIds.length > 0 ? preview.targetBlockIds : getRootBlockIds();
 
         if (targetBlockIds.length > 0) {
-          editor.replaceBlocks(targetBlockIds, blocks as any);
+          editor.replaceBlocks(targetBlockIds, preview.afterBlocks as any);
         } else {
-          const referenceBlockId = getAiInsertReferenceBlockId(panelState);
-
-          if (referenceBlockId) {
-            editor.insertBlocks(blocks as any, referenceBlockId, "after");
-          } else {
-            editor.replaceBlocks(editor.document as any, blocks as any);
-          }
+          editor.replaceBlocks(editor.document as any, preview.afterBlocks as any);
         }
-      }
+      });
 
       persistEditorDocument("saved");
-      setAiPanel(null);
+      setAiPreview(null);
     } catch (error) {
-      setAiPanel((previous) =>
+      setAiPreview((previous) =>
         previous
           ? {
               ...previous,
@@ -1162,7 +1454,10 @@ export default function EditorPane({
         ? getAiSourceSnapshot("note")
         : {
             markdown: currentPanel.sourceMarkdown,
-            targetBlockIds: currentPanel.targetBlockIds
+            targetBlockIds: currentPanel.targetBlockIds,
+            sourceBlocks: currentPanel.sourceBlocks,
+            targetBlocks: currentPanel.targetBlocks,
+            inlineRange: currentPanel.inlineRange
           };
 
     if (!shouldGenerateNew && !snapshot.markdown.trim()) {
@@ -1179,6 +1474,9 @@ export default function EditorPane({
       status: "generating" as const,
       sourceMarkdown: snapshot.markdown,
       targetBlockIds: snapshot.targetBlockIds,
+      sourceBlocks: snapshot.sourceBlocks,
+      targetBlocks: snapshot.targetBlocks,
+      inlineRange: snapshot.inlineRange,
       error: null
     };
 
@@ -1186,24 +1484,68 @@ export default function EditorPane({
 
     try {
       const apiKey = await readGeminiApiKey();
-      const resultMarkdown = await generateGeminiMarkdown({
-        apiKey,
-        model: readStoredGeminiModel(),
-        action,
-        scope: currentPanel.scope,
-        markdown: snapshot.markdown,
-        appLanguage: language,
-        noteTitle: titleDraft.trim() || note.title,
-        customPrompt,
-        customMode,
-        targetLanguage
-      });
+      const model = readStoredGeminiModel();
+      const intent = shouldGenerateNew ? "insert" : "replace";
+      let resultBlocks: NoteContent;
+      let resultSummary = "";
+      let resultWarnings: string[] = [];
+      let fallbackUsed = false;
 
-      await applyAiMarkdownResult(
+      try {
+        const structuredPayload = await generateGeminiStructuredEdit({
+          apiKey,
+          model,
+          action,
+          scope: currentPanel.scope,
+          markdown: snapshot.markdown,
+          appLanguage: language,
+          noteTitle: titleDraft.trim() || note.title,
+          customPrompt,
+          customMode,
+          targetLanguage,
+          editorBlocks: snapshot.sourceBlocks,
+          intent
+        });
+        const sanitizedPayload = sanitizeAiStructuredEditPayload(structuredPayload, {
+          fallbackSummary: t("note.aiPreviewSummaryDefault")
+        });
+
+        resultBlocks = sanitizedPayload.blocks;
+        resultSummary = sanitizedPayload.summary;
+        resultWarnings = sanitizedPayload.warnings;
+      } catch (structuredError) {
+        if (isFatalAiRequestError(structuredError)) {
+          throw structuredError;
+        }
+
+        console.warn("Gemini structured editor output failed; falling back to Markdown.", structuredError);
+
+        const resultMarkdown = await generateGeminiMarkdown({
+          apiKey,
+          model,
+          action,
+          scope: currentPanel.scope,
+          markdown: snapshot.markdown,
+          appLanguage: language,
+          noteTitle: titleDraft.trim() || note.title,
+          customPrompt,
+          customMode,
+          targetLanguage
+        });
+
+        resultBlocks = await parseAiMarkdownToBlocks(resultMarkdown);
+        resultWarnings = [t("note.aiPreviewMarkdownFallback")];
+        fallbackUsed = true;
+      }
+
+      openAiPreview(
         nextPanelState,
-        resultMarkdown,
-        shouldGenerateNew ? "insert" : "replace",
-        action
+        resultBlocks,
+        intent,
+        action,
+        resultSummary,
+        resultWarnings,
+        fallbackUsed
       );
     } catch (error) {
       setAiPanel((previous) =>
@@ -1683,6 +2025,126 @@ export default function EditorPane({
         }}
       />
 
+      {aiPreview ? (
+        <div className="editor-ai-preview-layer" role="presentation">
+          <button
+            type="button"
+            className="editor-ai-preview-backdrop"
+            aria-label={t("note.aiPreviewCancel")}
+            onClick={() => {
+              if (aiPreview.status !== "applying") {
+                setAiPreview(null);
+              }
+            }}
+          />
+          <section
+            className="editor-ai-preview-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editor-ai-preview-title"
+          >
+            <header className="editor-ai-preview-header">
+              <div>
+                <p className="editor-ai-preview-kicker">{t("note.aiPreviewKicker")}</p>
+                <h3 id="editor-ai-preview-title">{t("note.aiPreviewTitle")}</h3>
+                <p>{aiPreview.summary}</p>
+              </div>
+              <button
+                type="button"
+                className="editor-ai-preview-close"
+                onClick={() => setAiPreview(null)}
+                disabled={aiPreview.status === "applying"}
+                aria-label={t("note.aiClose")}
+              >
+                <CloseGlyph />
+              </button>
+            </header>
+
+            <div className="editor-ai-preview-meta">
+              <span>
+                {aiPreview.applyMode === "insertBlocks"
+                  ? t("note.aiPreviewInsertMode")
+                  : aiPreview.applyMode === "replaceInline"
+                    ? t("note.aiPreviewInlineMode")
+                    : t("note.aiPreviewReplaceMode")}
+              </span>
+              <span>
+                {t("note.aiPreviewStats", {
+                  beforeBlocks: aiPreview.beforeStats.blocks,
+                  afterBlocks: aiPreview.afterStats.blocks,
+                  beforeWords: aiPreview.beforeStats.words,
+                  afterWords: aiPreview.afterStats.words
+                })}
+              </span>
+              {aiPreview.fallbackUsed ? <span>{t("note.aiPreviewFallbackBadge")}</span> : null}
+            </div>
+
+            {aiPreview.warnings.length > 0 ? (
+              <div className="editor-ai-preview-warnings">
+                {aiPreview.warnings.map((warning) => (
+                  <span key={warning}>{warning}</span>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="editor-ai-preview-grid">
+              <section className="editor-ai-preview-card">
+                <div className="editor-ai-preview-card-title">
+                  <span>{t("note.aiPreviewBefore")}</span>
+                  <span>{t("note.aiPreviewBlocksCount", { count: aiPreview.beforeStats.blocks })}</span>
+                </div>
+                <div className="editor-ai-preview-scroll">
+                  <NoteStaticPreview
+                    content={aiPreview.beforeBlocks}
+                    emptyLabel={t("note.aiPreviewEmptyBefore")}
+                    resolveFileUrl={onResolveFileUrl}
+                    compact
+                  />
+                </div>
+              </section>
+
+              <section className="editor-ai-preview-card is-after">
+                <div className="editor-ai-preview-card-title">
+                  <span>{t("note.aiPreviewAfter")}</span>
+                  <span>{t("note.aiPreviewBlocksCount", { count: aiPreview.afterStats.blocks })}</span>
+                </div>
+                <div className="editor-ai-preview-scroll">
+                  <NoteStaticPreview
+                    content={aiPreview.afterBlocks}
+                    emptyLabel={t("note.aiPreviewEmptyAfter")}
+                    resolveFileUrl={onResolveFileUrl}
+                    compact
+                  />
+                </div>
+              </section>
+            </div>
+
+            {aiPreview.error ? (
+              <p className="editor-ai-preview-message is-error">{aiPreview.error}</p>
+            ) : null}
+
+            <footer className="editor-ai-preview-footer">
+              <button
+                type="button"
+                className="editor-ai-preview-secondary"
+                onClick={() => setAiPreview(null)}
+                disabled={aiPreview.status === "applying"}
+              >
+                {t("note.aiPreviewCancel")}
+              </button>
+              <button
+                type="button"
+                className="editor-ai-preview-primary"
+                onClick={applyAiPreviewResult}
+                disabled={aiPreview.status === "applying"}
+              >
+                {aiPreview.status === "applying" ? t("note.aiApplying") : t("note.aiPreviewApply")}
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+
       {aiPanel ? (
         <div
           ref={aiPanelRef}
@@ -1902,11 +2364,21 @@ export default function EditorPane({
                       strategy: "fixed"
                     },
                     elementProps: {
+                      className: "editor-floating-toolbar-popover",
                       style: {
                         zIndex: 60
                       },
+                      onPointerEnter: () => {
+                        restoreFloatingMediaSelection();
+                      },
+                      onPointerMove: () => {
+                        restoreFloatingMediaSelection();
+                      },
+                      onPointerDownCapture: (event) => {
+                        preserveFloatingMediaSelection(event);
+                      },
                       onMouseDown: (event) => {
-                        event.preventDefault();
+                        preserveFloatingMediaSelection(event);
                       }
                     }
                   }}

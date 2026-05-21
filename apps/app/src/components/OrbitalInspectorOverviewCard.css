@@ -1,5 +1,5 @@
 .orbital-inspector-overview-card {
-  --overview-card-accent: var(--gold);
+  --overview-card-accent: var(--accent-theme-primary, var(--gold));
   display: grid;
   gap: 9px;
   margin: 0 12px 12px;

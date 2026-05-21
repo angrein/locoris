@@ -28,6 +28,13 @@ type InspectorSubviewDocumentFilterState = {
   onToggle: () => void;
 };
 
+type InspectorSubviewHierarchyToggle = {
+  label: string;
+  expanded: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+};
+
 type OrbitalInspectorSubviewHeaderProps = {
   title: string;
   count: number;
@@ -41,6 +48,7 @@ type OrbitalInspectorSubviewHeaderProps = {
     note: InspectorSubviewAction;
     canvas: InspectorSubviewAction;
   } | null;
+  hierarchyToggle?: InspectorSubviewHierarchyToggle | null;
   scopeSwitch?: InspectorSubviewScopeSwitch | null;
   documentFilters?: Record<OrbitalInspectorSubviewDocumentFilter, InspectorSubviewDocumentFilterState> | null;
   onBack: () => void;
@@ -61,6 +69,30 @@ function SearchIcon() {
     <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
       <circle cx="10.7" cy="10.7" r="5.8" />
       <path d="m15 15 4.2 4.2" />
+    </svg>
+  );
+}
+
+function HierarchyToggleIcon({ expanded }: { expanded: boolean }) {
+  if (expanded) {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M7 6.8h10" />
+        <path d="M7 12h10" />
+        <path d="M7 17.2h10" />
+        <path d="m9.4 4.5-2.2 2.3 2.2 2.3" />
+        <path d="m14.6 14.9 2.2 2.3-2.2 2.3" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="M7 6.8h10" />
+      <path d="M7 12h10" />
+      <path d="M7 17.2h10" />
+      <path d="m7.2 4.5 2.2 2.3-2.2 2.3" />
+      <path d="m16.8 14.9-2.2 2.3 2.2 2.3" />
     </svg>
   );
 }
@@ -132,6 +164,7 @@ export default function OrbitalInspectorSubviewHeader({
   searchPlaceholder,
   query,
   quickActions,
+  hierarchyToggle,
   scopeSwitch,
   documentFilters,
   onBack,
@@ -164,38 +197,60 @@ export default function OrbitalInspectorSubviewHeader({
           <span className="orbital-inspector-subview-count">{count}</span>
         </div>
 
-        {quickActions ? (
-          <div className="orbital-inspector-subview-actions" aria-label={quickActions.folder.label}>
-            <button
-              type="button"
-              className="orbital-inspector-subview-action"
-              onClick={quickActions.folder.onClick}
-              disabled={quickActions.folder.disabled}
-              aria-label={quickActions.folder.label}
-              title={quickActions.folder.label}
-            >
-              <CreateIcon kind="folder" />
-            </button>
-            <button
-              type="button"
-              className="orbital-inspector-subview-action"
-              onClick={quickActions.note.onClick}
-              disabled={quickActions.note.disabled}
-              aria-label={quickActions.note.label}
-              title={quickActions.note.label}
-            >
-              <CreateIcon kind="note" />
-            </button>
-            <button
-              type="button"
-              className="orbital-inspector-subview-action"
-              onClick={quickActions.canvas.onClick}
-              disabled={quickActions.canvas.disabled}
-              aria-label={quickActions.canvas.label}
-              title={quickActions.canvas.label}
-            >
-              <CreateIcon kind="canvas" />
-            </button>
+        {quickActions || hierarchyToggle ? (
+          <div
+            className="orbital-inspector-subview-actions"
+            aria-label={quickActions?.folder.label ?? hierarchyToggle?.label}
+          >
+            {hierarchyToggle ? (
+              <button
+                type="button"
+                className={`orbital-inspector-subview-action orbital-inspector-subview-hierarchy-toggle ${
+                  hierarchyToggle.expanded ? "is-expanded" : ""
+                }`}
+                onClick={hierarchyToggle.onToggle}
+                disabled={hierarchyToggle.disabled}
+                aria-label={hierarchyToggle.label}
+                title={hierarchyToggle.label}
+              >
+                <HierarchyToggleIcon expanded={hierarchyToggle.expanded} />
+              </button>
+            ) : null}
+
+            {quickActions ? (
+              <>
+                <button
+                  type="button"
+                  className="orbital-inspector-subview-action"
+                  onClick={quickActions.folder.onClick}
+                  disabled={quickActions.folder.disabled}
+                  aria-label={quickActions.folder.label}
+                  title={quickActions.folder.label}
+                >
+                  <CreateIcon kind="folder" />
+                </button>
+                <button
+                  type="button"
+                  className="orbital-inspector-subview-action"
+                  onClick={quickActions.note.onClick}
+                  disabled={quickActions.note.disabled}
+                  aria-label={quickActions.note.label}
+                  title={quickActions.note.label}
+                >
+                  <CreateIcon kind="note" />
+                </button>
+                <button
+                  type="button"
+                  className="orbital-inspector-subview-action"
+                  onClick={quickActions.canvas.onClick}
+                  disabled={quickActions.canvas.disabled}
+                  aria-label={quickActions.canvas.label}
+                  title={quickActions.canvas.label}
+                >
+                  <CreateIcon kind="canvas" />
+                </button>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>

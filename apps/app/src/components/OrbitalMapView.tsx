@@ -62,6 +62,7 @@ const ORBITAL_NODE_POSITION_EASE_MS = 180;
 const ORBITAL_NODE_POSITION_SNAP_DISTANCE = 0.18;
 const LOW_DENSITY_DPR_THRESHOLD = 1.5;
 const HIERARCHY_SORT_ORDER_STEP = 1024;
+const DEFAULT_INTERFACE_ACCENT = "var(--accent-theme-primary, var(--gold))";
 
 interface OrbitalMapViewProps {
   projects: Project[];
@@ -226,6 +227,8 @@ interface OrbitalMapViewProps {
     foldersMenu: string;
     hierarchyScopeVault: string;
     hierarchyScopeProject: string;
+    expandHierarchy: string;
+    collapseHierarchy: string;
     tagsMenu: string;
     filesMenu: string;
     pinnedMenu: string;
@@ -2059,6 +2062,26 @@ function countInspectorHierarchyItems(items: InspectorHierarchyItem[]): number {
   return items.reduce((total, item) => total + 1 + countInspectorHierarchyItems(item.children), 0);
 }
 
+function collectInspectorHierarchyExpandableIds(items: InspectorHierarchyItem[]) {
+  const projectIds: string[] = [];
+  const folderIds: string[] = [];
+
+  const visit = (item: InspectorHierarchyItem) => {
+    if (item.children.length > 0) {
+      if (item.kind === "core") {
+        projectIds.push(item.id);
+      } else if (item.kind === "folder") {
+        folderIds.push(item.id);
+      }
+    }
+
+    item.children.forEach(visit);
+  };
+
+  items.forEach(visit);
+  return { projectIds, folderIds };
+}
+
 function getEntityProjectId(entityId: string | null, data: OrbitalData) {
   if (!entityId) {
     return null;
@@ -2244,6 +2267,9 @@ export default function OrbitalMapView({
   >([]);
   const [collapsedInspectorFolders, setCollapsedInspectorFolders] = useState<string[]>([]);
   const [expandedInspectorProjects, setExpandedInspectorProjects] = useState<string[]>([]);
+  const [isInspectorHierarchyAutoExpandSuppressed, setIsInspectorHierarchyAutoExpandSuppressed] =
+    useState(false);
+  const [inspectorHierarchyAutoScrollRequestId, setInspectorHierarchyAutoScrollRequestId] = useState(0);
   const [inspectorMenu, setInspectorMenu] = useState<InspectorMenu>("overview");
   const [inspectorHierarchyScope, setInspectorHierarchyScope] =
     useState<InspectorHierarchyScope>("vault");
@@ -2291,6 +2317,7 @@ export default function OrbitalMapView({
   const inspectorPanelRef = useRef<HTMLElement | null>(null);
   const inspectorMenuListRef = useRef<HTMLDivElement | null>(null);
   const inspectorHierarchyItemRefs = useRef(new Map<string, HTMLElement>());
+  const lastInspectorHierarchyAutoScrollKeyRef = useRef<string | null>(null);
   const overviewColorTriggerRef = useRef<HTMLButtonElement | null>(null);
   const overviewColorPanelRef = useRef<HTMLDivElement | null>(null);
   const suppressSceneBackgroundClickRef = useRef(false);
@@ -2610,6 +2637,9 @@ export default function OrbitalMapView({
     [notes]
   );
   const isVaultInspectorScope = inspectorHierarchyScope === "vault";
+  const inspectorContextAccent = isVaultInspectorScope
+    ? DEFAULT_INTERFACE_ACCENT
+    : currentProject?.color ?? DEFAULT_INTERFACE_ACCENT;
   const colorCounts = useMemo(() => {
     const counts = new Map<string, number>();
 
@@ -2889,27 +2919,12 @@ export default function OrbitalMapView({
     noteFilteredEntityIds.forEach((entityId) => matches.add(entityId));
     assetFilteredEntityIds.forEach((entityId) => matches.add(entityId));
 
-    [
-      ...searchMatchedEntityIds,
-      ...colorFilteredEntityIds,
-      ...tagFilteredEntityIds,
-      ...noteFilteredEntityIds,
-      ...assetFilteredEntityIds
-    ].forEach((entityId) => {
-      const projectId = getEntityProjectId(entityId, orbitalData);
-      if (projectId) {
-        matches.add(getProjectEntityId(projectId));
-      }
-    });
-
     return matches;
   }, [
     assetFilteredEntityIds,
     colorFilteredEntityIds,
-    folderDescendantFilteredEntityIds,
     folderPrimaryFilteredEntityIds,
     noteFilteredEntityIds,
-    orbitalData,
     searchMatchedEntityIds,
     tagFilteredEntityIds
   ]);
@@ -2952,7 +2967,7 @@ export default function OrbitalMapView({
     const selectionActive = Boolean(selectedEntityId);
     const filterActive = hasActiveFilter;
 
-    if (selectionActive) {
+    if (selectionActive && !filterActive) {
       selectionVisualContext.primary.forEach((entityId) => applyTone(entityId, "primary"));
       selectionVisualContext.direct.forEach((entityId) => applyTone(entityId, "direct"));
       selectionVisualContext.secondary.forEach((entityId) => applyTone(entityId, "secondary"));
@@ -3106,6 +3121,10 @@ export default function OrbitalMapView({
     }
 
     inspectorHierarchyItemRefs.current.delete(entityId);
+  };
+  const requestInspectorHierarchyAutoScroll = () => {
+    lastInspectorHierarchyAutoScrollKeyRef.current = null;
+    setInspectorHierarchyAutoScrollRequestId((current) => current + 1);
   };
   const currentProjectNode = currentProjectEntityId
     ? renderedScene.entityMap.get(currentProjectEntityId)
@@ -3283,30 +3302,59 @@ export default function OrbitalMapView({
     const targetEntityId = hierarchyFocusedEntityId ?? selectedEntityId;
 
     if (effectiveInspectorMenu !== "folders" || !targetEntityId) {
+      lastInspectorHierarchyAutoScrollKeyRef.current = null;
+      return;
+    }
+
+    const scrollKey = [
+      effectiveInspectorMenu,
+      inspectorHierarchyScope,
+      normalizedInspectorQuery,
+      targetEntityId,
+      inspectorHierarchyAutoScrollRequestId
+    ].join(":");
+
+    if (lastInspectorHierarchyAutoScrollKeyRef.current === scrollKey) {
       return;
     }
 
     const frameId = window.requestAnimationFrame(() => {
-      const container = inspectorMenuListRef.current;
+      const scroller = inspectorPanelRef.current;
+      const list = inspectorMenuListRef.current;
       const target = inspectorHierarchyItemRefs.current.get(targetEntityId);
 
-      if (!container || !target) {
+      if (!scroller || !list || !target) {
         return;
       }
 
-      const containerRect = container.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
+      const header = scroller.querySelector(
+        ".orbital-inspector-subview-top.orbital-inspector-subview-card"
+      ) as HTMLElement | null;
+      const headerRect = header?.getBoundingClientRect() ?? null;
       const targetRect = target.getBoundingClientRect();
+      const topBoundary = Math.max(
+        scrollerRect.top + 8,
+        headerRect ? headerRect.bottom + 10 : scrollerRect.top + 8
+      );
+      const bottomBoundary = scrollerRect.bottom - 12;
       const isVisible =
-        targetRect.top >= containerRect.top + 8 &&
-        targetRect.bottom <= containerRect.bottom - 8;
+        targetRect.top >= topBoundary &&
+        targetRect.bottom <= bottomBoundary;
 
       if (!isVisible) {
-        target.scrollIntoView({
-          block: "nearest",
-          inline: "nearest",
+        const nextScrollTop =
+          targetRect.top < topBoundary
+            ? scroller.scrollTop + targetRect.top - topBoundary
+            : scroller.scrollTop + targetRect.bottom - bottomBoundary;
+
+        scroller.scrollTo({
+          top: Math.max(0, nextScrollTop),
           behavior: "smooth"
         });
       }
+
+      lastInspectorHierarchyAutoScrollKeyRef.current = scrollKey;
     });
 
     return () => {
@@ -3315,9 +3363,10 @@ export default function OrbitalMapView({
   }, [
     effectiveInspectorMenu,
     hierarchyFocusedEntityId,
+    inspectorHierarchyAutoScrollRequestId,
+    inspectorHierarchyScope,
     normalizedInspectorQuery,
-    selectedEntityId,
-    selectedHierarchyExpandedFolderSet
+    selectedEntityId
   ]);
 
   useEffect(() => {
@@ -4643,6 +4692,8 @@ export default function OrbitalMapView({
     projectId: string | null,
     options?: { centerInScene?: boolean; preserveProjectContext?: boolean }
   ) => {
+    setIsInspectorHierarchyAutoExpandSuppressed(false);
+
     if (options?.centerInScene) {
       pendingInspectorCenterRef.current = {
         entityId,
@@ -4694,6 +4745,7 @@ export default function OrbitalMapView({
     item: InspectorHierarchyItem,
     event: ReactMouseEvent<HTMLElement>
   ) => {
+    setIsInspectorHierarchyAutoExpandSuppressed(false);
     const isAdditiveSelection = event.metaKey || event.ctrlKey;
     const isRangeSelection = event.shiftKey;
     setHierarchyFocusedEntityId(item.entityId);
@@ -4780,6 +4832,7 @@ export default function OrbitalMapView({
   };
 
   const switchInspectorHierarchyScope = (scope: InspectorHierarchyScope) => {
+    setIsInspectorHierarchyAutoExpandSuppressed(false);
     setInspectorHierarchyScope(scope);
 
     if (scope === "project" && inspectorScopeProjectId) {
@@ -4902,7 +4955,7 @@ export default function OrbitalMapView({
       : 0;
   const selectedInspectorAccent =
     selectedNode?.kind === "core"
-      ? selectedNode.project?.color ?? DEFAULT_PROJECT_COLOR
+      ? selectedNode.project?.color ?? DEFAULT_INTERFACE_ACCENT
       : selectedNode?.kind === "folder"
         ? selectedNode.folder?.color ?? DEFAULT_FOLDER_COLOR
         : selectedNode?.note?.color ?? DEFAULT_NOTE_COLOR;
@@ -5222,6 +5275,50 @@ export default function OrbitalMapView({
     () => filterInspectorHierarchy(inspectorHierarchyTree, normalizedInspectorQuery),
     [inspectorHierarchyTree, normalizedInspectorQuery]
   );
+  const inspectorHierarchyExpandableIds = useMemo(
+    () => collectInspectorHierarchyExpandableIds(inspectorHierarchyTree),
+    [inspectorHierarchyTree]
+  );
+  const activeExpandableProjectIds = isVaultInspectorScope
+    ? inspectorHierarchyExpandableIds.projectIds
+    : [];
+  const activeExpandableFolderIds = inspectorHierarchyExpandableIds.folderIds;
+  const hasExpandableInspectorHierarchyItems =
+    activeExpandableProjectIds.length > 0 || activeExpandableFolderIds.length > 0;
+  const isInspectorHierarchyFullyExpanded = useMemo(() => {
+    if (!hasExpandableInspectorHierarchyItems) {
+      return false;
+    }
+
+    if (normalizedInspectorQuery.length > 0) {
+      return true;
+    }
+
+    const areProjectsExpanded = activeExpandableProjectIds.every(
+      (projectId) =>
+        expandedInspectorProjectSet.has(projectId) ||
+        (!isInspectorHierarchyAutoExpandSuppressed &&
+          selectedHierarchyExpandedProjectSet.has(projectId))
+    );
+    const areFoldersExpanded = activeExpandableFolderIds.every(
+      (folderId) =>
+        !collapsedInspectorFolderSet.has(folderId) ||
+        (!isInspectorHierarchyAutoExpandSuppressed &&
+          selectedHierarchyExpandedFolderSet.has(folderId))
+    );
+
+    return areProjectsExpanded && areFoldersExpanded;
+  }, [
+    activeExpandableFolderIds,
+    activeExpandableProjectIds,
+    collapsedInspectorFolderSet,
+    expandedInspectorProjectSet,
+    hasExpandableInspectorHierarchyItems,
+    isInspectorHierarchyAutoExpandSuppressed,
+    normalizedInspectorQuery.length,
+    selectedHierarchyExpandedFolderSet,
+    selectedHierarchyExpandedProjectSet
+  ]);
   const flattenedInspectorHierarchy = useMemo(() => {
     const items: InspectorHierarchyItem[] = [];
     const visit = (item: InspectorHierarchyItem) => {
@@ -5301,9 +5398,7 @@ export default function OrbitalMapView({
     effectiveInspectorMenu === "notes"
       ? labels.documentsMenu
       : effectiveInspectorMenu === "folders"
-        ? isVaultInspectorScope
-          ? labels.projectsStat
-          : labels.foldersMenu
+        ? labels.foldersMenu
         : effectiveInspectorMenu === "tags"
           ? labels.tagsMenu
           : effectiveInspectorMenu === "files"
@@ -7238,13 +7333,15 @@ export default function OrbitalMapView({
         ? isCoreCollapsible
           ? hasDraftChild ||
             normalizedInspectorQuery.length > 0 ||
-            selectedHierarchyExpandedProjectSet.has(item.id) ||
+            (!isInspectorHierarchyAutoExpandSuppressed &&
+              selectedHierarchyExpandedProjectSet.has(item.id)) ||
             expandedInspectorProjectSet.has(item.id)
           : true
         : isExpandable
           ? hasDraftChild ||
             normalizedInspectorQuery.length > 0 ||
-            selectedHierarchyExpandedFolderSet.has(item.id) ||
+            (!isInspectorHierarchyAutoExpandSuppressed &&
+              selectedHierarchyExpandedFolderSet.has(item.id)) ||
             !collapsedInspectorFolderSet.has(item.id)
           : false;
     const isSceneSelected = selectedEntityId === item.entityId;
@@ -7657,6 +7754,30 @@ export default function OrbitalMapView({
     setInspectorHierarchyScope(isVaultOverview ? "vault" : "project");
     openInspectorMenu(menu);
   };
+  const handleToggleInspectorHierarchyExpansion = () => {
+    if (!hasExpandableInspectorHierarchyItems || normalizedInspectorQuery.length > 0) {
+      return;
+    }
+
+    const projectIdSet = new Set(activeExpandableProjectIds);
+    const folderIdSet = new Set(activeExpandableFolderIds);
+    lastInspectorHierarchyAutoScrollKeyRef.current = null;
+
+    if (isInspectorHierarchyFullyExpanded) {
+      setIsInspectorHierarchyAutoExpandSuppressed(true);
+      setExpandedInspectorProjects((current) => current.filter((projectId) => !projectIdSet.has(projectId)));
+      setCollapsedInspectorFolders((current) =>
+        Array.from(new Set([...current, ...activeExpandableFolderIds]))
+      );
+      return;
+    }
+
+    setIsInspectorHierarchyAutoExpandSuppressed(false);
+    setExpandedInspectorProjects((current) =>
+      Array.from(new Set([...current, ...activeExpandableProjectIds]))
+    );
+    setCollapsedInspectorFolders((current) => current.filter((folderId) => !folderIdSet.has(folderId)));
+  };
   const handleOverviewFocusProject = (projectId: string) => {
     setSelectedEntityId(getProjectEntityId(projectId));
     setActiveProjectId(null);
@@ -7891,7 +8012,7 @@ export default function OrbitalMapView({
               )
         }
         kicker={overviewKicker}
-        accentColor={isVaultOverview ? DEFAULT_PROJECT_COLOR : currentProject?.color ?? DEFAULT_PROJECT_COLOR}
+        accentColor={isVaultOverview ? DEFAULT_INTERFACE_ACCENT : currentProject?.color ?? DEFAULT_INTERFACE_ACCENT}
         activeProjectId={currentProjectId}
         activeProjectIndex={activeProjectIndex}
         projectCount={orbitalData.projects.length}
@@ -7966,13 +8087,27 @@ export default function OrbitalMapView({
         <OrbitalInspectorSubviewHeader
           title={inspectorMenuTitle}
           count={inspectorMenuCount}
-          accentColor={currentProject?.color ?? DEFAULT_PROJECT_COLOR}
+          accentColor={inspectorContextAccent}
           backLabel={labels.back}
           searchLabel={labels.searchPlaceholder}
           searchPlaceholder={labels.searchPlaceholder}
           query={inspectorQuery}
           onBack={handleInspectorBack}
           onQueryChange={setInspectorQuery}
+          hierarchyToggle={
+            effectiveInspectorMenu === "folders"
+              ? {
+                  label: isInspectorHierarchyFullyExpanded
+                    ? labels.collapseHierarchy
+                    : labels.expandHierarchy,
+                  expanded: isInspectorHierarchyFullyExpanded,
+                  disabled:
+                    !hasExpandableInspectorHierarchyItems ||
+                    normalizedInspectorQuery.length > 0,
+                  onToggle: handleToggleInspectorHierarchyExpansion
+                }
+              : null
+          }
           quickActions={
             showInspectorHierarchyQuickActions
               ? {
@@ -8177,7 +8312,7 @@ export default function OrbitalMapView({
                     title: tag.name,
                     kindLabel: labels.tagsMenu,
                     count: inspectorTagCounts.get(normalizeTagLookup(tag.name)) ?? 0,
-                    icon: renderInspectorItemIcon("tag", currentProject?.color ?? DEFAULT_PROJECT_COLOR)
+                    icon: renderInspectorItemIcon("tag", inspectorContextAccent)
                   })}
                 </div>
               ))
@@ -8797,7 +8932,7 @@ export default function OrbitalMapView({
         <div
           ref={sceneWrapRef}
           className="orbital-scene-wrap"
-          style={{ "--orbital-scene-accent": currentProject?.color ?? DEFAULT_PROJECT_COLOR } as CSSProperties}
+          style={{ "--orbital-scene-accent": currentProject?.color ?? DEFAULT_INTERFACE_ACCENT } as CSSProperties}
         >
           <div className="orbital-filter-dock">
             <div className="orbital-filter-shell">
@@ -8894,8 +9029,11 @@ export default function OrbitalMapView({
 
               {renderedScene.nodes.map((node) => {
                 const nodeTone = getSceneTone(node.entityId);
-                const isPrimaryTone = nodeTone === "primary";
                 const isSelected = node.entityId === selectedEntityId;
+                const isFilterMatched =
+                  filterPrimaryEntityIds.has(node.entityId) ||
+                  filterSecondaryEntityIds.has(node.entityId);
+                const showSelectedVisuals = isSelected && (!hasActiveFilter || isFilterMatched);
                 const folderVisualKind = node.kind === "folder" ? getFolderVisualKind(node.folder) : null;
                 const isRootFolder = folderVisualKind === "folder";
                 const isSubfolder = folderVisualKind === "subfolder";
@@ -8905,7 +9043,7 @@ export default function OrbitalMapView({
                 const nodeCoreFlareRotation = sceneMovingEntityIds.has(node.entityId) ? coreFlareRotation : 0;
                 const showLabel =
                   node.kind === "core" ||
-                  isSelected ||
+                  showSelectedVisuals ||
                   nodeTone === "primary" ||
                   nodeTone === "direct" ||
                   (nodeTone === "secondary" && !isMobilePreviewMode) ||
@@ -8923,7 +9061,7 @@ export default function OrbitalMapView({
                       node.note?.contentType === "canvas" ? "is-canvas-entry" : ""
                     } ${isRootFolder ? "is-root-folder" : ""} ${isSubfolder ? "is-subfolder" : ""} ${
                       isRootEntry ? "is-root-entry" : ""
-                    } is-${nodeTone} ${isSelected ? "is-selected" : ""}`}
+                    } is-${nodeTone} ${showSelectedVisuals ? "is-selected" : ""}`}
                     style={{ "--node-color": node.color } as CSSProperties}
                     transform={`translate(${node.x} ${node.y})`}
                     onPointerDown={(event) => {
@@ -8952,12 +9090,16 @@ export default function OrbitalMapView({
                     onClick={(event) => {
                       event.stopPropagation();
                       suppressSceneBackgroundClickRef.current = false;
+                      setIsInspectorHierarchyAutoExpandSuppressed(false);
                       setSelectedEntityId(node.entityId);
 
                       const nodeProjectId =
                         node.project?.id ?? node.folder?.projectId ?? node.note?.projectId ?? null;
 
                       if (effectiveInspectorMenu !== "overview") {
+                        setHierarchyFocusedEntityId(node.entityId);
+                        requestInspectorHierarchyAutoScroll();
+
                         if (isVaultInspectorScope) {
                           setActiveProjectId(null);
                           setInspectorHierarchyScope("vault");
@@ -8966,15 +9108,13 @@ export default function OrbitalMapView({
                           setInspectorHierarchyScope("project");
                         }
 
-                        if (effectiveInspectorMenu === "folders") {
-                          setHierarchyFocusedEntityId(node.entityId);
-                        }
-
                         return;
                       }
 
                       setInspectorHierarchyScope("project");
                       openInspectorMenu(node.kind === "core" ? "overview" : "folders");
+                      setHierarchyFocusedEntityId(node.entityId);
+                      requestInspectorHierarchyAutoScroll();
                       if (nodeProjectId) {
                         setActiveProjectId(nodeProjectId);
                       }
@@ -9168,7 +9308,7 @@ export default function OrbitalMapView({
                       )
                     ) : null}
 
-                    {isSelected ? <circle r={node.radius * 1.82} className="orbital-selection-ring" /> : null}
+                    {showSelectedVisuals ? <circle r={node.radius * 1.82} className="orbital-selection-ring" /> : null}
 
                     {showLabel ? (
                       <g transform={`translate(0 ${node.radius + 24})`}>
@@ -9176,7 +9316,7 @@ export default function OrbitalMapView({
                           className={`orbital-label-group orbital-label-group-${node.kind} ${
                             isRootFolder ? "is-root-folder" : ""
                           } ${isSubfolder ? "is-subfolder" : ""} ${isRootEntry ? "is-root-entry" : ""} ${
-                            isSelected ? "is-selected" : ""
+                            showSelectedVisuals ? "is-selected" : ""
                           } is-${nodeTone}`}
                         >
                           <rect
