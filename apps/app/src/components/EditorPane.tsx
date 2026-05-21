@@ -45,10 +45,12 @@ import {
   generateGeminiMarkdown,
   generateGeminiStructuredEdit,
   readGeminiApiKey,
+  readStoredGeminiEditorFormat,
   readStoredGeminiModel,
   type GeminiAiAction,
   type GeminiAiScope,
-  type GeminiCustomMode
+  type GeminiCustomMode,
+  type GeminiEditorFormat
 } from "../lib/aiIntegration";
 import {
   collectAiContentStats,
@@ -90,6 +92,7 @@ type AiInlineRange = {
   to: number;
 };
 type AiPreviewApplyMode = "replaceBlocks" | "insertBlocks" | "replaceInline";
+type AiPreviewMethod = GeminiEditorFormat | "markdown-fallback";
 type AiPreviewState = {
   status: "idle" | "applying" | "error";
   action: GeminiAiAction;
@@ -107,6 +110,7 @@ type AiPreviewState = {
   inlineText: string | null;
   error: string | null;
   fallbackUsed: boolean;
+  method: AiPreviewMethod;
 };
 
 const EDITOR_TYPOGRAPHY_MODE_STORAGE_KEY = "zen:editor-typography-mode";
@@ -1303,7 +1307,7 @@ export default function EditorPane({
     action: GeminiAiAction,
     summary: string,
     warnings: string[],
-    fallbackUsed: boolean
+    method: AiPreviewMethod
   ) => {
     const canReplaceInline =
       intent === "replace" &&
@@ -1346,7 +1350,8 @@ export default function EditorPane({
       inlineRange: applyMode === "replaceInline" ? panelState.inlineRange : null,
       inlineText: applyMode === "replaceInline" ? inlineText : null,
       error: null,
-      fallbackUsed
+      fallbackUsed: method === "markdown-fallback",
+      method
     });
     setAiPanel(null);
   };
@@ -1485,41 +1490,14 @@ export default function EditorPane({
     try {
       const apiKey = await readGeminiApiKey();
       const model = readStoredGeminiModel();
+      const editorFormat = readStoredGeminiEditorFormat();
       const intent = shouldGenerateNew ? "insert" : "replace";
       let resultBlocks: NoteContent;
       let resultSummary = "";
       let resultWarnings: string[] = [];
-      let fallbackUsed = false;
+      let resultMethod: AiPreviewMethod = editorFormat;
 
-      try {
-        const structuredPayload = await generateGeminiStructuredEdit({
-          apiKey,
-          model,
-          action,
-          scope: currentPanel.scope,
-          markdown: snapshot.markdown,
-          appLanguage: language,
-          noteTitle: titleDraft.trim() || note.title,
-          customPrompt,
-          customMode,
-          targetLanguage,
-          editorBlocks: snapshot.sourceBlocks,
-          intent
-        });
-        const sanitizedPayload = sanitizeAiStructuredEditPayload(structuredPayload, {
-          fallbackSummary: t("note.aiPreviewSummaryDefault")
-        });
-
-        resultBlocks = sanitizedPayload.blocks;
-        resultSummary = sanitizedPayload.summary;
-        resultWarnings = sanitizedPayload.warnings;
-      } catch (structuredError) {
-        if (isFatalAiRequestError(structuredError)) {
-          throw structuredError;
-        }
-
-        console.warn("Gemini structured editor output failed; falling back to Markdown.", structuredError);
-
+      if (editorFormat === "markdown") {
         const resultMarkdown = await generateGeminiMarkdown({
           apiKey,
           model,
@@ -1534,8 +1512,53 @@ export default function EditorPane({
         });
 
         resultBlocks = await parseAiMarkdownToBlocks(resultMarkdown);
-        resultWarnings = [t("note.aiPreviewMarkdownFallback")];
-        fallbackUsed = true;
+      } else {
+        try {
+          const structuredPayload = await generateGeminiStructuredEdit({
+            apiKey,
+            model,
+            action,
+            scope: currentPanel.scope,
+            markdown: snapshot.markdown,
+            appLanguage: language,
+            noteTitle: titleDraft.trim() || note.title,
+            customPrompt,
+            customMode,
+            targetLanguage,
+            editorBlocks: snapshot.sourceBlocks,
+            intent
+          });
+          const sanitizedPayload = sanitizeAiStructuredEditPayload(structuredPayload, {
+            fallbackSummary: t("note.aiPreviewSummaryDefault")
+          });
+
+          resultBlocks = sanitizedPayload.blocks;
+          resultSummary = sanitizedPayload.summary;
+          resultWarnings = sanitizedPayload.warnings;
+        } catch (structuredError) {
+          if (isFatalAiRequestError(structuredError)) {
+            throw structuredError;
+          }
+
+          console.warn("Gemini structured editor output failed; falling back to Markdown.", structuredError);
+
+          const resultMarkdown = await generateGeminiMarkdown({
+            apiKey,
+            model,
+            action,
+            scope: currentPanel.scope,
+            markdown: snapshot.markdown,
+            appLanguage: language,
+            noteTitle: titleDraft.trim() || note.title,
+            customPrompt,
+            customMode,
+            targetLanguage
+          });
+
+          resultBlocks = await parseAiMarkdownToBlocks(resultMarkdown);
+          resultWarnings = [t("note.aiPreviewMarkdownFallback")];
+          resultMethod = "markdown-fallback";
+        }
       }
 
       openAiPreview(
@@ -1545,7 +1568,7 @@ export default function EditorPane({
         action,
         resultSummary,
         resultWarnings,
-        fallbackUsed
+        resultMethod
       );
     } catch (error) {
       setAiPanel((previous) =>
@@ -2076,7 +2099,13 @@ export default function EditorPane({
                   afterWords: aiPreview.afterStats.words
                 })}
               </span>
-              {aiPreview.fallbackUsed ? <span>{t("note.aiPreviewFallbackBadge")}</span> : null}
+              <span className={`editor-ai-preview-method is-${aiPreview.method}`}>
+                {aiPreview.method === "rich-json"
+                  ? t("note.aiPreviewMethodRichJson")
+                  : aiPreview.method === "markdown"
+                    ? t("note.aiPreviewMethodMarkdown")
+                    : t("note.aiPreviewFallbackBadge")}
+              </span>
             </div>
 
             {aiPreview.warnings.length > 0 ? (

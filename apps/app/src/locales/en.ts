@@ -167,6 +167,8 @@ const en = {
     aiPreviewMarkdownFallback:
       "Strict rich output did not pass, so the result was assembled through Markdown fallback.",
     aiPreviewFallbackBadge: "Markdown fallback",
+    aiPreviewMethodRichJson: "Rich JSON",
+    aiPreviewMethodMarkdown: "Markdown",
     aiPreviewReplaceMode: "Replaces the selected content",
     aiPreviewInsertMode: "Inserts new blocks below",
     aiPreviewInlineMode: "Replaces selected text",
@@ -544,6 +546,16 @@ const en = {
       "Limits: the smallest free-tier headroom; better used selectively instead of as the default.",
     aiModelLimitsDisclaimer:
       "Google changes free quotas by model, region, and account. Locoris shows a UX profile and verifies the selected model id with a live request.",
+    aiEditorFormatLabel: "Editor format",
+    aiEditorFormatHint: "Applies immediately",
+    aiEditorFormatRichTitle: "Rich JSON",
+    aiEditorFormatRichChip: "Native",
+    aiEditorFormatRichDescription:
+      "Strict rich output through responseFormat / responseJsonSchema. Best for preserving blocks, tables, checklists, and styles.",
+    aiEditorFormatMarkdownTitle: "Markdown",
+    aiEditorFormatMarkdownChip: "Classic",
+    aiEditorFormatMarkdownDescription:
+      "Text-first Markdown mode. Sometimes more creatively loose, but less reliable for rich editor structure.",
     aiModelAdvancedTitle: "Advanced model id",
     aiModelAdvancedDescription: "For new, experimental, or manually enabled Gemini API models.",
     aiModelIdLabel: "Model ID",

@@ -22,6 +22,7 @@ import {
 export type GeminiAiAction = "beautify" | "improve" | "fix" | "translate" | "custom";
 export type GeminiAiScope = "note" | "selection";
 export type GeminiCustomMode = "edit" | "generate";
+export type GeminiEditorFormat = "rich-json" | "markdown";
 
 export type GeminiModelOption = {
   id: string;
@@ -38,7 +39,9 @@ export type GeminiModelOption = {
 export const GEMINI_API_KEY_SECRET_KEY = "ai:gemini:api-key";
 export const GEMINI_API_KEY_BROWSER_STORAGE_KEY = "zen:ai.gemini.api-key";
 export const GEMINI_MODEL_STORAGE_KEY = "locoris.ai.gemini.model";
+export const GEMINI_EDITOR_FORMAT_STORAGE_KEY = "locoris.ai.editor-format";
 export const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
+export const DEFAULT_GEMINI_EDITOR_FORMAT: GeminiEditorFormat = "rich-json";
 export const EDITOR_AI_OPEN_EVENT = "locoris:editor-ai-open";
 
 export const GEMINI_MODEL_OPTIONS: readonly GeminiModelOption[] = [
@@ -143,6 +146,8 @@ type GeminiGenerateResponse = {
   };
 };
 
+type GeminiGenerationConfig = Record<string, unknown>;
+
 export function sanitizeGeminiModelId(model: string | null | undefined) {
   return (typeof model === "string" ? model.trim() : "").replace(/^models\//i, "");
 }
@@ -176,6 +181,19 @@ export function readStoredGeminiModel() {
 
 export function writeStoredGeminiModel(model: string) {
   writePersistentString(GEMINI_MODEL_STORAGE_KEY, resolveModelId(model));
+}
+
+export function readStoredGeminiEditorFormat(): GeminiEditorFormat {
+  const storedFormat = readPersistentString(GEMINI_EDITOR_FORMAT_STORAGE_KEY);
+
+  return storedFormat === "markdown" ? "markdown" : DEFAULT_GEMINI_EDITOR_FORMAT;
+}
+
+export function writeStoredGeminiEditorFormat(format: GeminiEditorFormat) {
+  writePersistentString(
+    GEMINI_EDITOR_FORMAT_STORAGE_KEY,
+    format === "markdown" ? "markdown" : DEFAULT_GEMINI_EDITOR_FORMAT
+  );
 }
 
 function canUseBrowserGeminiKeyFallback() {
@@ -276,7 +294,10 @@ function buildStructuredActionInstruction(input: GenerateGeminiStructuredEditInp
   if (input.action === "beautify") {
     return [
       `Transform the ${scopeLabel} into a polished premium Locoris note.`,
-      "Use the editor block types, text styles, tables, checklists, quotes, headings, lists, links, and tasteful emoji when they improve clarity.",
+      "This action must create a visibly more beautiful rich note, not only a light rewrite.",
+      "Add elegant hierarchy, expressive headings, concise sections, bullet lists, numbered lists, checklists, quotes, tables, links, and text styles when they improve clarity.",
+      "Use tasteful, context-aware emoji in headings or key list items when it makes the note warmer, easier to scan, or more presentation-ready. Keep emoji premium and sparse, but do not omit them when the content naturally supports them.",
+      "Use subtle text styles and color/background accents only when they help structure the result.",
       "Preserve the input language exactly unless the user explicitly asked for a different language.",
       "Keep meaning faithful. Do not invent facts."
     ].join("\n");
@@ -448,6 +469,18 @@ function extractGeminiText(payload: GeminiGenerateResponse) {
   return cleanGeminiMarkdown(text);
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function shouldRetryStructuredRequest(error: unknown) {
+  const message = getErrorMessage(error);
+
+  return !/api key|unauthenticated|permission_denied|resource_exhausted|quota|not found|not supported|unsupported|model/i.test(
+    message
+  );
+}
+
 function toGeminiResponseSchema(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(toGeminiResponseSchema);
@@ -468,6 +501,80 @@ function toGeminiResponseSchema(value: unknown): unknown {
   );
 }
 
+function buildStructuredGenerationConfigs(input: GenerateGeminiStructuredEditInput): GeminiGenerationConfig[] {
+  const temperature =
+    input.action === "beautify"
+      ? 0.52
+      : input.action === "custom"
+        ? 0.42
+        : 0.15;
+  const baseConfig = {
+    temperature,
+    maxOutputTokens: 8192
+  };
+
+  return [
+    {
+      ...baseConfig,
+      responseFormat: {
+        text: {
+          mimeType: "application/json",
+          schema: AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA
+        }
+      }
+    },
+    {
+      ...baseConfig,
+      responseMimeType: "application/json",
+      responseJsonSchema: AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA
+    },
+    {
+      ...baseConfig,
+      responseMimeType: "application/json",
+      responseSchema: toGeminiResponseSchema(AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA)
+    }
+  ];
+}
+
+async function requestGeminiGeneratedText(input: {
+  apiKey: string;
+  model: string;
+  prompt: string;
+  generationConfig: GeminiGenerationConfig;
+}) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": input.apiKey
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: input.prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: input.generationConfig
+      })
+    }
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as GeminiGenerateResponse;
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message || `GEMINI_HTTP_${response.status}`);
+  }
+
+  return extractGeminiText(payload);
+}
+
 export async function generateGeminiMarkdown(input: GenerateGeminiMarkdownInput) {
   const apiKey = input.apiKey.trim();
   const model = resolveModelId(input.model);
@@ -481,40 +588,15 @@ export async function generateGeminiMarkdown(input: GenerateGeminiMarkdownInput)
     throw new Error("GEMINI_INPUT_EMPTY");
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: buildGeminiPrompt(input)
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: input.action === "beautify" || input.action === "custom" ? 0.45 : 0.2,
-          maxOutputTokens: 8192
-        }
-      })
+  return requestGeminiGeneratedText({
+    apiKey,
+    model,
+    prompt: buildGeminiPrompt(input),
+    generationConfig: {
+      temperature: input.action === "beautify" || input.action === "custom" ? 0.45 : 0.2,
+      maxOutputTokens: 8192
     }
-  );
-
-  const payload = (await response.json().catch(() => ({}))) as GeminiGenerateResponse;
-
-  if (!response.ok) {
-    throw new Error(payload.error?.message || `GEMINI_HTTP_${response.status}`);
-  }
-
-  return extractGeminiText(payload);
+  });
 }
 
 export async function generateGeminiStructuredEdit(
@@ -536,48 +618,29 @@ export async function generateGeminiStructuredEdit(
     throw new Error("GEMINI_INPUT_EMPTY");
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: buildGeminiStructuredPrompt(input)
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: input.action === "beautify" || input.action === "custom" ? 0.38 : 0.15,
-          maxOutputTokens: 8192,
-          responseMimeType: "application/json",
-          responseSchema: toGeminiResponseSchema(AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA)
-        }
-      })
+  const prompt = buildGeminiStructuredPrompt(input);
+  const errors: string[] = [];
+
+  for (const generationConfig of buildStructuredGenerationConfigs(input)) {
+    try {
+      const text = await requestGeminiGeneratedText({
+        apiKey,
+        model,
+        prompt,
+        generationConfig
+      });
+
+      return JSON.parse(text) as AiStructuredEditPayload;
+    } catch (error) {
+      errors.push(getErrorMessage(error));
+
+      if (!shouldRetryStructuredRequest(error)) {
+        break;
+      }
     }
-  );
-
-  const payload = (await response.json().catch(() => ({}))) as GeminiGenerateResponse;
-
-  if (!response.ok) {
-    throw new Error(payload.error?.message || `GEMINI_HTTP_${response.status}`);
   }
 
-  const text = extractGeminiText(payload);
-
-  try {
-    return JSON.parse(text) as AiStructuredEditPayload;
-  } catch {
-    throw new Error("GEMINI_STRUCTURED_PARSE_FAILED");
-  }
+  throw new Error(errors.length > 0 ? `GEMINI_STRUCTURED_FAILED: ${errors.join(" | ")}` : "GEMINI_STRUCTURED_FAILED");
 }
 
 export async function testGeminiConnection(apiKey: string, model: string) {

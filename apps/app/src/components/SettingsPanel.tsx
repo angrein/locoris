@@ -12,11 +12,14 @@ import {
   GEMINI_MODEL_OPTIONS,
   isValidGeminiModelId,
   readGeminiApiKey,
+  readStoredGeminiEditorFormat,
   readStoredGeminiModel,
   sanitizeGeminiModelId,
   testGeminiConnection,
   writeGeminiApiKey,
-  writeStoredGeminiModel
+  writeStoredGeminiEditorFormat,
+  writeStoredGeminiModel,
+  type GeminiEditorFormat
 } from "../lib/aiIntegration";
 import type { LocalVaultKind, LocalVaultProfile } from "../lib/localVaults";
 import {
@@ -253,6 +256,8 @@ export default function SettingsPanel({
   const [aiKeyDraft, setAiKeyDraft] = useState("");
   const [aiModelId, setAiModelId] = useState(() => readStoredGeminiModel());
   const [aiModelDraft, setAiModelDraft] = useState(() => readStoredGeminiModel());
+  const [aiEditorFormat, setAiEditorFormat] =
+    useState<GeminiEditorFormat>(() => readStoredGeminiEditorFormat());
   const [aiFeedback, setAiFeedback] = useState<SyncFeedbackState>(null);
   const [aiModelCheckFeedback, setAiModelCheckFeedback] =
     useState<AiModelCheckFeedbackState>(null);
@@ -507,6 +512,12 @@ export default function SettingsPanel({
     }
   };
 
+  const selectAiEditorFormat = (format: GeminiEditorFormat) => {
+    setAiEditorFormat(format);
+    writeStoredGeminiEditorFormat(format);
+    setAiFeedback(null);
+  };
+
   const renderAiModelChips = (
     model: (typeof GEMINI_MODEL_OPTIONS)[number] | null
   ) => {
@@ -586,6 +597,7 @@ export default function SettingsPanel({
     try {
       await writeGeminiApiKey(apiKey);
       writeStoredGeminiModel(aiModelId);
+      writeStoredGeminiEditorFormat(aiEditorFormat);
       setAiFeedback({
         tone: "success",
         text: t("settings.aiSaved")
@@ -624,6 +636,7 @@ export default function SettingsPanel({
 
     try {
       writeStoredGeminiModel(aiModelId);
+      writeStoredGeminiEditorFormat(aiEditorFormat);
       await testGeminiConnection(apiKey, aiModelId);
       setAiFeedback({
         tone: "success",
@@ -881,6 +894,45 @@ export default function SettingsPanel({
                     <em>{t("settings.aiModelChange")}</em>
                   </span>
                 </button>
+              </div>
+
+              <div className="settings-ai-format-section">
+                <div className="settings-ai-section-head">
+                  <span>{t("settings.aiEditorFormatLabel")}</span>
+                  <span>{t("settings.aiEditorFormatHint")}</span>
+                </div>
+                <div
+                  className="settings-ai-format-grid"
+                  role="radiogroup"
+                  aria-label={t("settings.aiEditorFormatLabel")}
+                >
+                  <button
+                    type="button"
+                    className={`settings-ai-format-option ${aiEditorFormat === "rich-json" ? "is-active" : ""}`}
+                    onClick={() => selectAiEditorFormat("rich-json")}
+                    role="radio"
+                    aria-checked={aiEditorFormat === "rich-json"}
+                  >
+                    <span className="settings-ai-format-option-head">
+                      <strong>{t("settings.aiEditorFormatRichTitle")}</strong>
+                      <span>{t("settings.aiEditorFormatRichChip")}</span>
+                    </span>
+                    <p>{t("settings.aiEditorFormatRichDescription")}</p>
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-ai-format-option ${aiEditorFormat === "markdown" ? "is-active" : ""}`}
+                    onClick={() => selectAiEditorFormat("markdown")}
+                    role="radio"
+                    aria-checked={aiEditorFormat === "markdown"}
+                  >
+                    <span className="settings-ai-format-option-head">
+                      <strong>{t("settings.aiEditorFormatMarkdownTitle")}</strong>
+                      <span>{t("settings.aiEditorFormatMarkdownChip")}</span>
+                    </span>
+                    <p>{t("settings.aiEditorFormatMarkdownDescription")}</p>
+                  </button>
+                </div>
               </div>
 
               <div className="settings-ai-actions">

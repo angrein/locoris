@@ -717,6 +717,24 @@
   line-height: 1;
 }
 
+.editor-ai-preview-meta .editor-ai-preview-method {
+  border-color: color-mix(in srgb, var(--editor-accent) 30%, rgb(var(--line-rgb) / 0.12));
+  background: color-mix(in srgb, var(--editor-accent) 10%, rgba(255, 255, 255, 0.035));
+  color: color-mix(in srgb, var(--text) 86%, var(--editor-accent) 14%);
+}
+
+.editor-ai-preview-meta .editor-ai-preview-method.is-markdown {
+  border-color: rgb(var(--cyan-rgb) / 0.2);
+  background: rgb(var(--cyan-rgb) / 0.07);
+  color: color-mix(in srgb, var(--text) 82%, var(--cyan) 18%);
+}
+
+.editor-ai-preview-meta .editor-ai-preview-method.is-markdown-fallback {
+  border-color: rgba(255, 196, 87, 0.22);
+  background: rgba(255, 196, 87, 0.075);
+  color: color-mix(in srgb, var(--text) 82%, #ffc457 18%);
+}
+
 .editor-ai-preview-warnings span {
   border-color: rgba(255, 196, 87, 0.2);
   background: rgba(255, 196, 87, 0.07);
@@ -725,9 +743,12 @@
 
 .editor-ai-preview-grid {
   min-height: 0;
+  max-height: clamp(220px, calc(100vh - 310px), 470px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
+  padding-bottom: 4px;
+  overflow: hidden;
 }
 
 .editor-ai-preview-card {
@@ -799,10 +820,16 @@
 }
 
 .editor-ai-preview-footer {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(var(--line-rgb) / 0.08);
+  background:
+    linear-gradient(180deg, rgb(var(--surface-deep-rgb) / 0), rgb(var(--surface-deep-rgb) / 0.42));
 }
 
 .editor-ai-preview-secondary,

@@ -167,6 +167,8 @@ const ru = {
     aiPreviewMarkdownFallback:
       "Строгий rich-формат не прошел, поэтому результат собран через Markdown fallback.",
     aiPreviewFallbackBadge: "Markdown fallback",
+    aiPreviewMethodRichJson: "Rich JSON",
+    aiPreviewMethodMarkdown: "Markdown",
     aiPreviewReplaceMode: "Заменит выбранный фрагмент",
     aiPreviewInsertMode: "Вставит новый блок ниже",
     aiPreviewInlineMode: "Заменит выделенный текст",
@@ -546,6 +548,16 @@ const ru = {
       "Лимиты: самые маленькие в бесплатном тире; лучше использовать точечно, а не как модель по умолчанию.",
     aiModelLimitsDisclaimer:
       "Google меняет бесплатные квоты по модели, региону и аккаунту. Locoris показывает UX-профиль и проверяет выбранный model id живым запросом.",
+    aiEditorFormatLabel: "Формат редактора",
+    aiEditorFormatHint: "Применяется сразу",
+    aiEditorFormatRichTitle: "Rich JSON",
+    aiEditorFormatRichChip: "Нативно",
+    aiEditorFormatRichDescription:
+      "Строгий rich-формат через responseFormat / responseJsonSchema. Лучше сохраняет блоки, таблицы, чеклисты и стили.",
+    aiEditorFormatMarkdownTitle: "Markdown",
+    aiEditorFormatMarkdownChip: "Классика",
+    aiEditorFormatMarkdownDescription:
+      "Текстовый Markdown-режим. Иногда дает более свободный творческий результат, но хуже сохраняет rich-структуру редактора.",
     aiModelAdvancedTitle: "Продвинутый model id",
     aiModelAdvancedDescription: "Для новых, экспериментальных или вручную включенных моделей Gemini API.",
     aiModelIdLabel: "Model ID",
