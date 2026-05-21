@@ -448,6 +448,26 @@ function extractGeminiText(payload: GeminiGenerateResponse) {
   return cleanGeminiMarkdown(text);
 }
 
+function toGeminiResponseSchema(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(toGeminiResponseSchema);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => {
+      if (key === "type" && typeof entryValue === "string") {
+        return [key, entryValue.toUpperCase()];
+      }
+
+      return [key, toGeminiResponseSchema(entryValue)];
+    })
+  );
+}
+
 export async function generateGeminiMarkdown(input: GenerateGeminiMarkdownInput) {
   const apiKey = input.apiKey.trim();
   const model = resolveModelId(input.model);
@@ -539,7 +559,7 @@ export async function generateGeminiStructuredEdit(
           temperature: input.action === "beautify" || input.action === "custom" ? 0.38 : 0.15,
           maxOutputTokens: 8192,
           responseMimeType: "application/json",
-          responseSchema: AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA
+          responseSchema: toGeminiResponseSchema(AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA)
         }
       })
     }
