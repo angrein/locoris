@@ -12,13 +12,19 @@ import {
   GEMINI_MODEL_OPTIONS,
   isValidGeminiModelId,
   readGeminiApiKey,
+  readStoredGeminiCanvasGenerationMode,
+  readStoredGeminiEditorApplyMode,
   readStoredGeminiEditorFormat,
   readStoredGeminiModel,
   sanitizeGeminiModelId,
   testGeminiConnection,
   writeGeminiApiKey,
+  writeStoredGeminiCanvasGenerationMode,
+  writeStoredGeminiEditorApplyMode,
   writeStoredGeminiEditorFormat,
   writeStoredGeminiModel,
+  type GeminiCanvasGenerationMode,
+  type GeminiEditorApplyMode,
   type GeminiEditorFormat
 } from "../lib/aiIntegration";
 import type { LocalVaultKind, LocalVaultProfile } from "../lib/localVaults";
@@ -258,6 +264,10 @@ export default function SettingsPanel({
   const [aiModelDraft, setAiModelDraft] = useState(() => readStoredGeminiModel());
   const [aiEditorFormat, setAiEditorFormat] =
     useState<GeminiEditorFormat>(() => readStoredGeminiEditorFormat());
+  const [aiEditorApplyMode, setAiEditorApplyMode] =
+    useState<GeminiEditorApplyMode>(() => readStoredGeminiEditorApplyMode());
+  const [aiCanvasGenerationMode, setAiCanvasGenerationMode] =
+    useState<GeminiCanvasGenerationMode>(() => readStoredGeminiCanvasGenerationMode());
   const [aiFeedback, setAiFeedback] = useState<SyncFeedbackState>(null);
   const [aiModelCheckFeedback, setAiModelCheckFeedback] =
     useState<AiModelCheckFeedbackState>(null);
@@ -518,6 +528,18 @@ export default function SettingsPanel({
     setAiFeedback(null);
   };
 
+  const selectAiEditorApplyMode = (mode: GeminiEditorApplyMode) => {
+    setAiEditorApplyMode(mode);
+    writeStoredGeminiEditorApplyMode(mode);
+    setAiFeedback(null);
+  };
+
+  const selectAiCanvasGenerationMode = (mode: GeminiCanvasGenerationMode) => {
+    setAiCanvasGenerationMode(mode);
+    writeStoredGeminiCanvasGenerationMode(mode);
+    setAiFeedback(null);
+  };
+
   const renderAiModelChips = (
     model: (typeof GEMINI_MODEL_OPTIONS)[number] | null
   ) => {
@@ -598,6 +620,8 @@ export default function SettingsPanel({
       await writeGeminiApiKey(apiKey);
       writeStoredGeminiModel(aiModelId);
       writeStoredGeminiEditorFormat(aiEditorFormat);
+      writeStoredGeminiEditorApplyMode(aiEditorApplyMode);
+      writeStoredGeminiCanvasGenerationMode(aiCanvasGenerationMode);
       setAiFeedback({
         tone: "success",
         text: t("settings.aiSaved")
@@ -637,6 +661,8 @@ export default function SettingsPanel({
     try {
       writeStoredGeminiModel(aiModelId);
       writeStoredGeminiEditorFormat(aiEditorFormat);
+      writeStoredGeminiEditorApplyMode(aiEditorApplyMode);
+      writeStoredGeminiCanvasGenerationMode(aiCanvasGenerationMode);
       await testGeminiConnection(apiKey, aiModelId);
       setAiFeedback({
         tone: "success",
@@ -898,6 +924,10 @@ export default function SettingsPanel({
 
               <div className="settings-ai-format-section">
                 <div className="settings-ai-section-head">
+                  <span>{t("settings.aiEditorBehaviorTitle")}</span>
+                  <span>{t("settings.aiEditorBehaviorDescription")}</span>
+                </div>
+                <div className="settings-ai-subsection-head">
                   <span>{t("settings.aiEditorFormatLabel")}</span>
                   <span>{t("settings.aiEditorFormatHint")}</span>
                 </div>
@@ -931,6 +961,82 @@ export default function SettingsPanel({
                       <span>{t("settings.aiEditorFormatMarkdownChip")}</span>
                     </span>
                     <p>{t("settings.aiEditorFormatMarkdownDescription")}</p>
+                  </button>
+                </div>
+
+                <div className="settings-ai-subsection-head">
+                  <span>{t("settings.aiEditorApplyModeLabel")}</span>
+                  <span>{t("settings.aiEditorApplyModeHint")}</span>
+                </div>
+                <div
+                  className="settings-ai-format-grid"
+                  role="radiogroup"
+                  aria-label={t("settings.aiEditorApplyModeLabel")}
+                >
+                  <button
+                    type="button"
+                    className={`settings-ai-format-option ${aiEditorApplyMode === "diff" ? "is-active" : ""}`}
+                    onClick={() => selectAiEditorApplyMode("diff")}
+                    role="radio"
+                    aria-checked={aiEditorApplyMode === "diff"}
+                  >
+                    <span className="settings-ai-format-option-head">
+                      <strong>{t("settings.aiEditorApplyModeDiffTitle")}</strong>
+                      <span>{t("settings.aiEditorApplyModeDiffChip")}</span>
+                    </span>
+                    <p>{t("settings.aiEditorApplyModeDiffDescription")}</p>
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-ai-format-option ${aiEditorApplyMode === "instant" ? "is-active" : ""}`}
+                    onClick={() => selectAiEditorApplyMode("instant")}
+                    role="radio"
+                    aria-checked={aiEditorApplyMode === "instant"}
+                  >
+                    <span className="settings-ai-format-option-head">
+                      <strong>{t("settings.aiEditorApplyModeInstantTitle")}</strong>
+                      <span>{t("settings.aiEditorApplyModeInstantChip")}</span>
+                    </span>
+                    <p>{t("settings.aiEditorApplyModeInstantDescription")}</p>
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-ai-format-section">
+                <div className="settings-ai-section-head">
+                  <span>{t("settings.aiCanvasGenerationModeLabel")}</span>
+                  <span>{t("settings.aiCanvasGenerationModeHint")}</span>
+                </div>
+                <div
+                  className="settings-ai-format-grid"
+                  role="radiogroup"
+                  aria-label={t("settings.aiCanvasGenerationModeLabel")}
+                >
+                  <button
+                    type="button"
+                    className={`settings-ai-format-option ${aiCanvasGenerationMode === "mermaid" ? "is-active" : ""}`}
+                    onClick={() => selectAiCanvasGenerationMode("mermaid")}
+                    role="radio"
+                    aria-checked={aiCanvasGenerationMode === "mermaid"}
+                  >
+                    <span className="settings-ai-format-option-head">
+                      <strong>{t("settings.aiCanvasGenerationMermaidTitle")}</strong>
+                      <span>{t("settings.aiCanvasGenerationMermaidChip")}</span>
+                    </span>
+                    <p>{t("settings.aiCanvasGenerationMermaidDescription")}</p>
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-ai-format-option ${aiCanvasGenerationMode === "schema" ? "is-active" : ""}`}
+                    onClick={() => selectAiCanvasGenerationMode("schema")}
+                    role="radio"
+                    aria-checked={aiCanvasGenerationMode === "schema"}
+                  >
+                    <span className="settings-ai-format-option-head">
+                      <strong>{t("settings.aiCanvasGenerationSchemaTitle")}</strong>
+                      <span className="is-beta">{t("settings.aiCanvasGenerationSchemaChip")}</span>
+                    </span>
+                    <p>{t("settings.aiCanvasGenerationSchemaDescription")}</p>
                   </button>
                 </div>
               </div>

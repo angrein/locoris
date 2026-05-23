@@ -3089,6 +3089,7 @@ export default function App() {
               <CanvasPane
                 key={`orbital-canvas-${orbitalEditorEntry.id}-${settings.language}`}
                 note={orbitalEditorEntry}
+                notes={notes}
                 folders={folders}
                 tags={tags}
                 language={settings.language}
@@ -3131,6 +3132,24 @@ export default function App() {
                   );
                 }}
                 onLoadFiles={() => loadCanvasFiles(orbitalEditorEntry.id)}
+                onCreateCanvasFromAi={async (content, files, fileNames, title) => {
+                  const canvas = await handleCreateCanvasAt(
+                    orbitalEditorEntry.folderId,
+                    orbitalEditorEntry.tagIds,
+                    orbitalEditorEntry.projectId
+                  );
+                  const nextTitle = title?.trim().slice(0, 120);
+
+                  if (nextTitle) {
+                    await handleUpdateNoteMeta(canvas.id, {
+                      title: nextTitle,
+                      color: orbitalEditorEntry.color || canvas.color
+                    });
+                  }
+
+                  await handleSaveCanvasContentForNote(canvas.id, content, files, fileNames, "saved");
+                  setOrbitalEditorNoteId(canvas.id);
+                }}
                 libraryStorageScopeId={activeLocalVaultId}
               />
             ) : (

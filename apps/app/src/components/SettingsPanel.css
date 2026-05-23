@@ -731,6 +731,28 @@
   color: rgba(187, 194, 226, 0.62);
 }
 
+.settings-ai-subsection-head {
+  display: grid;
+  gap: 3px;
+  margin-top: 4px;
+  color: rgba(235, 239, 255, 0.8);
+  font-size: 0.68rem;
+  line-height: 1.28;
+}
+
+.settings-ai-format-grid + .settings-ai-subsection-head {
+  margin-top: 10px;
+}
+
+.settings-ai-subsection-head span:first-child {
+  color: rgba(248, 250, 255, 0.88);
+  font-weight: 760;
+}
+
+.settings-ai-subsection-head span:last-child {
+  color: rgba(187, 194, 226, 0.58);
+}
+
 .settings-ai-selected-model-card {
   width: 100%;
   min-width: 0;
@@ -955,6 +977,14 @@
   font-size: 0.56rem;
   font-weight: 760;
   line-height: 1;
+}
+
+.settings-ai-format-option-head span:last-child.is-beta {
+  border-color: color-mix(in srgb, #9be7ff 24%, rgb(var(--line-rgb) / 0.1));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #9be7ff 14%, transparent), transparent 62%),
+    rgba(255, 255, 255, 0.025);
+  color: color-mix(in srgb, var(--text) 78%, #9be7ff 22%);
 }
 
 .settings-ai-format-option p {

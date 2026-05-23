@@ -45,6 +45,7 @@ import {
   generateGeminiMarkdown,
   generateGeminiStructuredEdit,
   readGeminiApiKey,
+  readStoredGeminiEditorApplyMode,
   readStoredGeminiEditorFormat,
   readStoredGeminiModel,
   type GeminiAiAction,
@@ -1300,7 +1301,7 @@ export default function EditorPane({
     );
   };
 
-  const openAiPreview = (
+  const createAiPreviewState = (
     panelState: AiPanelState,
     blocks: NoteContent,
     intent: "replace" | "insert",
@@ -1308,7 +1309,7 @@ export default function EditorPane({
     summary: string,
     warnings: string[],
     method: AiPreviewMethod
-  ) => {
+  ): AiPreviewState => {
     const canReplaceInline =
       intent === "replace" &&
       panelState.scope === "selection" &&
@@ -1333,7 +1334,7 @@ export default function EditorPane({
         ? createPlainPreviewBlocks(inlineText)
         : blocks;
 
-    setAiPreview({
+    return {
       status: "idle",
       action,
       scope: panelState.scope,
@@ -1352,22 +1353,36 @@ export default function EditorPane({
       error: null,
       fallbackUsed: method === "markdown-fallback",
       method
-    });
+    };
+  };
+
+  const openAiPreview = (
+    panelState: AiPanelState,
+    blocks: NoteContent,
+    intent: "replace" | "insert",
+    action: GeminiAiAction,
+    summary: string,
+    warnings: string[],
+    method: AiPreviewMethod
+  ) => {
+    setAiPreview(createAiPreviewState(panelState, blocks, intent, action, summary, warnings, method));
     setAiPanel(null);
   };
 
-  const applyAiPreviewResult = () => {
-    const preview = aiPreview;
+  const applyAiPreviewResult = (previewOverride?: AiPreviewState) => {
+    const preview = previewOverride ?? aiPreview;
 
     if (!preview || preview.status === "applying") {
       return;
     }
 
-    setAiPreview({
-      ...preview,
-      status: "applying",
-      error: null
-    });
+    if (!previewOverride) {
+      setAiPreview({
+        ...preview,
+        status: "applying",
+        error: null
+      });
+    }
 
     try {
       editor.focus();
@@ -1408,6 +1423,10 @@ export default function EditorPane({
       persistEditorDocument("saved");
       setAiPreview(null);
     } catch (error) {
+      if (previewOverride) {
+        throw error;
+      }
+
       setAiPreview((previous) =>
         previous
           ? {
@@ -1491,6 +1510,7 @@ export default function EditorPane({
       const apiKey = await readGeminiApiKey();
       const model = readStoredGeminiModel();
       const editorFormat = readStoredGeminiEditorFormat();
+      const editorApplyMode = readStoredGeminiEditorApplyMode();
       const intent = shouldGenerateNew ? "insert" : "replace";
       let resultBlocks: NoteContent;
       let resultSummary = "";
@@ -1561,15 +1581,34 @@ export default function EditorPane({
         }
       }
 
-      openAiPreview(
-        nextPanelState,
-        resultBlocks,
-        intent,
-        action,
-        resultSummary,
-        resultWarnings,
-        resultMethod
-      );
+      if (editorApplyMode === "instant") {
+        setAiPanel({
+          ...nextPanelState,
+          status: "applying"
+        });
+        applyAiPreviewResult(
+          createAiPreviewState(
+            nextPanelState,
+            resultBlocks,
+            intent,
+            action,
+            resultSummary,
+            resultWarnings,
+            resultMethod
+          )
+        );
+        setAiPanel(null);
+      } else {
+        openAiPreview(
+          nextPanelState,
+          resultBlocks,
+          intent,
+          action,
+          resultSummary,
+          resultWarnings,
+          resultMethod
+        );
+      }
     } catch (error) {
       setAiPanel((previous) =>
         previous
@@ -2164,7 +2203,7 @@ export default function EditorPane({
               <button
                 type="button"
                 className="editor-ai-preview-primary"
-                onClick={applyAiPreviewResult}
+                onClick={() => applyAiPreviewResult()}
                 disabled={aiPreview.status === "applying"}
               >
                 {aiPreview.status === "applying" ? t("note.aiApplying") : t("note.aiPreviewApply")}

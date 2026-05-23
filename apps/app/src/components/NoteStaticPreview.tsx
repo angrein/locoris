@@ -29,6 +29,20 @@ const DARK_BACKGROUND_COLORS: Record<string, string> = {
   pink: "#4f1f43"
 };
 
+const TEXT_METADATA_KEYS = new Set([
+  "id",
+  "type",
+  "styles",
+  "props",
+  "href",
+  "url",
+  "name",
+  "caption",
+  "language",
+  "checked",
+  "children"
+]);
+
 type TableContent = {
   type?: string;
   headerRows?: unknown;
@@ -191,12 +205,8 @@ function extractText(value: unknown): string {
     parts.push(record.text);
   }
 
-  if (typeof record.href === "string") {
-    parts.push(extractText(record.content));
-  }
-
   Object.entries(record).forEach(([key, nestedValue]) => {
-    if (key !== "text" && key !== "href") {
+    if (key !== "text" && !TEXT_METADATA_KEYS.has(key)) {
       const nestedText = extractText(nestedValue);
       if (nestedText) {
         parts.push(nestedText);
