@@ -896,6 +896,25 @@ export default function App() {
         : null,
     [activeLocalVaultId, syncTransportIndicator]
   );
+  const activeLocalVaultProfile = useMemo(
+    () => localVaults.find((vault) => vault.id === activeLocalVaultId) ?? null,
+    [activeLocalVaultId, localVaults]
+  );
+  const activePrivateVaultWarningContext = useMemo(() => {
+    if (!activeLocalVaultProfile) {
+      return null;
+    }
+
+    return {
+      localVaultId: activeLocalVaultProfile.id,
+      vaultKind: activeLocalVaultProfile.vaultKind,
+      vaultName: getDisplayVaultName(
+        activeLocalVaultProfile,
+        currentAppLanguage,
+        localVaults.findIndex((vault) => vault.id === activeLocalVaultProfile.id)
+      )
+    };
+  }, [activeLocalVaultProfile, currentAppLanguage, localVaults]);
 
   const selectedFolderName = selectedFolderId ? folderPathMap.get(selectedFolderId) ?? null : null;
   const selectedTagName = selectedTagId ? tagMap.get(selectedTagId)?.name ?? null : null;
@@ -3151,11 +3170,13 @@ export default function App() {
                   setOrbitalEditorNoteId(canvas.id);
                 }}
                 libraryStorageScopeId={activeLocalVaultId}
+                privateVaultWarningContext={activePrivateVaultWarningContext}
               />
             ) : (
               <EditorPane
                 key={`orbital-note-${orbitalEditorEntry.id}-${settings.language}`}
                 note={orbitalEditorEntry}
+                assets={assets.filter((asset) => asset.noteId === orbitalEditorEntry.id)}
                 folders={folders}
                 tags={tags}
                 language={settings.language}
@@ -3193,6 +3214,7 @@ export default function App() {
                 }
                 onUploadFile={(file) => handleStoreAsset(orbitalEditorEntry.id, file)}
                 onResolveFileUrl={resolveAssetUrl}
+                privateVaultWarningContext={activePrivateVaultWarningContext}
               />
             )
           ) : null

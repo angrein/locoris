@@ -2310,7 +2310,9 @@ export default function OrbitalMapView({
   const targetNodePositionsRef = useRef(new Map<string, OrbitalScenePosition>());
   const projectPositionDraftsRef = useRef<Record<string, { x: number; y: number }>>({});
   const noteHoverPreviewScrollRef = useRef<HTMLDivElement | null>(null);
+  const hoverPreviewCardRef = useRef<HTMLDivElement | null>(null);
   const hoverPreviewCloseTimeoutRef = useRef<number | null>(null);
+  const hoverPreviewCursorRef = useRef({ x: 0, y: 0 });
   const hoverPreviewSceneAnchorRef = useRef<SVGGElement | null>(null);
   const folderDraftRowRef = useRef<HTMLDivElement | null>(null);
   const folderDraftInputRef = useRef<HTMLInputElement | null>(null);
@@ -3152,9 +3154,26 @@ export default function OrbitalMapView({
     hoverPreviewSceneAnchorRef.current = null;
   };
 
+  const isPointerInsideHoverPreviewCard = () => {
+    const card = hoverPreviewCardRef.current;
+
+    if (!card) {
+      return false;
+    }
+
+    const { x, y } = hoverPreviewCursorRef.current;
+    const element = document.elementFromPoint(x, y);
+    return Boolean(element && card.contains(element));
+  };
+
   const scheduleSelectionHoverPreviewClose = () => {
     clearHoverPreviewCloseTimeout();
     hoverPreviewCloseTimeoutRef.current = window.setTimeout(() => {
+      if (isPointerInsideHoverPreviewCard()) {
+        hoverPreviewCloseTimeoutRef.current = null;
+        return;
+      }
+
       setHoveredSelectionNoteId(null);
       setHoveredAssetId(null);
       hoverPreviewCloseTimeoutRef.current = null;
@@ -3182,6 +3201,7 @@ export default function OrbitalMapView({
     setHoverPreviewAnchorSource(source);
     setHoverPreviewFallbackRect(options?.anchorRect ?? null);
     hoverPreviewSceneAnchorRef.current = options?.sceneAnchorElement ?? null;
+    hoverPreviewCursorRef.current = { x: clientX, y: clientY };
     setHoverPreviewCursor({ x: clientX, y: clientY });
   };
 
@@ -3205,6 +3225,7 @@ export default function OrbitalMapView({
     setHoverPreviewAnchorSource(source);
     setHoverPreviewFallbackRect(options?.anchorRect ?? null);
     hoverPreviewSceneAnchorRef.current = null;
+    hoverPreviewCursorRef.current = { x: clientX, y: clientY };
     setHoverPreviewCursor({ x: clientX, y: clientY });
   };
 
@@ -3230,6 +3251,7 @@ export default function OrbitalMapView({
       hoverPreviewSceneAnchorRef.current = options.sceneAnchorElement ?? null;
     }
 
+    hoverPreviewCursorRef.current = { x: clientX, y: clientY };
     setHoverPreviewCursor({ x: clientX, y: clientY });
   };
 
@@ -3269,6 +3291,7 @@ export default function OrbitalMapView({
   useEffect(() => {
     if (
       hoverPreviewAnchorSource === "inspector" &&
+      effectiveInspectorMenu !== "overview" &&
       effectiveInspectorMenu !== "notes" &&
       effectiveInspectorMenu !== "folders" &&
       effectiveInspectorMenu !== "files" &&
@@ -9379,6 +9402,7 @@ export default function OrbitalMapView({
 
       {!isMobilePreviewMode && hoverPreviewPosition && (hoverPreviewNote || hoverPreviewAsset) ? (
           <div
+            ref={hoverPreviewCardRef}
             className={`orbital-note-hovercard ${hoverPreviewAsset ? "orbital-file-hovercard" : ""}`}
             style={{
               left: hoverPreviewPosition.left,
@@ -9388,8 +9412,17 @@ export default function OrbitalMapView({
               "--hovercard-accent": hoverPreviewAccent,
               "--hovercard-placement": hoverPreviewPosition.placement
             } as CSSProperties}
-            onPointerEnter={clearHoverPreviewCloseTimeout}
-            onPointerLeave={scheduleSelectionHoverPreviewClose}
+            onPointerEnter={(event) => {
+              hoverPreviewCursorRef.current = { x: event.clientX, y: event.clientY };
+              clearHoverPreviewCloseTimeout();
+            }}
+            onPointerMove={(event) => {
+              hoverPreviewCursorRef.current = { x: event.clientX, y: event.clientY };
+            }}
+            onPointerLeave={(event) => {
+              hoverPreviewCursorRef.current = { x: event.clientX, y: event.clientY };
+              scheduleSelectionHoverPreviewClose();
+            }}
           >
             {hoverPreviewNote ? (
               <>

@@ -284,6 +284,17 @@
     rgba(255, 255, 255, 0.028);
 }
 
+.settings-row.is-backup:hover {
+  border-color: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 22%, rgba(255, 255, 255, 0.08));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 10%, transparent),
+      rgba(255, 255, 255, 0.018)
+    ),
+    rgba(255, 255, 255, 0.028);
+}
+
 .settings-row.is-update:hover {
   border-color: rgb(var(--gold-rgb) / 0.18);
   background:

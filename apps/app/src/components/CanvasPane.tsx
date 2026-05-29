@@ -21,6 +21,10 @@ import "./CanvasPane.css";
 import "./CanvasPane.excalidraw.css";
 import ConfirmDialog from "./ConfirmDialog";
 import FolderPicker from "./FolderPicker";
+import {
+  usePrivateVaultWarning,
+  type PrivateVaultWarningContext
+} from "./PrivateVaultWarningDialog";
 import TagInputField from "./TagInputField";
 import {
   DEFAULT_CANVAS_BACKGROUND,
@@ -41,6 +45,13 @@ import {
 } from "../lib/excalidrawLibrary";
 import { COLOR_PALETTE, DEFAULT_NOTE_COLOR } from "../lib/palette";
 import { flattenFolderOptions, formatTimestamp } from "../lib/notes";
+import { saveBlobFileWithDialog } from "../lib/nativeFileIntegration";
+import {
+  createCanvasJsonBlob,
+  createCanvasPdfBlob,
+  type CanvasExportFormat
+} from "../lib/exportImport/canvasExport";
+import { sanitizeExportFileName } from "../lib/exportImport/filenames";
 import {
   generateGeminiCanvasMermaid,
   generateGeminiCanvasSpec,
@@ -96,6 +107,7 @@ interface CanvasPaneProps {
     title?: string
   ) => Promise<void> | void;
   libraryStorageScopeId: string;
+  privateVaultWarningContext?: PrivateVaultWarningContext | null;
   immersive?: boolean;
 }
 
@@ -114,6 +126,7 @@ type CanvasAiCommandId =
   | "findProblems"
   | "findMissingLinks";
 type CanvasAiPreviewMethod = "mermaid" | "canvas-json";
+type CanvasExportStatus = "pdf" | "json" | "error" | null;
 
 type CanvasAiPreview = {
   kind: GeminiCanvasDiagramKind;
@@ -884,6 +897,21 @@ function CanvasAiCloseIcon() {
   );
 }
 
+function ExportIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M10 3.8v8.1m0 0 3.2-3.2M10 11.9 6.8 8.7M4.5 14.2v1.5h11v-1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 interface CanvasBackgroundMenuSectionProps {
   label: string;
   customLabel: string;
@@ -963,13 +991,15 @@ function CanvasBackgroundMenuSection({
 interface CanvasMenuActionProps {
   label: string;
   onSelect: () => void;
+  icon?: "trash" | "export";
+  tone?: "default" | "danger";
 }
 
-function CanvasMenuAction({ label, onSelect }: CanvasMenuActionProps) {
+function CanvasMenuAction({ label, onSelect, icon = "trash", tone = "danger" }: CanvasMenuActionProps) {
   return (
     <button type="button" className="canvas-mainmenu-action" onClick={onSelect}>
-      <span className="canvas-mainmenu-icon is-danger">
-        <TrashIcon />
+      <span className={`canvas-mainmenu-icon ${tone === "danger" ? "is-danger" : ""}`}>
+        {icon === "export" ? <ExportIcon /> : <TrashIcon />}
       </span>
       <span>{label}</span>
     </button>
@@ -995,6 +1025,7 @@ export default function CanvasPane({
   onLoadFiles,
   onCreateCanvasFromAi,
   libraryStorageScopeId,
+  privateVaultWarningContext = null,
   immersive = false
 }: CanvasPaneProps) {
   const { t } = useTranslation();
@@ -1021,12 +1052,14 @@ export default function CanvasPane({
   const [canvasAiMessage, setCanvasAiMessage] = useState("");
   const [canvasAiNotice, setCanvasAiNotice] = useState<CanvasAiInlineNotice | null>(null);
   const [canvasAiPreview, setCanvasAiPreview] = useState<CanvasAiPreview | null>(null);
+  const [canvasExportStatus, setCanvasExportStatus] = useState<CanvasExportStatus>(null);
   const [canvasSelectionCount, setCanvasSelectionCount] = useState(0);
   const canvasStageShellRef = useRef<HTMLDivElement | null>(null);
   const canvasAiShellRef = useRef<HTMLDivElement | null>(null);
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
   const canvasAiNoticeTimeoutRef = useRef<number | null>(null);
+  const canvasExportStatusTimeoutRef = useRef<number | null>(null);
   const canvasAiRequestIdRef = useRef(0);
   const excalidrawApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const latestSceneRef = useRef<CanvasContent>(note.canvasContent ?? { elements: [], appState: null });
@@ -1072,6 +1105,8 @@ export default function CanvasPane({
       })
       .slice(0, 8);
   }, [canvasAiNoteSearch, canvasAiSourceNotes, language]);
+  const { confirmPrivateVaultAction, privateVaultWarningDialog } =
+    usePrivateVaultWarning(privateVaultWarningContext);
   const selectedCanvasAiSourceNote = useMemo(
     () => canvasAiSourceNotes.find((sourceNote) => sourceNote.id === canvasAiSourceNoteId) ?? null,
     [canvasAiSourceNoteId, canvasAiSourceNotes]
@@ -1138,6 +1173,10 @@ export default function CanvasPane({
     () => () => {
       if (canvasAiNoticeTimeoutRef.current !== null) {
         window.clearTimeout(canvasAiNoticeTimeoutRef.current);
+      }
+
+      if (canvasExportStatusTimeoutRef.current !== null) {
+        window.clearTimeout(canvasExportStatusTimeoutRef.current);
       }
     },
     []
@@ -1752,6 +1791,10 @@ export default function CanvasPane({
       return;
     }
 
+    if (!(await confirmPrivateVaultAction("ai"))) {
+      return;
+    }
+
     const context = getCanvasAiContext();
     const requestId = canvasAiRequestIdRef.current + 1;
     const requestCommand = activeCanvasAiCommand;
@@ -2133,6 +2176,72 @@ export default function CanvasPane({
     }, 220);
   };
 
+  const showCanvasExportStatus = (status: Exclude<CanvasExportStatus, null>) => {
+    setCanvasExportStatus(status);
+
+    if (canvasExportStatusTimeoutRef.current !== null) {
+      window.clearTimeout(canvasExportStatusTimeoutRef.current);
+    }
+
+    canvasExportStatusTimeoutRef.current = window.setTimeout(() => {
+      setCanvasExportStatus(null);
+      canvasExportStatusTimeoutRef.current = null;
+    }, 2400);
+  };
+
+  const handleExportCanvas = async (format: CanvasExportFormat) => {
+    const api = excalidrawApiRef.current;
+
+    if (!api) {
+      showCanvasExportStatus("error");
+      return;
+    }
+
+    if (!(await confirmPrivateVaultAction("export"))) {
+      return;
+    }
+
+    try {
+      const name = sanitizeExportFileName(titleDraft.trim() || getDisplayNoteTitle(note, language), "canvas");
+      const elements = api.getSceneElements() as readonly ExcalidrawElement[];
+      const appState = api.getAppState() as Partial<ExcalidrawAppState>;
+      const files = api.getFiles();
+      const exportConfig =
+        format === "pdf"
+          ? {
+              defaultPath: `${name}.pdf`,
+              filterName: "PDF",
+              extensions: ["pdf"],
+              preferredExtension: "pdf",
+              blob: await createCanvasPdfBlob({ elements, appState, files, name })
+            }
+          : {
+              defaultPath: `${name}.excalidraw.json`,
+              filterName: "Excalidraw JSON",
+              extensions: ["json", "excalidraw"],
+              preferredExtension: "json",
+              blob: createCanvasJsonBlob({ elements, appState, files, name })
+            };
+      const didSave = await saveBlobFileWithDialog({
+        defaultPath: exportConfig.defaultPath,
+        filters: [
+          {
+            name: exportConfig.filterName,
+            extensions: exportConfig.extensions
+          }
+        ],
+        blob: exportConfig.blob,
+        preferredExtension: exportConfig.preferredExtension
+      });
+
+      if (didSave) {
+        showCanvasExportStatus(format);
+      }
+    } catch {
+      showCanvasExportStatus("error");
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (titleTimeoutRef.current) {
@@ -2321,6 +2430,11 @@ export default function CanvasPane({
 
           <div className="canvas-pane-toolbar-meta">
             <span className={`editor-save-pill is-${saveState}`}>{t(`saveState.${saveState}`)}</span>
+            {canvasExportStatus ? (
+              <span className={`canvas-pane-file-status is-${canvasExportStatus}`}>
+                {t(`canvas.exportStatus.${canvasExportStatus}`)}
+              </span>
+            ) : null}
             <span className="canvas-pane-contextmeta">
               {t("note.updated")}: {formatTimestamp(note.updatedAt, language)}
             </span>
@@ -2833,6 +2947,18 @@ export default function CanvasPane({
               >
                 <MainMenu>
                   <MainMenu.DefaultItems.SaveAsImage />
+                  <CanvasMenuAction
+                    label={t("canvas.exportPdf")}
+                    icon="export"
+                    tone="default"
+                    onSelect={() => void handleExportCanvas("pdf")}
+                  />
+                  <CanvasMenuAction
+                    label={t("canvas.exportJson")}
+                    icon="export"
+                    tone="default"
+                    onSelect={() => void handleExportCanvas("json")}
+                  />
                   <MainMenu.Separator />
                   <CanvasBackgroundMenuSection
                     label={t("canvas.backgroundLabel")}
@@ -2847,6 +2973,8 @@ export default function CanvasPane({
                   <MainMenu.Separator />
                   <CanvasMenuAction
                     label={t("canvas.clearCanvas")}
+                    icon="trash"
+                    tone="danger"
                     onSelect={() => setIsClearCanvasDialogOpen(true)}
                   />
                   <MainMenu.Separator />
@@ -2864,6 +2992,7 @@ export default function CanvasPane({
               onConfirm={handleClearCanvasConfirm}
               onCancel={() => setIsClearCanvasDialogOpen(false)}
             />
+            {privateVaultWarningDialog}
           </div>
         </div>
 

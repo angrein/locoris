@@ -23,9 +23,13 @@ import "./EditorPane.css";
 import ConfirmDialog from "./ConfirmDialog";
 import EditorFormattingToolbar from "./EditorFormattingToolbar";
 import FolderPicker from "./FolderPicker";
+import NoteTransferModal from "./NoteTransferModal";
 import NoteStaticPreview from "./NoteStaticPreview";
+import {
+  usePrivateVaultWarning,
+  type PrivateVaultWarningContext
+} from "./PrivateVaultWarningDialog";
 import TagInputField from "./TagInputField";
-import { getDisplayNoteTitle } from "../lib/displayNames";
 import { COLOR_PALETTE, DEFAULT_NOTE_COLOR } from "../lib/palette";
 import { editorBlockNoteSchema } from "../lib/blocknoteSchema";
 import {
@@ -60,11 +64,23 @@ import {
 } from "../lib/aiEditorSchema";
 import {
   openTextFileWithDialog,
-  saveTextFileWithDialog
+  saveBlobFileWithDialog
 } from "../lib/nativeFileIntegration";
-import type { AppLanguage, Folder, Note, NoteContent, SaveState, StoredBlock, Tag } from "../types";
+import {
+  createNoteDocxBlob,
+  createNoteHtmlBlob,
+  createNoteMarkdown,
+  createNotePdfBlob,
+  getNoteExportBaseName,
+  type NoteExportFormat
+} from "../lib/exportImport/noteExport";
+import type { AppLanguage, Asset, Folder, Note, NoteContent, SaveState, StoredBlock, Tag } from "../types";
 
 type MarkdownStatus = "copied" | "exported" | "imported" | "error" | null;
+type NoteTransferStatus = {
+  tone: "success" | "error" | "info";
+  text: string;
+} | null;
 type EditorTypographyMode = "focus" | "reading";
 type PendingMarkdownImport = {
   fileName: string;
@@ -566,6 +582,119 @@ function pasteTextIntoEmptyInlineBlock(
   return true;
 }
 
+function getClipboardImageFiles(event: ClipboardEvent) {
+  const items = event.clipboardData?.items;
+
+  if (!items) {
+    return [];
+  }
+
+  return Array.from(items)
+    .map((item) => (item.kind === "file" ? item.getAsFile() : null))
+    .filter((file): file is File => Boolean(file && file.type.startsWith("image/")));
+}
+
+function getImageExtension(mimeType: string) {
+  if (mimeType === "image/jpeg") {
+    return "jpg";
+  }
+
+  if (mimeType === "image/svg+xml") {
+    return "svg";
+  }
+
+  const subtype = mimeType.split("/")[1]?.split("+")[0];
+  return subtype || "png";
+}
+
+function normalizePastedImageFile(file: File, index: number) {
+  if (file.name.trim()) {
+    return file;
+  }
+
+  const mimeType = file.type || "image/png";
+
+  return new File([file], `pasted-image-${index + 1}.${getImageExtension(mimeType)}`, {
+    type: mimeType,
+    lastModified: Date.now()
+  });
+}
+
+function isImageOnlyClipboardPayload(event: ClipboardEvent, imageFiles: File[]) {
+  if (imageFiles.length === 0) {
+    return false;
+  }
+
+  const clipboardData = event.clipboardData;
+  const html = clipboardData?.getData("text/html") ?? "";
+  const plainText = clipboardData?.getData("text/plain").trim() ?? "";
+
+  if (!html) {
+    return plainText.length === 0;
+  }
+
+  const parsedDocument = new DOMParser().parseFromString(html, "text/html");
+
+  parsedDocument.body.querySelectorAll("img, picture, source").forEach((element) => element.remove());
+  return (parsedDocument.body.textContent ?? "").trim().length === 0;
+}
+
+function canReplaceBlockWithPastedImage(block: StoredBlock) {
+  return (
+    typeof block.id === "string" &&
+    Array.isArray(block.content) &&
+    block.content.length === 0 &&
+    (!Array.isArray(block.children) || block.children.length === 0)
+  );
+}
+
+function pasteClipboardImagesAsAssetBlocks(
+  editor: BlockNoteEditorInstance,
+  event: ClipboardEvent,
+  uploadFile: (file: File) => Promise<string>
+) {
+  const imageFiles = getClipboardImageFiles(event);
+
+  if (!isImageOnlyClipboardPayload(event, imageFiles)) {
+    return false;
+  }
+
+  event.preventDefault();
+
+  void (async () => {
+    let referenceBlock: StoredBlock;
+
+    try {
+      referenceBlock = editor.getTextCursorPosition().block as unknown as StoredBlock;
+    } catch {
+      return;
+    }
+
+    for (const [index, rawFile] of imageFiles.entries()) {
+      const file = normalizePastedImageFile(rawFile, index);
+      const url = await uploadFile(file);
+      const nextBlock = {
+        type: "image",
+        props: {
+          url,
+          name: file.name,
+          showPreview: true
+        }
+      };
+
+      if (index === 0 && canReplaceBlockWithPastedImage(referenceBlock)) {
+        referenceBlock = editor.updateBlock(referenceBlock.id, nextBlock as any) as unknown as StoredBlock;
+      } else {
+        referenceBlock = editor.insertBlocks([nextBlock as any], referenceBlock as any, "after")[0] as unknown as StoredBlock;
+      }
+    }
+  })().catch(() => {
+    // The editor remains unchanged if a pasted image cannot be persisted.
+  });
+
+  return true;
+}
+
 function getCurrentEmptyInlinePasteRestoreSnapshot(
   editor: BlockNoteEditorInstance
 ): EmptyInlinePasteRestoreSnapshot | null {
@@ -724,6 +853,7 @@ function restorePastedEmptyInlineBlockType(
 
 interface EditorPaneProps {
   note: Note;
+  assets: Asset[];
   folders: Folder[];
   tags: Tag[];
   language: AppLanguage;
@@ -739,11 +869,13 @@ interface EditorPaneProps {
   onContentChange: (content: NoteContent, state: SaveState) => void;
   onUploadFile: (file: File) => Promise<string>;
   onResolveFileUrl: (url: string) => Promise<string>;
+  privateVaultWarningContext?: PrivateVaultWarningContext | null;
   immersive?: boolean;
 }
 
 export default function EditorPane({
   note,
+  assets,
   folders,
   tags,
   language,
@@ -759,6 +891,7 @@ export default function EditorPane({
   onContentChange,
   onUploadFile,
   onResolveFileUrl,
+  privateVaultWarningContext = null,
   immersive = false
 }: EditorPaneProps) {
   const { t } = useTranslation();
@@ -768,7 +901,11 @@ export default function EditorPane({
 
     return storedMode === "reading" ? "reading" : "focus";
   });
-  const [markdownStatus, setMarkdownStatus] = useState<MarkdownStatus>(null);
+  const [noteTransferOpen, setNoteTransferOpen] = useState(false);
+  const [noteTransferStatus, setNoteTransferStatus] =
+    useState<NoteTransferStatus>(null);
+  const [noteTransferBusy, setNoteTransferBusy] =
+    useState<NoteExportFormat | "copy" | "import" | null>(null);
   const [pendingMarkdownImport, setPendingMarkdownImport] =
     useState<PendingMarkdownImport | null>(null);
   const [aiPanel, setAiPanel] = useState<AiPanelState | null>(null);
@@ -798,6 +935,8 @@ export default function EditorPane({
     [folderOptions, note.folderId]
   );
   const normalizedContent = useMemo(() => normalizeNoteContent(note.content), [note.content]);
+  const { confirmPrivateVaultAction, privateVaultWarningDialog } =
+    usePrivateVaultWarning(privateVaultWarningContext);
 
   useEffect(() => {
     isTitleFieldFocusedRef.current = false;
@@ -812,6 +951,9 @@ export default function EditorPane({
 
   useEffect(() => {
     setPendingMarkdownImport(null);
+    setNoteTransferOpen(false);
+    setNoteTransferStatus(null);
+    setNoteTransferBusy(null);
     setAiPanel(null);
     setAiPreview(null);
     checklistStableOrderRef.current = new Map();
@@ -846,6 +988,10 @@ export default function EditorPane({
       uploadFile: onUploadFile,
       resolveFileUrl: onResolveFileUrl,
       pasteHandler: ({ event, editor, defaultPasteHandler }) => {
+        if (pasteClipboardImagesAsAssetBlocks(editor, event, onUploadFile)) {
+          return true;
+        }
+
         if (pasteTextIntoEmptyInlineBlock(editor, event)) {
           return true;
         }
@@ -1493,6 +1639,10 @@ export default function EditorPane({
       return;
     }
 
+    if (!(await confirmPrivateVaultAction("ai"))) {
+      return;
+    }
+
     const nextPanelState = {
       ...currentPanel,
       status: "generating" as const,
@@ -1819,58 +1969,130 @@ export default function EditorPane({
   };
 
   const showMarkdownStatus = (status: Exclude<MarkdownStatus, null>) => {
-    setMarkdownStatus(status);
+    setNoteTransferStatus({
+      tone: status === "error" ? "error" : "success",
+      text: t(`note.markdownStatus.${status}`)
+    });
 
     if (markdownStatusTimeoutRef.current) {
       window.clearTimeout(markdownStatusTimeoutRef.current);
     }
 
     markdownStatusTimeoutRef.current = window.setTimeout(() => {
-      setMarkdownStatus(null);
+      setNoteTransferStatus(null);
       markdownStatusTimeoutRef.current = null;
     }, 2400);
   };
 
   const getMarkdown = () => editor.blocksToMarkdownLossy(editor.document as any);
 
-  const getMarkdownFilename = () => {
-    const safeTitle = getDisplayNoteTitle(
-      {
-        title: titleDraft.trim() || note.title,
-        plainText: note.plainText,
-        excerpt: note.excerpt
-      },
-      language
-    )
-      .replace(/[\\/:*?"<>|]+/g, "-")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 80);
+  const getCurrentExportNote = (): Note => {
+    const content = editor.document as unknown as NoteContent;
 
-    return `${safeTitle || "note"}.md`;
+    return {
+      ...note,
+      title: titleDraft.trim() || note.title,
+      content,
+      plainText: extractPlainText(content),
+      excerpt: extractPlainText(content).slice(0, 180)
+    };
   };
 
   const handleCopyMarkdown = async () => {
+    if (!(await confirmPrivateVaultAction("export"))) {
+      return;
+    }
+
+    setNoteTransferBusy("copy");
+
     try {
       await navigator.clipboard.writeText(getMarkdown());
       showMarkdownStatus("copied");
     } catch {
       showMarkdownStatus("error");
+    } finally {
+      setNoteTransferBusy(null);
     }
   };
 
-  const handleExportMarkdown = async () => {
+  const saveNoteExportBlob = async (input: {
+    blob: Blob;
+    fileName: string;
+    filterName: string;
+    extensions: string[];
+    preferredExtension: string;
+  }) => {
+    return saveBlobFileWithDialog({
+      defaultPath: input.fileName,
+      filters: [
+        {
+          name: input.filterName,
+          extensions: input.extensions
+        }
+      ],
+      blob: input.blob,
+      preferredExtension: input.preferredExtension
+    });
+  };
+
+  const handleExportNote = async (format: NoteExportFormat) => {
+    if (!(await confirmPrivateVaultAction("export"))) {
+      return;
+    }
+
+    setNoteTransferBusy(format);
+    setNoteTransferStatus(null);
+
     try {
-      const didSave = await saveTextFileWithDialog({
-        defaultPath: getMarkdownFilename(),
-        filters: [
-          {
-            name: "Markdown",
-            extensions: ["md", "markdown"]
-          }
-        ],
-        content: getMarkdown(),
-        preferredExtension: "md"
+      const exportNote = getCurrentExportNote();
+      const baseName = getNoteExportBaseName(exportNote, language);
+      const markdown = getMarkdown();
+      const exportMap: Record<NoteExportFormat, {
+        fileName: string;
+        filterName: string;
+        extensions: string[];
+        preferredExtension: string;
+        createBlob: () => Blob | Promise<Blob>;
+      }> = {
+        markdown: {
+          fileName: `${baseName}.md`,
+          filterName: "Markdown",
+          extensions: ["md", "markdown"],
+          preferredExtension: "md",
+          createBlob: () =>
+            new Blob([createNoteMarkdown({ note: exportNote, markdown })], {
+              type: "text/markdown;charset=utf-8"
+            })
+        },
+        html: {
+          fileName: `${baseName}.html`,
+          filterName: "HTML",
+          extensions: ["html", "htm"],
+          preferredExtension: "html",
+          createBlob: () => createNoteHtmlBlob({ note: exportNote, language, markdown })
+        },
+        pdf: {
+          fileName: `${baseName}.pdf`,
+          filterName: "PDF",
+          extensions: ["pdf"],
+          preferredExtension: "pdf",
+          createBlob: () => createNotePdfBlob({ note: exportNote, language, markdown })
+        },
+        docx: {
+          fileName: `${baseName}.docx`,
+          filterName: "Word",
+          extensions: ["docx"],
+          preferredExtension: "docx",
+          createBlob: () => createNoteDocxBlob({ note: exportNote, language, markdown, assets })
+        }
+      };
+      const exportConfig = exportMap[format];
+      const didSave = await saveNoteExportBlob({
+        blob: await exportConfig.createBlob(),
+        fileName: exportConfig.fileName,
+        filterName: exportConfig.filterName,
+        extensions: exportConfig.extensions,
+        preferredExtension: exportConfig.preferredExtension
       });
 
       if (!didSave) {
@@ -1880,23 +2102,33 @@ export default function EditorPane({
       showMarkdownStatus("exported");
     } catch {
       showMarkdownStatus("error");
+    } finally {
+      setNoteTransferBusy(null);
     }
   };
 
   const applyMarkdownImport = async (markdown: string) => {
+    setNoteTransferBusy("import");
+
     try {
       const blocks = await Promise.resolve(editor.tryParseMarkdownToBlocks(markdown));
 
       editor.replaceBlocks(editor.document as any, blocks as any);
       onContentChange(blocks as unknown as NoteContent, "saved");
       setPendingMarkdownImport(null);
+      setNoteTransferOpen(false);
       showMarkdownStatus("imported");
     } catch {
       showMarkdownStatus("error");
+    } finally {
+      setNoteTransferBusy(null);
     }
   };
 
   const handleImportMarkdown = async () => {
+    setNoteTransferBusy("import");
+    setNoteTransferStatus(null);
+
     const importedFile = await openTextFileWithDialog({
       filters: [
         {
@@ -1907,6 +2139,7 @@ export default function EditorPane({
     });
 
     if (!importedFile) {
+      setNoteTransferBusy(null);
       return;
     }
 
@@ -1915,12 +2148,14 @@ export default function EditorPane({
 
       if (getMarkdown().trim().length > 0) {
         setPendingMarkdownImport({ fileName, markdown: text });
+        setNoteTransferBusy(null);
         return;
       }
 
       await applyMarkdownImport(text);
     } catch {
       showMarkdownStatus("error");
+      setNoteTransferBusy(null);
     }
   };
 
@@ -2038,31 +2273,26 @@ export default function EditorPane({
           </div>
 
           <div className="editor-pane-markdown-actions" aria-label={t("note.markdownActions")}>
-            <button type="button" className="editor-pane-ghost-action" onClick={handleCopyMarkdown}>
-              {t("note.copyMarkdown")}
-            </button>
             <button
               type="button"
-              className="editor-pane-ghost-action"
-              onClick={() => void handleExportMarkdown()}
+              className="editor-pane-ghost-action editor-pane-transfer-action"
+              onClick={() => setNoteTransferOpen(true)}
             >
-              {t("note.exportMarkdown")}
+              {t("note.transferButton")}
             </button>
-            <button
-              type="button"
-              className="editor-pane-ghost-action"
-              onClick={() => void handleImportMarkdown()}
-            >
-              {t("note.importMarkdown")}
-            </button>
-            {markdownStatus ? (
-              <span className={`editor-pane-markdown-status is-${markdownStatus}`}>
-                {t(`note.markdownStatus.${markdownStatus}`)}
-              </span>
-            ) : null}
           </div>
         </div>
       </div>
+
+      <NoteTransferModal
+        open={noteTransferOpen}
+        status={noteTransferStatus}
+        busyFormat={noteTransferBusy}
+        onClose={() => setNoteTransferOpen(false)}
+        onCopyMarkdown={() => void handleCopyMarkdown()}
+        onExport={(format) => void handleExportNote(format)}
+        onImportMarkdown={() => void handleImportMarkdown()}
+      />
 
       <ConfirmDialog
         open={Boolean(pendingMarkdownImport)}
@@ -2086,6 +2316,8 @@ export default function EditorPane({
           void applyMarkdownImport(pendingMarkdownImport.markdown);
         }}
       />
+
+      {privateVaultWarningDialog}
 
       {aiPreview ? (
         <div className="editor-ai-preview-layer" role="presentation">

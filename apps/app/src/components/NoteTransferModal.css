@@ -1,0 +1,304 @@
+.note-transfer-layer {
+  --note-transfer-accent: var(--note-accent, var(--accent-theme-primary, var(--gold)));
+  position: fixed;
+  inset: 0;
+  z-index: 84;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  isolation: isolate;
+}
+
+.note-transfer-dim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background:
+    radial-gradient(circle at 22% 16%, color-mix(in srgb, var(--note-transfer-accent) 9%, transparent), transparent 34%),
+    radial-gradient(circle at 78% 78%, rgb(var(--cyan-rgb) / 0.055), transparent 38%),
+    rgba(3, 5, 15, 0.74);
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.note-transfer-modal {
+  position: relative;
+  z-index: 1;
+  width: min(680px, calc(100vw - 34px));
+  max-height: min(720px, calc(100vh - 34px));
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  overflow: hidden;
+  padding: 18px;
+  border-radius: 26px;
+  border: 1px solid color-mix(in srgb, var(--note-transfer-accent) 22%, rgb(var(--line-rgb) / 0.12));
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--note-transfer-accent) 13%, transparent), transparent 34%),
+    radial-gradient(circle at 100% 16%, rgb(var(--cyan-rgb) / 0.055), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.016)),
+    rgba(8, 11, 25, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 28px 90px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(24px) saturate(1.12);
+  -webkit-backdrop-filter: blur(24px) saturate(1.12);
+}
+
+.note-transfer-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.09), transparent 18%, transparent 72%, rgba(255, 255, 255, 0.025)),
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.055), transparent 28%);
+  opacity: 0.72;
+}
+
+.note-transfer-head,
+.note-transfer-tabs,
+.note-transfer-body,
+.note-transfer-status {
+  position: relative;
+  z-index: 1;
+}
+
+.note-transfer-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 13px;
+}
+
+.note-transfer-glyph {
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 17px;
+  color: color-mix(in srgb, var(--note-transfer-accent) 68%, rgba(248, 250, 255, 0.92));
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--note-transfer-accent) 18%, rgba(255, 255, 255, 0.045)), rgba(255, 255, 255, 0.02)),
+    rgba(8, 12, 26, 0.76);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--note-transfer-accent) 34%, rgba(255, 255, 255, 0.09)),
+    0 14px 30px rgba(0, 0, 0, 0.2);
+}
+
+.note-transfer-glyph svg,
+.note-transfer-close {
+  width: 21px;
+  height: 21px;
+}
+
+.note-transfer-glyph svg * {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.note-transfer-kicker {
+  margin: 0 0 5px;
+  color: color-mix(in srgb, var(--note-transfer-accent) 45%, rgba(207, 215, 244, 0.75));
+  font-size: 0.62rem;
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.note-transfer-head h3 {
+  margin: 0;
+  color: rgba(248, 250, 255, 0.96);
+  font-size: 1.05rem;
+  line-height: 1.22;
+  letter-spacing: 0;
+}
+
+.note-transfer-head p:not(.note-transfer-kicker) {
+  margin: 5px 0 0;
+  color: rgba(190, 199, 229, 0.74);
+  font-size: 0.76rem;
+  line-height: 1.48;
+}
+
+.note-transfer-close {
+  min-width: 34px;
+  min-height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 13px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(238, 243, 255, 0.86);
+  font: inherit;
+  cursor: pointer;
+}
+
+.note-transfer-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 17px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.note-transfer-tabs button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: rgba(198, 207, 235, 0.76);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.note-transfer-tabs button.is-active {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--note-transfer-accent) 13%, rgba(255, 255, 255, 0.02));
+  color: rgba(248, 250, 255, 0.94);
+}
+
+.note-transfer-body {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding-right: 2px;
+}
+
+.note-transfer-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.note-transfer-option,
+.note-transfer-import-card {
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border-radius: 18px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+  color: rgba(236, 241, 255, 0.86);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.note-transfer-option:hover,
+.note-transfer-import-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--note-transfer-accent) 34%, rgb(var(--line-rgb) / 0.14));
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--note-transfer-accent) 12%, transparent), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.note-transfer-option:disabled,
+.note-transfer-import-card:disabled,
+.note-transfer-copy-action:disabled {
+  cursor: progress;
+  opacity: 0.64;
+}
+
+.note-transfer-option-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.note-transfer-option-head strong {
+  min-width: 0;
+  color: rgba(249, 251, 255, 0.96);
+  font-size: 0.8rem;
+  line-height: 1.22;
+}
+
+.note-transfer-option-head span:last-child {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--note-transfer-accent) 18%, rgb(var(--line-rgb) / 0.1));
+  background: color-mix(in srgb, var(--note-transfer-accent) 9%, rgba(255, 255, 255, 0.02));
+  color: color-mix(in srgb, var(--text) 78%, var(--note-transfer-accent) 22%);
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.note-transfer-option p,
+.note-transfer-import-card p,
+.note-transfer-note {
+  margin: 0;
+  color: rgba(194, 203, 232, 0.72);
+  font-size: 0.69rem;
+  line-height: 1.48;
+}
+
+.note-transfer-copy-action {
+  width: fit-content;
+  min-height: 31px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--note-transfer-accent) 24%, rgb(var(--line-rgb) / 0.12));
+  background: color-mix(in srgb, var(--note-transfer-accent) 9%, rgba(255, 255, 255, 0.02));
+  color: rgba(240, 244, 255, 0.9);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.note-transfer-status {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 15px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  background: rgba(255, 255, 255, 0.028);
+  color: rgba(207, 215, 244, 0.82);
+  font-size: 0.7rem;
+  line-height: 1.42;
+}
+
+.note-transfer-status.is-success {
+  border-color: color-mix(in srgb, #8ff0c2 24%, rgb(var(--line-rgb) / 0.12));
+  color: color-mix(in srgb, var(--text) 76%, #8ff0c2 24%);
+}
+
+.note-transfer-status.is-error {
+  border-color: color-mix(in srgb, var(--red) 28%, rgb(var(--line-rgb) / 0.12));
+  color: color-mix(in srgb, var(--text) 72%, var(--red) 28%);
+}
+
+@media (max-width: 620px) {
+  .note-transfer-option-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .note-transfer-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .note-transfer-glyph {
+    display: none;
+  }
+}
+

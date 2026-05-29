@@ -46,6 +46,7 @@ import type {
   SyncVaultBinding,
   VaultEncryptionSummary
 } from "../types";
+import BackupSettingsPanel from "./BackupSettingsPanel";
 import SyncSettingsPanel from "./SyncSettingsPanel";
 import "./SettingsPanel.css";
 
@@ -187,6 +188,16 @@ function AiGlyph() {
   );
 }
 
+function BackupGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M5.2 6.9a4.8 4.8 0 0 1 8.9 2.2h.4a2.7 2.7 0 0 1 0 5.4H5.3a3.1 3.1 0 0 1-.1-6.2" />
+      <path d="M10 8.1v5.2" className="settings-row-icon-accent" />
+      <path d="m7.8 11.1 2.2 2.2 2.2-2.2" className="settings-row-icon-accent" />
+    </svg>
+  );
+}
+
 function BackGlyph() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -210,7 +221,7 @@ function ChevronGlyph({ expanded = false }: { expanded?: boolean }) {
   );
 }
 
-type SettingsView = "root" | "sync" | "accent" | "ai";
+type SettingsView = "root" | "sync" | "accent" | "ai" | "backup";
 
 function UpdateGlyph() {
   return (
@@ -1268,6 +1279,55 @@ export default function SettingsPanel({
     );
   }
 
+  if (view === "backup") {
+    const activeVault = localVaults.find((vault) => vault.id === activeLocalVaultId) ?? null;
+    const activeVaultName = activeVault?.name || t("app.localVault");
+
+    return (
+      <section className="settings-panel-shell">
+        <div className="settings-panel-controls">
+          <button
+            type="button"
+            className="settings-panel-nav-button"
+            onClick={() => setView("root")}
+            aria-label={t("settings.back")}
+            title={t("settings.back")}
+          >
+            <span className="settings-row-action-icon" aria-hidden="true">
+              <BackGlyph />
+            </span>
+          </button>
+          <div className="settings-panel-controls-spacer" />
+          <button
+            type="button"
+            className="settings-panel-nav-button"
+            onClick={onClose}
+            aria-label={t("orbit.closeModal")}
+            title={t("orbit.closeModal")}
+          >
+            <span className="settings-panel-close-icon" aria-hidden="true">
+              <CloseGlyph />
+            </span>
+          </button>
+        </div>
+
+        <header className="settings-panel-header">
+          <div className="settings-panel-heading">
+            <h2 className="panel-title settings-panel-title">{t("settings.backupTitle")}</h2>
+            <p className="settings-panel-caption">{t("settings.backupCaption")}</p>
+          </div>
+        </header>
+
+        <BackupSettingsPanel
+          activeLocalVaultId={activeLocalVaultId}
+          vaultName={activeVaultName}
+          vaultKind={activeVault?.vaultKind ?? "regular"}
+          language={settings.language}
+        />
+      </section>
+    );
+  }
+
   if (view === "accent") {
     return (
       <section className="settings-panel-shell">
@@ -1429,6 +1489,26 @@ export default function SettingsPanel({
               </div>
               <span className="settings-row-side">
                 <span className="settings-row-count">{aiConnectionLabel}</span>
+                <span className="settings-row-action-icon" aria-hidden="true">
+                  <ChevronGlyph />
+                </span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="settings-row settings-row-destination is-backup"
+              onClick={() => setView("backup")}
+            >
+              <span className="settings-row-icon settings-destination-icon" aria-hidden="true">
+                <BackupGlyph />
+              </span>
+              <div className="settings-row-copy">
+                <strong>{t("settings.backupTitle")}</strong>
+                <span>{t("settings.backupDescription")}</span>
+              </div>
+              <span className="settings-row-side">
+                <span className="settings-row-count">{t("settings.backupChip")}</span>
                 <span className="settings-row-action-icon" aria-hidden="true">
                   <ChevronGlyph />
                 </span>

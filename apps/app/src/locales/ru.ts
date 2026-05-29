@@ -18,6 +18,50 @@ const ru = {
     kicker: "Подтверждение",
     cancel: "Отмена"
   },
+  privateVaultWarning: {
+    kicker: "Приватное хранилище",
+    continueOnce: "Только сейчас",
+    ai: {
+      title: "AI получит данные из «{{vault}}»",
+      message:
+        "Это приватное хранилище. Чтобы выполнить AI-команду, Locoris отправит выбранный текст или контекст canvas в Gemini через подключенный API key.",
+      detailPrimary:
+        "После отправки запрос уже находится вне локального зашифрованного контура хранилища.",
+      detailSecondary:
+        "Продолжай только если в этом фрагменте нет данных, которые нельзя передавать внешнему AI-провайдеру.",
+      confirmLabel: "Понятно, продолжить"
+    },
+    export: {
+      title: "Экспорт создаст открытый файл",
+      message:
+        "Форматы PDF, DOCX, HTML, Markdown, JSON и копирование Markdown выводят содержимое «{{vault}}» за пределы приватного хранилища.",
+      detailPrimary:
+        "Экспортированный файл или текст в буфере обмена не защищен passphrase приватного хранилища.",
+      detailSecondary:
+        "Сохраняй такие файлы только в доверенном месте или внутри отдельного зашифрованного хранилища.",
+      confirmLabel: "Понятно, экспортировать"
+    },
+    backupExact: {
+      title: "Бэкап нужно хранить как секрет",
+      message:
+        "Locoris-бэкап для «{{vault}}» переносит содержимое хранилища в отдельный файл восстановления.",
+      detailPrimary:
+        "Этот файл нужен для точного восстановления, но сам файл находится вне текущей защиты хранилища.",
+      detailSecondary:
+        "Для чувствительных данных храни .locorisbackup в зашифрованной папке, диске или надежном облаке.",
+      confirmLabel: "Понятно, создать"
+    },
+    backupReadable: {
+      title: "Читаемый ZIP не зашифрован",
+      message:
+        "Читаемый ZIP для «{{vault}}» специально создает документы, вложения и canvas в формате, удобном вне Locoris.",
+      detailPrimary:
+        "Это портативный архив для чтения, а не приватный или зашифрованный формат восстановления.",
+      detailSecondary:
+        "Внутри могут быть DOCX, Markdown, изображения, файлы и canvas-экспорты с исходным содержимым.",
+      confirmLabel: "Понятно, создать ZIP"
+    }
+  },
   sections: {
     topology: "Карта знаний",
     folders: "Папки",
@@ -125,6 +169,28 @@ const ru = {
     typographyFocus: "Фокус",
     typographyReading: "Чтение",
     markdownActions: "Markdown действия",
+    transferButton: "Экспорт / импорт",
+    transferKicker: "Документ",
+    transferTitle: "Экспорт и импорт заметки",
+    transferDescription: "Только действия для текущей заметки: PDF, DOCX, HTML, Markdown и импорт Markdown.",
+    transferTabs: "Экспорт и импорт",
+    transferExportTab: "Экспорт",
+    transferImportTab: "Импорт",
+    transferWorking: "Готовим…",
+    transferExportPdf: "PDF",
+    transferExportPdfChip: "Печать",
+    transferExportPdfDescription: "Фиксированный документ для отправки, печати и архива.",
+    transferExportDocx: "DOCX",
+    transferExportDocxChip: "Word",
+    transferExportDocxDescription: "Совместимый файл для Word, учебы, офиса и клиентов.",
+    transferExportHtml: "HTML",
+    transferExportHtmlChip: "Rich",
+    transferExportHtmlDescription: "Самый переносимый rich-формат с сохранением структуры и базовых стилей.",
+    transferExportMarkdown: "Markdown",
+    transferExportMarkdownChip: "MD",
+    transferExportMarkdownDescription: "Легкий текстовый формат для переноса, Git и внешних редакторов.",
+    transferImportMarkdownDescription: "Выбери .md, .markdown или .txt файл. Если заметка не пустая, Locoris попросит подтвердить замену.",
+    transferImportWarning: "Импорт Markdown заменяет содержимое текущей заметки после подтверждения.",
     copyMarkdown: "Копировать MD",
     exportMarkdown: "Экспорт MD",
     importMarkdown: "Импорт MD",
@@ -218,6 +284,12 @@ const ru = {
     exportPng: "PNG",
     exportSvg: "SVG",
     exportJson: "JSON",
+    exportPdf: "PDF",
+    exportStatus: {
+      pdf: "PDF экспортирован",
+      json: "JSON экспортирован",
+      error: "Ошибка экспорта"
+    },
     importActions: "Импорт холста",
     importJson: "Импорт JSON",
     importJsonTitle: "Заменить текущий холст?",
@@ -746,6 +818,46 @@ const ru = {
     aiFlowTitle: "Как это работает",
     aiFlowDescription:
       "Кнопка в редакторе применяет Gemini ко всей заметке, а кнопка в плавающем меню — только к выделенному тексту.",
+    backupTitle: "Бэкап",
+    backupCaption:
+      "Файлы точного восстановления и читаемый ZIP-экспорт активного локального хранилища.",
+    backupDescription: "Экспорт, восстановление и человекочитаемый архив текущего хранилища.",
+    backupChip: "Хранилище",
+    backupKicker: "Бэкап хранилища",
+    backupHeroTitle: "Спокойный способ уйти и вернуться",
+    backupHeroDescription:
+      "Создай Locoris-бэкап для точного восстановления или читаемый ZIP, где заметки, вложения и canvas сохраняют структуру хранилища.",
+    backupExactTitle: "Locoris-бэкап",
+    backupExactChip: "Точно",
+    backupExactDescription:
+      "Один .locorisbackup файл с проектами, папками, заметками, canvas, вложениями, тегами, избранным, цветами и локальными настройками хранилища.",
+    backupRestoreTitle: "Восстановить бэкап",
+    backupRestoreChip: "Импорт",
+    backupRestoreDescription:
+      "Выбери .locorisbackup файл и замени активное хранилище после подтверждения.",
+    backupReadableTitle: "Читаемый ZIP",
+    backupReadableChip: "Портативно",
+    backupReadableDescription:
+      "ZIP-архив с той же иерархией, Markdown и DOCX заметками, вложениями, canvas JSON и PNG-превью canvas, если рендер доступен.",
+    backupSafetyTitle: "Важно",
+    backupSafetyDescription:
+      "Точное восстановление заменяет текущее активное хранилище. Читаемый ZIP нужен для доступа вне Locoris и не является полным форматом восстановления.",
+    backupWorking: "Работаем…",
+    backupCreated: "Locoris-бэкап создан.",
+    backupCreateFailed: "Не удалось создать Locoris-бэкап.",
+    backupReadableCreated: "Читаемый ZIP-экспорт создан.",
+    backupReadableFailed: "Не удалось создать читаемый ZIP-экспорт.",
+    backupValidated: "Файл бэкапа корректный. Подтверди восстановление, чтобы продолжить.",
+    backupInvalid: "Этот файл не похож на корректный Locoris-бэкап.",
+    backupRestored: "Бэкап восстановлен в активное хранилище.",
+    backupRestoreFailed: "Не удалось восстановить бэкап.",
+    backupRestoreKicker: "Восстановление хранилища",
+    backupRestoreConfirmTitle: "Заменить активное хранилище?",
+    backupRestoreConfirmMessage:
+      "Будет восстановлено «{{vaultName}}» из файла {{fileName}} в текущее активное хранилище. Дата экспорта: {{date}}.",
+    backupRestoreConfirmDetail:
+      "Текущее содержимое хранилища будет заменено. Создай бэкап заранее, если к нему может понадобиться вернуться.",
+    backupRestoreConfirm: "Восстановить",
     syncTitle: "Синхронизация",
     syncDescription: "{{vaultCount}} хранилищ на этом устройстве, подключено {{connectionCount}} способов синхронизации.",
     desktopUpdateTitle: "Обновления приложения",

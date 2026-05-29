@@ -18,6 +18,50 @@ const en = {
     kicker: "Confirm action",
     cancel: "Cancel"
   },
+  privateVaultWarning: {
+    kicker: "Private vault",
+    continueOnce: "Just this time",
+    ai: {
+      title: "AI will receive data from “{{vault}}”",
+      message:
+        "This is a private vault. To run the AI command, Locoris will send the selected text or canvas context to Gemini through the connected API key.",
+      detailPrimary:
+        "After the request is sent, it is outside the local encrypted boundary of this vault.",
+      detailSecondary:
+        "Continue only when this fragment does not contain data you cannot share with an external AI provider.",
+      confirmLabel: "I understand, continue"
+    },
+    export: {
+      title: "Export creates an open file",
+      message:
+        "PDF, DOCX, HTML, Markdown, JSON, and Markdown copy move content from “{{vault}}” outside the private vault.",
+      detailPrimary:
+        "The exported file or clipboard text is not protected by the private vault passphrase.",
+      detailSecondary:
+        "Save these files only in a trusted location or inside another encrypted container.",
+      confirmLabel: "I understand, export"
+    },
+    backupExact: {
+      title: "Store this backup like a secret",
+      message:
+        "A Locoris backup for “{{vault}}” moves the vault content into a separate restore file.",
+      detailPrimary:
+        "This file is useful for exact restore, but the file itself is outside the current vault protection.",
+      detailSecondary:
+        "For sensitive data, keep .locorisbackup inside an encrypted folder, disk, or trusted cloud location.",
+      confirmLabel: "I understand, create"
+    },
+    backupReadable: {
+      title: "Readable ZIP is not encrypted",
+      message:
+        "A readable ZIP for “{{vault}}” intentionally creates documents, assets, and canvases in formats that are useful outside Locoris.",
+      detailPrimary:
+        "This is a portable reading archive, not a private or encrypted restore format.",
+      detailSecondary:
+        "It may contain DOCX, Markdown, images, files, and canvas exports with the original content.",
+      confirmLabel: "I understand, create ZIP"
+    }
+  },
   sections: {
     topology: "Knowledge topology",
     folders: "Folder mesh",
@@ -125,6 +169,28 @@ const en = {
     typographyFocus: "Focus",
     typographyReading: "Reading",
     markdownActions: "Markdown actions",
+    transferButton: "Export / import",
+    transferKicker: "Document",
+    transferTitle: "Export and import note",
+    transferDescription: "Only actions for the current note: PDF, DOCX, HTML, Markdown, and Markdown import.",
+    transferTabs: "Export and import",
+    transferExportTab: "Export",
+    transferImportTab: "Import",
+    transferWorking: "Working…",
+    transferExportPdf: "PDF",
+    transferExportPdfChip: "Print",
+    transferExportPdfDescription: "A fixed document for sending, printing, and archiving.",
+    transferExportDocx: "DOCX",
+    transferExportDocxChip: "Word",
+    transferExportDocxDescription: "A compatible file for Word, study, office workflows, and clients.",
+    transferExportHtml: "HTML",
+    transferExportHtmlChip: "Rich",
+    transferExportHtmlDescription: "The most portable rich format with structure and basic styling preserved.",
+    transferExportMarkdown: "Markdown",
+    transferExportMarkdownChip: "MD",
+    transferExportMarkdownDescription: "A light text format for portability, Git, and external editors.",
+    transferImportMarkdownDescription: "Choose a .md, .markdown, or .txt file. If the note is not empty, Locoris will ask before replacing it.",
+    transferImportWarning: "Markdown import replaces the current note content after confirmation.",
     copyMarkdown: "Copy MD",
     exportMarkdown: "Export MD",
     importMarkdown: "Import MD",
@@ -218,6 +284,12 @@ const en = {
     exportPng: "PNG",
     exportSvg: "SVG",
     exportJson: "JSON",
+    exportPdf: "PDF",
+    exportStatus: {
+      pdf: "PDF exported",
+      json: "JSON exported",
+      error: "Export failed"
+    },
     importActions: "Canvas import",
     importJson: "Import JSON",
     importJsonTitle: "Replace current canvas?",
@@ -744,6 +816,46 @@ const en = {
     aiFlowTitle: "How it works",
     aiFlowDescription:
       "The editor button applies Gemini to the whole note, while the floating toolbar button applies it only to selected text.",
+    backupTitle: "Backup",
+    backupCaption:
+      "Exact restore files and a readable ZIP export for the active local vault.",
+    backupDescription: "Export, restore, or create a human-readable archive of this vault.",
+    backupChip: "Vault",
+    backupKicker: "Vault backup",
+    backupHeroTitle: "A calm way to leave and return",
+    backupHeroDescription:
+      "Create a Locoris backup for exact restoration, or a readable ZIP where notes, assets, and canvases keep the vault structure.",
+    backupExactTitle: "Locoris backup",
+    backupExactChip: "Exact",
+    backupExactDescription:
+      "One .locorisbackup file with projects, folders, notes, canvases, assets, tags, favorites, colors, and local vault settings.",
+    backupRestoreTitle: "Restore backup",
+    backupRestoreChip: "Import",
+    backupRestoreDescription:
+      "Choose a .locorisbackup file and replace the active vault after confirmation.",
+    backupReadableTitle: "Readable ZIP",
+    backupReadableChip: "Portable",
+    backupReadableDescription:
+      "A ZIP archive with the same hierarchy, Markdown and DOCX notes, assets, canvas JSON, and canvas PNG previews when rendering is available.",
+    backupSafetyTitle: "Safety note",
+    backupSafetyDescription:
+      "Exact restore replaces the current active vault. Readable ZIP is for access outside Locoris and is not intended as a full restore format.",
+    backupWorking: "Working…",
+    backupCreated: "Locoris backup was created.",
+    backupCreateFailed: "The Locoris backup could not be created.",
+    backupReadableCreated: "Readable ZIP export was created.",
+    backupReadableFailed: "The readable ZIP export could not be created.",
+    backupValidated: "Backup file is valid. Confirm restore to continue.",
+    backupInvalid: "This file does not look like a valid Locoris backup.",
+    backupRestored: "Backup restored into the active vault.",
+    backupRestoreFailed: "The backup could not be restored.",
+    backupRestoreKicker: "Restore vault",
+    backupRestoreConfirmTitle: "Replace the active vault?",
+    backupRestoreConfirmMessage:
+      "This will restore “{{vaultName}}” from {{fileName}} into the currently active vault. Exported: {{date}}.",
+    backupRestoreConfirmDetail:
+      "The current vault content will be replaced. Create a backup first if you may need to return to it.",
+    backupRestoreConfirm: "Restore",
     syncTitle: "Synchronization",
     syncDescription: "{{vaultCount}} vaults on this device, {{connectionCount}} sync methods connected.",
     desktopUpdateTitle: "App updates",

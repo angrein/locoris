@@ -1,0 +1,174 @@
+.backup-settings-layout {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.backup-settings-hero {
+  overflow: hidden;
+}
+
+.backup-settings-hero-copy {
+  min-width: 0;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.backup-settings-hero-icon {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 18px;
+  color: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 68%, rgba(248, 250, 255, 0.9));
+  border: 1px solid color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 28%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 16%, transparent), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.032);
+}
+
+.backup-settings-hero-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.backup-settings-hero-icon svg * {
+  fill: rgba(255, 255, 255, 0.04);
+  stroke: currentColor;
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.backup-settings-hero-icon .backup-card-icon-accent {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text) 72%, var(--utility-modal-accent, var(--gold)) 28%);
+}
+
+.backup-settings-hero h3 {
+  margin: 3px 0 0;
+  color: rgba(248, 250, 255, 0.96);
+  font-size: 1.05rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.backup-settings-hero p:not(.panel-kicker) {
+  margin: 7px 0 0;
+  color: rgba(192, 201, 231, 0.76);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.backup-settings-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.backup-settings-card {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border-radius: 18px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+  color: rgba(236, 241, 255, 0.86);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.backup-settings-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 34%, rgb(var(--line-rgb) / 0.14));
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 12%, transparent), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.backup-settings-card:disabled {
+  cursor: progress;
+  opacity: 0.64;
+}
+
+.backup-settings-card-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.backup-settings-card-head strong {
+  min-width: 0;
+  color: rgba(249, 251, 255, 0.96);
+  font-size: 0.78rem;
+  line-height: 1.24;
+}
+
+.backup-settings-card-head span:last-child {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 18%, rgb(var(--line-rgb) / 0.1));
+  background: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 9%, rgba(255, 255, 255, 0.02));
+  color: color-mix(in srgb, var(--text) 78%, var(--utility-modal-accent, var(--gold)) 22%);
+  font-size: 0.56rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.backup-settings-card p,
+.backup-settings-note p {
+  margin: 0;
+  color: rgba(194, 203, 232, 0.72);
+  font-size: 0.69rem;
+  line-height: 1.5;
+}
+
+.backup-settings-note {
+  display: grid;
+  gap: 8px;
+}
+
+.backup-settings-note > span {
+  color: rgba(248, 250, 255, 0.88);
+  font-size: 0.74rem;
+  font-weight: 760;
+}
+
+.backup-settings-feedback {
+  padding: 10px 12px;
+  border-radius: 15px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.backup-settings-feedback.is-success {
+  border-color: color-mix(in srgb, #8ff0c2 24%, rgb(var(--line-rgb) / 0.12));
+  color: color-mix(in srgb, var(--text) 76%, #8ff0c2 24%);
+}
+
+.backup-settings-feedback.is-error {
+  border-color: color-mix(in srgb, var(--red) 28%, rgb(var(--line-rgb) / 0.12));
+  color: color-mix(in srgb, var(--text) 72%, var(--red) 28%);
+}
+
+.backup-settings-feedback.is-info {
+  border-color: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 24%, rgb(var(--line-rgb) / 0.12));
+}
+
+@media (max-width: 900px) {
+  .backup-settings-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
