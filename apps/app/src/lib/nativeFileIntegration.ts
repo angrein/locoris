@@ -1,4 +1,4 @@
-import { isTauri } from "@tauri-apps/api/core";
+import { isDesktopRuntime } from "./runtime";
 
 export type NativeDialogFilter = {
   name: string;
@@ -14,10 +14,6 @@ type OpenFileResult = {
 type OpenTextFileResult = OpenFileResult & {
   text: string;
 };
-
-function isDesktopRuntime() {
-  return isTauri();
-}
 
 function getFileNameFromPath(path: string) {
   const normalizedPath = path.replace(/\\/g, "/");

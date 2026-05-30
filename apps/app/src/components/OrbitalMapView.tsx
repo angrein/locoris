@@ -25,6 +25,7 @@ import OrbitalInspectorContextMenu, {
 } from "./OrbitalInspectorContextMenu";
 import OrbitalInspectorSubviewHeader from "./OrbitalInspectorSubviewHeader";
 import "./OrbitalChrome.css";
+import "./OrbitalMobileShell.css";
 import {
   getDisplayNoteTitle,
   getDisplayProjectName,
@@ -41,12 +42,17 @@ import type { LocalVaultKind } from "../lib/localVaults";
 import { getCanvasMetrics } from "../lib/canvas";
 import { buildFolderPathMap, formatTimestamp } from "../lib/notes";
 import { normalizeTagLookup, sortTagsByName, uniqueTagsByName } from "../lib/tags";
+import type { AppRuntimeLayoutSnapshot } from "../lib/runtime";
+import type { OrbitalAnimationMode } from "../lib/interfacePreferences";
+import { useAndroidBackHandler } from "../lib/useAndroidBackHandler";
 import type { AppLanguage, Asset, Folder, Note, Project, Tag } from "../types";
 
 type SceneNodeKind = "core" | "folder" | "note";
 type OrbitalChild = { folder?: FolderBranch; note?: Note };
 type InspectorMenu = "overview" | "notes" | "folders" | "tags" | "files" | "pinned" | "colors";
 type InspectorHierarchyScope = "project" | "vault";
+type OrbitalMobileSection = "vault" | "documents" | "map" | "pinned";
+type OrbitalMobileNavSection = OrbitalMobileSection | "settings";
 type InspectorHierarchyItemKind = "core" | "folder" | "note" | "canvas";
 type InspectorCompactIconKind =
   | InspectorHierarchyItemKind
@@ -72,6 +78,8 @@ interface OrbitalMapViewProps {
   assets: Asset[];
   assetCount: number;
   language: AppLanguage;
+  adaptiveLayout: AppRuntimeLayoutSnapshot;
+  orbitalAnimationMode: OrbitalAnimationMode;
   activeLocalVaultId: string;
   localVaultOptions: LocalVaultSwitcherItem[];
   syncStatusChip?: {
@@ -97,6 +105,7 @@ interface OrbitalMapViewProps {
   trashModalSlot?: ReactNode;
   showClose?: boolean;
   onClose: () => void;
+  onOrbitalAnimationModeChange: (mode: OrbitalAnimationMode) => void;
   onSelectLocalVault: (localVaultId: string) => void;
   onCreateLocalVault?: (input: {
     name: string;
@@ -472,6 +481,26 @@ type InspectorClipboardItem =
   | { kind: "note" | "canvas"; id: string };
 
 type InspectorDropPlacement = "inside" | "before" | "after";
+type MobileMoveDestination = {
+  entityId: string;
+  kind: "project" | "folder";
+  projectId: string;
+  parentId: string | null;
+  label: string;
+  color: string;
+  issue?: string | null;
+};
+
+type MobileMoveConflict = {
+  item: InspectorClipboardItem;
+  currentName: string;
+  suggestedName: string;
+};
+
+type MobileMoveConflictState = {
+  destination: MobileMoveDestination;
+  conflicts: MobileMoveConflict[];
+};
 
 type InspectorDropIntent = {
   targetEntityId: string;
@@ -495,6 +524,10 @@ const ORBIT_ACTIVE_FRAME_MS = 1000 / 25;
 const ORBIT_IDLE_FRAME_MS = 1000 / 10;
 const ORBIT_ACTIVE_FRAME_MS_LARGE = 1000 / 15;
 const ORBIT_IDLE_FRAME_MS_LARGE = 1000 / 7;
+const ORBIT_ANDROID_ACTIVE_FRAME_MS = 1000 / 12;
+const ORBIT_ANDROID_IDLE_FRAME_MS = 1000 / 4;
+const ORBIT_ANDROID_ACTIVE_FRAME_MS_LARGE = 1000 / 8;
+const ORBIT_ANDROID_IDLE_FRAME_MS_LARGE = 1000 / 3;
 const INSPECTOR_LONG_PRESS_MS = 460;
 const INSPECTOR_LONG_PRESS_MOVE_TOLERANCE = 12;
 const GENERATED_CANVAS_ASSET_NAME_RE = /^canvas-[a-f0-9]{8}\.[a-z0-9]+$/i;
@@ -2142,6 +2175,8 @@ export default function OrbitalMapView({
   assets,
   assetCount,
   language,
+  adaptiveLayout,
+  orbitalAnimationMode,
   activeLocalVaultId,
   localVaultOptions,
   syncStatusChip,
@@ -2156,6 +2191,7 @@ export default function OrbitalMapView({
   trashModalSlot,
   showClose = true,
   onClose,
+  onOrbitalAnimationModeChange,
   onSelectLocalVault,
   onCreateLocalVault,
   onRenameLocalVault,
@@ -2225,7 +2261,7 @@ export default function OrbitalMapView({
       ? false
       : window.matchMedia(`(max-width: ${MOBILE_PREVIEW_BREAKPOINT}px)`).matches
   );
-  const [isOrbitInteractionActive, setIsOrbitInteractionActive] = useState(true);
+  const [isOrbitInteractionActive, setIsOrbitInteractionActive] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
   const [activeColorFilters, setActiveColorFilters] = useState<string[]>([]);
   const editorModalRef = useRef<HTMLDivElement | null>(null);
@@ -2273,6 +2309,13 @@ export default function OrbitalMapView({
   const [inspectorMenu, setInspectorMenu] = useState<InspectorMenu>("overview");
   const [inspectorHierarchyScope, setInspectorHierarchyScope] =
     useState<InspectorHierarchyScope>("vault");
+  const [mobileSection, setMobileSection] = useState<OrbitalMobileSection>("vault");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileSelectionMode, setIsMobileSelectionMode] = useState(false);
+  const [mobileMoveItems, setMobileMoveItems] = useState<InspectorClipboardItem[]>([]);
+  const [mobileMoveDestination, setMobileMoveDestination] = useState<MobileMoveDestination | null>(null);
+  const [mobileMoveConflictState, setMobileMoveConflictState] =
+    useState<MobileMoveConflictState | null>(null);
   const [inspectorQuery, setInspectorQuery] = useState("");
   const [hierarchyFocusedEntityId, setHierarchyFocusedEntityId] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -2324,7 +2367,7 @@ export default function OrbitalMapView({
   const overviewColorPanelRef = useRef<HTMLDivElement | null>(null);
   const suppressSceneBackgroundClickRef = useRef(false);
   const orbitInteractionTimeoutRef = useRef<number | null>(null);
-  const orbitInteractionActiveRef = useRef(true);
+  const orbitInteractionActiveRef = useRef(false);
   const vaultRenameErrorTimeoutRef = useRef<number | null>(null);
   const inspectorToastTimeoutRef = useRef<number | null>(null);
   const inspectorDragItemsRef = useRef<InspectorClipboardItem[]>([]);
@@ -2345,6 +2388,13 @@ export default function OrbitalMapView({
     startX: number;
     startY: number;
     timeoutId: number;
+  } | null>(null);
+  const mobilePreviewLongPressRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    timeoutId: number;
+    onPreview: () => void;
   } | null>(null);
   const dragRef = useRef<
     | {
@@ -2368,6 +2418,21 @@ export default function OrbitalMapView({
       }
     | null
   >(null);
+  const isAndroidLayout = adaptiveLayout.runtimeKind === "android";
+  const isAndroidTouchLayout = isAndroidLayout || adaptiveLayout.pointer === "coarse";
+  const isAndroidMobileShell = isAndroidLayout && adaptiveLayout.isMobileShell;
+  const isAndroidPhoneShell = isAndroidMobileShell && adaptiveLayout.device === "phone";
+  const isAndroidTabletPortraitShell =
+    isAndroidMobileShell &&
+    adaptiveLayout.device === "tablet" &&
+    adaptiveLayout.orientation === "portrait";
+  const isAndroidTabletLandscapeShell =
+    isAndroidLayout &&
+    adaptiveLayout.device === "tablet" &&
+    adaptiveLayout.orientation === "landscape";
+  const canShowHoverPreview = !isAndroidTouchLayout && !isMobilePreviewMode;
+  const isOrbitalMotionEnabled = orbitalAnimationMode === "full";
+  const isMobileMapVisible = !isAndroidMobileShell || mobileSection === "map";
 
   const stopScenePositionAnimation = () => {
     if (sceneAnimationFrameRef.current !== null) {
@@ -2456,6 +2521,16 @@ export default function OrbitalMapView({
       mediaQuery.removeEventListener("change", syncMobileMode);
     };
   }, []);
+
+  useEffect(() => {
+    if (isAndroidMobileShell) {
+      return;
+    }
+
+    setIsMobileMenuOpen(false);
+    setIsMobileSelectionMode(false);
+    setMobileMoveItems([]);
+  }, [isAndroidMobileShell]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -3028,6 +3103,11 @@ export default function OrbitalMapView({
   );
   const sceneMovingEntityIds = useMemo(() => {
     const movingEntityIds = new Set<string>();
+
+    if (!isOrbitalMotionEnabled) {
+      return movingEntityIds;
+    }
+
     const selectedProjectId = getEntityProjectId(selectedEntityId, orbitalData);
 
     const addProject = (projectId: string | null | undefined) => {
@@ -3050,7 +3130,7 @@ export default function OrbitalMapView({
     });
 
     return movingEntityIds;
-  }, [currentProjectId, orbitalData, selectedEntityId]);
+  }, [currentProjectId, isOrbitalMotionEnabled, orbitalData, selectedEntityId]);
   const scene = useMemo(
     () =>
       materializeOrbitalScene(
@@ -3190,7 +3270,7 @@ export default function OrbitalMapView({
       sceneAnchorElement?: SVGGElement | null;
     }
   ) => {
-    if (isMobilePreviewMode) {
+    if (!canShowHoverPreview) {
       return;
     }
 
@@ -3214,7 +3294,7 @@ export default function OrbitalMapView({
       anchorRect?: HoverPreviewAnchorRect | null;
     }
   ) => {
-    if (isMobilePreviewMode) {
+    if (!canShowHoverPreview) {
       return;
     }
 
@@ -3229,6 +3309,86 @@ export default function OrbitalMapView({
     setHoverPreviewCursor({ x: clientX, y: clientY });
   };
 
+  const openMobileNotePreview = (noteId: string) => {
+    if (!isAndroidTouchLayout) {
+      return;
+    }
+
+    closeInspectorContextMenu();
+    clearHoverPreviewCloseTimeout();
+    markOrbitInteraction();
+    setHoveredSelectionNoteId(noteId);
+    setHoveredAssetId(null);
+    setHoverPreviewAnchorSource("inspector");
+    setHoverPreviewFallbackRect(null);
+    hoverPreviewSceneAnchorRef.current = null;
+  };
+
+  const openMobileAssetPreview = (assetId: string) => {
+    if (!isAndroidTouchLayout) {
+      return;
+    }
+
+    closeInspectorContextMenu();
+    clearHoverPreviewCloseTimeout();
+    markOrbitInteraction();
+    setHoveredSelectionNoteId(null);
+    setHoveredAssetId(assetId);
+    setHoverPreviewAnchorSource("inspector");
+    setHoverPreviewFallbackRect(null);
+    hoverPreviewSceneAnchorRef.current = null;
+  };
+
+  const clearMobilePreviewLongPress = () => {
+    if (mobilePreviewLongPressRef.current) {
+      window.clearTimeout(mobilePreviewLongPressRef.current.timeoutId);
+      mobilePreviewLongPressRef.current = null;
+    }
+  };
+
+  const startMobilePreviewLongPress = (
+    onPreview: () => void,
+    event: ReactPointerEvent<HTMLElement>
+  ) => {
+    if (!isAndroidTouchLayout || event.pointerType === "mouse") {
+      return;
+    }
+
+    clearMobilePreviewLongPress();
+    mobilePreviewLongPressRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      onPreview,
+      timeoutId: window.setTimeout(() => {
+        suppressInspectorClickRef.current = true;
+        mobilePreviewLongPressRef.current = null;
+        onPreview();
+      }, INSPECTOR_LONG_PRESS_MS)
+    };
+  };
+
+  const updateMobilePreviewLongPress = (event: ReactPointerEvent<HTMLElement>) => {
+    const pending = mobilePreviewLongPressRef.current;
+
+    if (!pending || pending.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (
+      Math.abs(event.clientX - pending.startX) > INSPECTOR_LONG_PRESS_MOVE_TOLERANCE ||
+      Math.abs(event.clientY - pending.startY) > INSPECTOR_LONG_PRESS_MOVE_TOLERANCE
+    ) {
+      clearMobilePreviewLongPress();
+    }
+  };
+
+  const endMobilePreviewLongPress = (pointerId: number) => {
+    if (mobilePreviewLongPressRef.current?.pointerId === pointerId) {
+      clearMobilePreviewLongPress();
+    }
+  };
+
   const updateSelectionHoverPreviewCursor = (
     clientX: number,
     clientY: number,
@@ -3237,7 +3397,7 @@ export default function OrbitalMapView({
       sceneAnchorElement?: SVGGElement | null;
     }
   ) => {
-    if (isMobilePreviewMode) {
+    if (!canShowHoverPreview) {
       return;
     }
 
@@ -3679,14 +3839,24 @@ export default function OrbitalMapView({
   const autoFocusEnabled = isSceneBudgetConstrained && !isPriorityFocusMode;
   const isSceneFocusActive = isSceneBudgetConstrained && isPriorityFocusMode;
   const isDenseOrbitalScene = orbitalData.totalEntities > 80;
-  const orbitFrameInterval = isOrbitInteractionActive
-    ? isDenseOrbitalScene
-      ? ORBIT_ACTIVE_FRAME_MS_LARGE
-      : ORBIT_ACTIVE_FRAME_MS
-    : isDenseOrbitalScene
-      ? ORBIT_IDLE_FRAME_MS_LARGE
-      : ORBIT_IDLE_FRAME_MS;
+  const orbitFrameInterval = isAndroidMobileShell
+    ? isOrbitInteractionActive
+      ? isDenseOrbitalScene
+        ? ORBIT_ANDROID_ACTIVE_FRAME_MS_LARGE
+        : ORBIT_ANDROID_ACTIVE_FRAME_MS
+      : isDenseOrbitalScene
+        ? ORBIT_ANDROID_IDLE_FRAME_MS_LARGE
+        : ORBIT_ANDROID_IDLE_FRAME_MS
+    : isOrbitInteractionActive
+      ? isDenseOrbitalScene
+        ? ORBIT_ACTIVE_FRAME_MS_LARGE
+        : ORBIT_ACTIVE_FRAME_MS
+      : isDenseOrbitalScene
+        ? ORBIT_IDLE_FRAME_MS_LARGE
+        : ORBIT_IDLE_FRAME_MS;
   const isOrbitAnimationSuspended =
+    !isOrbitalMotionEnabled ||
+    !isMobileMapVisible ||
     isPaused ||
     editorOpen ||
     activeModal !== null ||
@@ -3694,6 +3864,20 @@ export default function OrbitalMapView({
     prefersReducedMotion ||
     sceneMovingEntityIds.size === 0;
   useEffect(() => {
+    if (!isOrbitAnimationSuspended) {
+      // Continuous orbit motion already arrives through `scene`; the position-easing loop is
+      // reserved for static states so it does not chase a moving target every animation frame.
+      targetNodePositionsRef.current = new Map();
+      stopScenePositionAnimation();
+
+      if (animatedNodePositionsRef.current.size > 0) {
+        animatedNodePositionsRef.current = new Map();
+        setAnimatedSceneVersion((current) => current + 1);
+      }
+
+      return;
+    }
+
     const shouldSnapImmediately =
       prefersReducedMotion ||
       isOrbitAnimationSuspended ||
@@ -4586,7 +4770,7 @@ export default function OrbitalMapView({
 
   const handleInspectorContextPointerDown = (
     target: InspectorContextMenuTarget,
-    event: ReactPointerEvent<HTMLElement>
+    event: ReactPointerEvent<Element>
   ) => {
     if (event.pointerType !== "touch") {
       return;
@@ -4605,7 +4789,7 @@ export default function OrbitalMapView({
     };
   };
 
-  const handleInspectorContextPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+  const handleInspectorContextPointerMove = (event: ReactPointerEvent<Element>) => {
     const activeLongPress = inspectorLongPressRef.current;
 
     if (!activeLongPress || activeLongPress.pointerId !== event.pointerId) {
@@ -4769,7 +4953,8 @@ export default function OrbitalMapView({
     event: ReactMouseEvent<HTMLElement>
   ) => {
     setIsInspectorHierarchyAutoExpandSuppressed(false);
-    const isAdditiveSelection = event.metaKey || event.ctrlKey;
+    const isAdditiveSelection =
+      event.metaKey || event.ctrlKey || (isMobileSelectionMode && item.kind !== "core");
     const isRangeSelection = event.shiftKey;
     setHierarchyFocusedEntityId(item.entityId);
 
@@ -4840,7 +5025,7 @@ export default function OrbitalMapView({
       return;
     }
 
-    if (isMobilePreviewMode && item.note) {
+    if (isMobilePreviewMode && !isAndroidTouchLayout && item.note) {
       selectInspectorEntity(item.entityId, item.note.projectId, {
         centerInScene: true
       });
@@ -4880,6 +5065,39 @@ export default function OrbitalMapView({
 
     setInspectorMenu(menu);
     setInspectorQuery("");
+  };
+
+  const openMobileSection = (section: OrbitalMobileSection) => {
+    setMobileSection(section);
+    setIsMobileMenuOpen(false);
+
+    if (section === "vault") {
+      setInspectorHierarchyScope("vault");
+      openInspectorMenu("folders");
+      return;
+    }
+
+    if (section === "documents") {
+      openInspectorMenu("notes");
+      return;
+    }
+
+    if (section === "pinned") {
+      openInspectorMenu("pinned");
+      return;
+    }
+  };
+
+  const openMobileSettings = () => {
+    setIsMobileMenuOpen(false);
+    setActiveModal("settings");
+  };
+
+  const openSelectedMobileEntry = () => {
+    if (selectedNode?.note) {
+      closeSelectionHoverPreview();
+      onOpenNote(selectedNode.note.id);
+    }
   };
 
   const handleInspectorBack = () => {
@@ -5858,6 +6076,39 @@ export default function OrbitalMapView({
     };
   };
 
+  const buildSceneNodeContextTarget = (
+    node: OrbitalSceneNode | null | undefined
+  ): InspectorContextMenuTarget | null => {
+    if (!node) {
+      return null;
+    }
+
+    if (node.kind === "core" && node.project) {
+      return {
+        kind: "core",
+        project: node.project,
+        label: node.label,
+        color: node.color
+      };
+    }
+
+    if (node.kind === "folder" && node.folder) {
+      return {
+        kind: "folder",
+        folder: node.folder,
+        label: node.label,
+        color: node.color,
+        canCreateFolder: (orbitalData.folderMeta.get(node.folder.id)?.depth ?? 0) < 1
+      };
+    }
+
+    if (node.kind === "note" && node.note) {
+      return buildInspectorNoteContextTarget(node.note);
+    }
+
+    return null;
+  };
+
   const isEditingInspectorTarget = (target: InspectorContextMenuTarget) =>
     Boolean(
       inspectorRenameState &&
@@ -6426,6 +6677,359 @@ export default function OrbitalMapView({
     }
   };
 
+  const getMobileMoveItemEntityId = (item: InspectorClipboardItem) =>
+    item.kind === "folder" ? `folder:${item.id}` : `note:${item.id}`;
+
+  const getMobileMoveItemName = (item: InspectorClipboardItem) => {
+    if (item.kind === "folder") {
+      return orbitalData.folderById.get(item.id)?.name ?? "";
+    }
+
+    const note = orbitalData.noteById.get(item.id);
+    return note ? getNoteInspectorTitle(note) : "";
+  };
+
+  const normalizeMoveName = (value: string) => value.trim().toLocaleLowerCase(language);
+
+  const makeUniqueMoveName = (baseName: string, blockedNames: Set<string>) => {
+    const fallback = baseName.trim() || labels.note;
+    const copySuffix = t("orbit.duplicateSuffix");
+    let index = 2;
+    let candidate = `${fallback} ${copySuffix}`;
+
+    while (blockedNames.has(normalizeMoveName(candidate))) {
+      candidate = `${fallback} ${copySuffix} ${index}`;
+      index += 1;
+    }
+
+    blockedNames.add(normalizeMoveName(candidate));
+    return candidate;
+  };
+
+  const folderHasDescendantFolders = (folderId: string) => {
+    const stack = [...(orbitalData.foldersByParent.get(folderId) ?? [])];
+
+    while (stack.length > 0) {
+      const folder = stack.pop();
+
+      if (!folder) {
+        continue;
+      }
+
+      return true;
+    }
+
+    return false;
+  };
+
+  const isFolderMoveIntoSelfOrDescendant = (folderId: string, destinationParentId: string | null) => {
+    let cursor = destinationParentId;
+
+    while (cursor) {
+      if (cursor === folderId) {
+        return true;
+      }
+
+      cursor = orbitalData.folderById.get(cursor)?.parentId ?? null;
+    }
+
+    return false;
+  };
+
+  const buildMobileMoveDestination = (
+    item: InspectorHierarchyItem
+  ): MobileMoveDestination | null => {
+    if (item.kind === "core" && item.project) {
+      return {
+        entityId: item.entityId,
+        kind: "project",
+        projectId: item.project.id,
+        parentId: null,
+        label: item.label,
+        color: item.color,
+        issue: null
+      };
+    }
+
+    if (item.kind === "folder" && item.folder) {
+      return {
+        entityId: item.entityId,
+        kind: "folder",
+        projectId: item.folder.projectId,
+        parentId: item.folder.id,
+        label: item.label,
+        color: item.color,
+        issue: null
+      };
+    }
+
+    return null;
+  };
+
+  const getMobileMoveDestinationIssue = (
+    items: InspectorClipboardItem[],
+    destination: MobileMoveDestination
+  ) => {
+    if (!orbitalData.projectById.has(destination.projectId)) {
+      return labels.moveBlockedMissingTarget;
+    }
+
+    const destinationFolder = destination.parentId
+      ? orbitalData.folderById.get(destination.parentId) ?? null
+      : null;
+
+    if (destination.parentId && !destinationFolder) {
+      return labels.moveBlockedMissingTarget;
+    }
+
+    for (const item of items) {
+      if (item.kind !== "folder") {
+        continue;
+      }
+
+      if (!orbitalData.folderById.has(item.id)) {
+        return labels.moveBlockedInvalid;
+      }
+
+      if (isFolderMoveIntoSelfOrDescendant(item.id, destination.parentId)) {
+        return labels.moveBlockedInvalid;
+      }
+
+      if (destinationFolder?.parentId) {
+        return labels.moveBlockedDepth;
+      }
+
+      if (destination.parentId && folderHasDescendantFolders(item.id)) {
+        return labels.moveBlockedDepth;
+      }
+    }
+
+    return null;
+  };
+
+  const getMobileMoveConflicts = (
+    items: InspectorClipboardItem[],
+    destination: MobileMoveDestination
+  ) => {
+    const draggedEntityIds = new Set(items.map(getMobileMoveItemEntityId));
+    const folderNames = new Set(
+      folders
+        .filter(
+          (folder) =>
+            folder.projectId === destination.projectId &&
+            folder.parentId === destination.parentId &&
+            !draggedEntityIds.has(`folder:${folder.id}`)
+        )
+        .map((folder) => normalizeMoveName(folder.name))
+    );
+    const noteNames = new Set(
+      notes
+        .filter(
+          (note) =>
+            note.projectId === destination.projectId &&
+            note.folderId === destination.parentId &&
+            !note.trashedAt &&
+            !draggedEntityIds.has(`note:${note.id}`)
+        )
+        .map((note) => normalizeMoveName(getNoteInspectorTitle(note)))
+    );
+    const conflicts: MobileMoveConflict[] = [];
+
+    for (const item of items) {
+      const currentName = getMobileMoveItemName(item);
+      const normalizedName = normalizeMoveName(currentName);
+      const blockedNames = item.kind === "folder" ? folderNames : noteNames;
+
+      if (!normalizedName) {
+        continue;
+      }
+
+      if (blockedNames.has(normalizedName)) {
+        conflicts.push({
+          item,
+          currentName,
+          suggestedName: makeUniqueMoveName(currentName, blockedNames)
+        });
+      } else {
+        blockedNames.add(normalizedName);
+      }
+    }
+
+    return conflicts;
+  };
+
+  const getMobileMoveSortOrders = (
+    destination: MobileMoveDestination,
+    items: InspectorClipboardItem[]
+  ) => {
+    const draggedEntityIds = new Set(items.map(getMobileMoveItemEntityId));
+    const siblingOrders = [
+      ...folders
+        .filter(
+          (folder) =>
+            folder.projectId === destination.projectId &&
+            folder.parentId === destination.parentId &&
+            !draggedEntityIds.has(`folder:${folder.id}`)
+        )
+        .map(getHierarchySortOrder),
+      ...notes
+        .filter(
+          (note) =>
+            note.projectId === destination.projectId &&
+            note.folderId === destination.parentId &&
+            !note.trashedAt &&
+            !draggedEntityIds.has(`note:${note.id}`)
+        )
+        .map(getHierarchySortOrder)
+    ].sort((left, right) => left - right);
+    const previousOrder = siblingOrders.length > 0 ? siblingOrders[siblingOrders.length - 1] : null;
+
+    return getDropSortOrders(previousOrder, null, items.length);
+  };
+
+  const clearMobileMoveState = () => {
+    setMobileMoveItems([]);
+    setMobileMoveDestination(null);
+    setMobileMoveConflictState(null);
+    setInspectorDropIntent(null);
+  };
+
+  const performMobileMove = async (
+    destination: MobileMoveDestination,
+    conflictMode: "move" | "rename" | "copy" = "move"
+  ) => {
+    if (mobileMoveItems.length === 0) {
+      return;
+    }
+
+    const issue = getMobileMoveDestinationIssue(mobileMoveItems, destination);
+
+    if (issue) {
+      setMobileMoveDestination({ ...destination, issue });
+      showInspectorToast(issue);
+      return;
+    }
+
+    const conflicts = getMobileMoveConflicts(mobileMoveItems, destination);
+
+    if (conflicts.length > 0 && conflictMode === "move") {
+      setMobileMoveConflictState({ destination, conflicts });
+      return;
+    }
+
+    closeInspectorContextMenu();
+
+    try {
+      const sortOrders = getMobileMoveSortOrders(destination, mobileMoveItems);
+      const conflictsByEntityId = new Map(
+        conflicts.map((conflict) => [getMobileMoveItemEntityId(conflict.item), conflict])
+      );
+
+      if (conflictMode === "rename") {
+        for (const conflict of conflicts) {
+          if (conflict.item.kind === "folder") {
+            await onRenameFolder(conflict.item.id, conflict.suggestedName);
+          } else {
+            await onRenameNote(conflict.item.id, conflict.suggestedName);
+          }
+        }
+      }
+
+      for (const [index, item] of mobileMoveItems.entries()) {
+        const sortOrder = sortOrders[index];
+
+        if (conflictMode === "copy") {
+          if (item.kind === "folder") {
+            const copy = await onDuplicateFolder(
+              item.id,
+              destination.parentId,
+              destination.projectId,
+              sortOrder
+            );
+            const conflict = conflictsByEntityId.get(getMobileMoveItemEntityId(item));
+
+            if (copy && conflict) {
+              await onRenameFolder(copy.id, conflict.suggestedName);
+            }
+          } else {
+            const copy = await onDuplicateNote(
+              item.id,
+              destination.parentId,
+              destination.projectId,
+              sortOrder
+            );
+            const conflict = conflictsByEntityId.get(getMobileMoveItemEntityId(item));
+
+            if (copy && conflict) {
+              await onRenameNote(copy.id, conflict.suggestedName);
+            }
+          }
+
+          continue;
+        }
+
+        if (item.kind === "folder") {
+          await onMoveFolder(item.id, destination.parentId, destination.projectId, sortOrder);
+        } else {
+          await onMoveNote(item.id, destination.parentId, destination.projectId, sortOrder);
+        }
+      }
+
+      clearMobileMoveState();
+      setHierarchyFocusedEntityId(destination.entityId);
+    } catch (error) {
+      showInspectorToast(getMoveErrorMessage(error));
+    }
+  };
+
+  const beginMobileMoveSelection = (
+    target: InspectorContextMenuTarget | null = contextMenuTarget
+  ) => {
+    const items = getClipboardItemsFromTargets(getContextOperationTargets(target));
+
+    if (items.length === 0) {
+      return;
+    }
+
+    closeInspectorContextMenu();
+    setMobileMoveItems(items);
+    setMobileMoveDestination(null);
+    setMobileMoveConflictState(null);
+    setIsMobileSelectionMode(false);
+    setMobileSection("vault");
+    openInspectorMenu("folders");
+    showInspectorToast(t("orbit.mobileMoveChooseDestination"));
+  };
+
+  const cancelMobileMoveSelection = () => {
+    clearMobileMoveState();
+  };
+
+  const handleMobileMoveDestination = (item: InspectorHierarchyItem) => {
+    if (mobileMoveItems.length === 0) {
+      return false;
+    }
+
+    const destination = buildMobileMoveDestination(item);
+
+    if (!destination) {
+      showInspectorToast(t("orbit.mobileMovePickDestination"));
+      return true;
+    }
+
+    const issue = getMobileMoveDestinationIssue(mobileMoveItems, destination);
+    const nextDestination = { ...destination, issue };
+    setMobileMoveDestination(nextDestination);
+    setMobileMoveConflictState(null);
+    setHierarchyFocusedEntityId(item.entityId);
+
+    if (issue) {
+      showInspectorToast(issue);
+    }
+
+    return true;
+  };
+
   const getHierarchyDropCandidate = (clientX: number, clientY: number) => {
     if (typeof document === "undefined") {
       return null;
@@ -6491,6 +7095,7 @@ export default function OrbitalMapView({
   ) => {
     if (
       event.button !== 0 ||
+      isAndroidTouchLayout ||
       event.pointerType === "touch" ||
       item.kind === "core"
     ) {
@@ -6648,6 +7253,16 @@ export default function OrbitalMapView({
           }
         ];
 
+      if (isAndroidTouchLayout && operationTargets.length > 0) {
+        actions.push({
+          id: "move",
+          label: t("orbit.moveAction"),
+          icon: "location",
+          tone: "accent",
+          onSelect: () => beginMobileMoveSelection(target)
+        });
+      }
+
       if (isMultiTargetAction) {
         actions.push({
           id: "delete-selection",
@@ -6660,6 +7275,15 @@ export default function OrbitalMapView({
       });
 
         return actions;
+      }
+
+      if (isAndroidTouchLayout && (target.kind === "note" || target.kind === "canvas")) {
+        actions.push({
+          id: "preview",
+          label: t("orbit.mobilePreviewAction"),
+          icon: "note",
+          onSelect: () => openMobileNotePreview(target.note.id)
+        });
       }
 
       if (
@@ -6807,9 +7431,10 @@ export default function OrbitalMapView({
     labels.deleteFolder,
       labels.deleteSelection,
       labels.deleteSystem,
-      labels.goToLocationAction,
+    labels.goToLocationAction,
       labels.moveToTrash,
       labels.renameAction,
+      isAndroidTouchLayout,
       effectiveInspectorMenu,
       onDeleteProject,
     onDeleteFolder,
@@ -6821,6 +7446,7 @@ export default function OrbitalMapView({
     orbitalData.noteById,
     onRenameProject,
     onSetNotePinned,
+    openMobileNotePreview,
     t
   ]);
 
@@ -7053,6 +7679,69 @@ export default function OrbitalMapView({
     );
   }
 
+  function renderMobileOpenGlyph() {
+    return (
+      <svg viewBox="0 0 18 18" focusable="false" aria-hidden="true">
+        <path d="M6.8 4.4h6.8v6.8" />
+        <path d="m13.2 4.8-8.4 8.4" />
+        <path d="M4.4 5.8V4.4h1.4M12.2 13.6h1.4v-1.4" className="orbital-mobile-action-glyph-accent" />
+      </svg>
+    );
+  }
+
+  function renderMobileNavGlyph(section: OrbitalMobileNavSection) {
+    if (section === "vault") {
+      return (
+        <svg className="orbital-mobile-nav-glyph is-vault" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4.4 7.2h15.2v11.1H4.4z" />
+          <path d="M4.4 7.2 7.1 5.1h9.8l2.7 2.1" className="orbital-mobile-nav-glyph-accent" />
+          <path d="M8 11.1h8M8 14.5h5.7" className="orbital-mobile-nav-glyph-accent" />
+        </svg>
+      );
+    }
+
+    if (section === "documents") {
+      return (
+        <svg className="orbital-mobile-nav-glyph is-documents" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 4.7h7.7l3.4 3.4v11.2H7z" />
+          <path d="M14.5 4.9v3.5h3.4" className="orbital-mobile-nav-glyph-accent" />
+          <path d="M9.6 12h6M9.6 15h4.5" className="orbital-mobile-nav-glyph-accent" />
+        </svg>
+      );
+    }
+
+    if (section === "map") {
+      return (
+        <svg className="orbital-mobile-nav-glyph is-map" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="2.25" />
+          <path d="M5.2 14.8c2.6 4.2 9.2 4.8 13.6 1.1" className="orbital-mobile-nav-glyph-accent" />
+          <path d="M18.7 9.2C16.1 5 9.5 4.4 5.1 8.1" className="orbital-mobile-nav-glyph-accent" />
+          <circle cx="5.2" cy="8.1" r="1.35" className="orbital-mobile-nav-glyph-dot" />
+          <circle cx="18.8" cy="15.9" r="1.35" className="orbital-mobile-nav-glyph-dot" />
+        </svg>
+      );
+    }
+
+    if (section === "pinned") {
+      return (
+        <svg className="orbital-mobile-nav-glyph is-pinned" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m12 4.7 2.1 4.25 4.7.68-3.4 3.31.8 4.68L12 15.4l-4.2 2.22.8-4.68-3.4-3.31 4.7-.68z" />
+          <path d="M12 7.8v5.4" className="orbital-mobile-nav-glyph-accent" />
+        </svg>
+      );
+    }
+
+    return (
+      <svg className="orbital-mobile-nav-glyph is-settings" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="2.65" />
+        <path
+          d="M12 4.8v2.1M12 17.1v2.1M6.9 6.9l1.5 1.5M15.6 15.6l1.5 1.5M4.8 12h2.1M17.1 12h2.1M6.9 17.1l1.5-1.5M15.6 8.4l1.5-1.5"
+          className="orbital-mobile-nav-glyph-accent"
+        />
+      </svg>
+    );
+  }
+
   function renderEntryPreviewActions(
     note: Note,
     options?: {
@@ -7133,6 +7822,9 @@ export default function OrbitalMapView({
     count,
     icon,
     contextMenuTarget,
+    onPreview,
+    previewLabel,
+    openLabel,
     onDoubleClick,
     onPointerEnter,
     onPointerMove,
@@ -7147,12 +7839,19 @@ export default function OrbitalMapView({
     count?: number;
     icon: ReactNode;
     contextMenuTarget?: InspectorContextMenuTarget;
+    onPreview?: () => void;
+    previewLabel?: string;
+    openLabel?: string;
     onDoubleClick?: () => void;
     onPointerEnter?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
     onPointerMove?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
     onPointerLeave?: () => void;
     onPointerCancel?: () => void;
   }) {
+    const showMobilePreviewHint = isAndroidTouchLayout && Boolean(onPreview);
+    const showMobileOpenHint = isAndroidTouchLayout && Boolean(onDoubleClick);
+    const hasSide = Boolean(kindLabel || typeof count === "number" || showMobilePreviewHint || showMobileOpenHint);
+
     if (contextMenuTarget && isEditingInspectorTarget(contextMenuTarget)) {
       return (
         <div className="orbital-tree-item orbital-menu-compact-item is-editing">
@@ -7172,6 +7871,27 @@ export default function OrbitalMapView({
         type="button"
         className={`orbital-tree-item orbital-menu-compact-item ${isActive ? "is-active" : ""}`}
         onClick={(event) => {
+          const openTarget = (event.target as HTMLElement | null)?.closest(
+            "[data-mobile-open-action]"
+          );
+          const previewTarget = (event.target as HTMLElement | null)?.closest(
+            "[data-mobile-preview-action]"
+          );
+
+          if (openTarget && onDoubleClick) {
+            event.preventDefault();
+            event.stopPropagation();
+            onDoubleClick();
+            return;
+          }
+
+          if (previewTarget && onPreview) {
+            event.preventDefault();
+            event.stopPropagation();
+            onPreview();
+            return;
+          }
+
           if (consumeSuppressedInspectorClick()) {
             event.preventDefault();
             return;
@@ -7179,7 +7899,7 @@ export default function OrbitalMapView({
 
           onClick();
         }}
-        onDoubleClick={onDoubleClick}
+        onDoubleClick={isAndroidTouchLayout ? undefined : onDoubleClick}
         onContextMenu={
           contextMenuTarget
             ? (event) => {
@@ -7192,9 +7912,24 @@ export default function OrbitalMapView({
             : undefined
         }
         onPointerDown={
-          contextMenuTarget
+          contextMenuTarget || onPreview
             ? (event) => {
-                handleInspectorContextPointerDown(contextMenuTarget, event);
+                const mobileActionTarget = (event.target as HTMLElement | null)?.closest(
+                  "[data-mobile-open-action], [data-mobile-preview-action]"
+                );
+
+                if (mobileActionTarget) {
+                  return;
+                }
+
+                if (contextMenuTarget) {
+                  handleInspectorContextPointerDown(contextMenuTarget, event);
+                  return;
+                }
+
+                if (onPreview) {
+                  startMobilePreviewLongPress(onPreview, event);
+                }
               }
             : undefined
         }
@@ -7203,12 +7938,18 @@ export default function OrbitalMapView({
           onPointerMove?.(event);
           if (contextMenuTarget) {
             handleInspectorContextPointerMove(event);
+          } else if (onPreview) {
+            updateMobilePreviewLongPress(event);
           }
         }}
         onPointerUp={
-          contextMenuTarget
+          contextMenuTarget || onPreview
             ? (event) => {
-                handleInspectorContextPointerEnd(event.pointerId);
+                if (contextMenuTarget) {
+                  handleInspectorContextPointerEnd(event.pointerId);
+                } else {
+                  endMobilePreviewLongPress(event.pointerId);
+                }
               }
             : undefined
         }
@@ -7216,12 +7957,16 @@ export default function OrbitalMapView({
           onPointerLeave?.();
           if (contextMenuTarget) {
             handleInspectorContextPointerEnd(event.pointerId);
+          } else if (onPreview) {
+            endMobilePreviewLongPress(event.pointerId);
           }
         }}
         onPointerCancel={(event) => {
           onPointerCancel?.();
           if (contextMenuTarget) {
             handleInspectorContextPointerEnd(event.pointerId);
+          } else if (onPreview) {
+            endMobilePreviewLongPress(event.pointerId);
           }
         }}
       >
@@ -7232,11 +7977,31 @@ export default function OrbitalMapView({
             {meta ? <span className="orbital-menu-compact-meta">{meta}</span> : null}
           </span>
 
-          {kindLabel || typeof count === "number" ? (
+          {hasSide ? (
             <span className="orbital-menu-compact-side">
               {kindLabel ? <span className="orbital-tree-kind">{kindLabel}</span> : null}
               {typeof count === "number" ? (
                 <span className="orbital-menu-compact-count">{count}</span>
+              ) : null}
+              {showMobileOpenHint ? (
+                <span
+                  className="orbital-menu-compact-preview-mark is-open"
+                  data-mobile-open-action="true"
+                  aria-label={openLabel ?? title}
+                  title={openLabel ?? title}
+                >
+                  {renderMobileOpenGlyph()}
+                </span>
+              ) : null}
+              {showMobilePreviewHint ? (
+                <span
+                  className="orbital-menu-compact-preview-mark"
+                  data-mobile-preview-action="true"
+                  aria-label={previewLabel ?? t("orbit.mobilePreviewAction")}
+                  title={previewLabel ?? t("orbit.mobilePreviewAction")}
+                >
+                  i
+                </span>
               ) : null}
             </span>
           ) : null}
@@ -7455,7 +8220,34 @@ export default function OrbitalMapView({
               ref={(node) => registerInspectorHierarchyItemRef(item.entityId, node)}
               title={metaLabel}
               onClick={(event) => {
+                const openTarget = (event.target as HTMLElement | null)?.closest(
+                  "[data-mobile-open-action]"
+                );
+                const previewTarget = (event.target as HTMLElement | null)?.closest(
+                  "[data-mobile-preview-action]"
+                );
+
+                if (openTarget && item.note && isAndroidTouchLayout) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  closeSelectionHoverPreview();
+                  onOpenNote(item.note.id);
+                  return;
+                }
+
+                if (previewTarget && item.note && isAndroidTouchLayout) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  openMobileNotePreview(item.note.id);
+                  return;
+                }
+
                 if (consumeSuppressedInspectorClick()) {
+                  event.preventDefault();
+                  return;
+                }
+
+                if (handleMobileMoveDestination(item)) {
                   event.preventDefault();
                   return;
                 }
@@ -7463,7 +8255,9 @@ export default function OrbitalMapView({
                 handleInspectorHierarchySelection(item, event);
               }}
               onDoubleClick={
-                item.kind === "core"
+                isAndroidTouchLayout
+                  ? undefined
+                  : item.kind === "core"
                   ? () => {
                       if (item.project) {
                         centerOnProject(item.project.id);
@@ -7488,6 +8282,14 @@ export default function OrbitalMapView({
                 });
               }}
               onPointerDown={(event) => {
+                const mobileActionTarget = (event.target as HTMLElement | null)?.closest(
+                  "[data-mobile-open-action], [data-mobile-preview-action]"
+                );
+
+                if (mobileActionTarget) {
+                  return;
+                }
+
                 handleHierarchyPointerDragStart(item, event);
 
                 if (!contextMenuTarget) {
@@ -7497,7 +8299,7 @@ export default function OrbitalMapView({
                 handleInspectorContextPointerDown(contextMenuTarget, event);
               }}
               onPointerEnter={
-                item.note
+                item.note && canShowHoverPreview
                   ? (event) => {
                       openSelectionHoverPreview(
                         item.note!.id,
@@ -7520,7 +8322,7 @@ export default function OrbitalMapView({
                   return;
                 }
 
-                if (item.note) {
+                if (item.note && canShowHoverPreview) {
                   updateSelectionHoverPreviewCursor(event.clientX, event.clientY, {
                     anchorRect: toHoverPreviewAnchorRect(
                       event.currentTarget.getBoundingClientRect()
@@ -7536,7 +8338,7 @@ export default function OrbitalMapView({
                 handleHierarchyPointerDragEnd(event);
               }}
               onPointerLeave={(event) => {
-                if (item.note) {
+                if (item.note && canShowHoverPreview) {
                   scheduleSelectionHoverPreviewClose();
                 }
 
@@ -7545,7 +8347,7 @@ export default function OrbitalMapView({
                 }
               }}
               onPointerCancel={(event) => {
-                if (item.note) {
+                if (item.note && canShowHoverPreview) {
                   scheduleSelectionHoverPreviewClose();
                 }
 
@@ -7556,6 +8358,26 @@ export default function OrbitalMapView({
               <span className="orbital-tree-item-main">
                 <span className="orbital-tree-label">{item.label}</span>
                 <span className="orbital-tree-kind">{kindLabel}</span>
+                {isAndroidTouchLayout && item.note ? (
+                  <span className="orbital-tree-touch-actions">
+                    <span
+                      className="orbital-menu-compact-preview-mark is-open"
+                      data-mobile-open-action="true"
+                      aria-label={item.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
+                      title={item.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
+                    >
+                      {renderMobileOpenGlyph()}
+                    </span>
+                    <span
+                      className="orbital-menu-compact-preview-mark"
+                      data-mobile-preview-action="true"
+                      aria-label={t("orbit.mobilePreviewAction")}
+                      title={t("orbit.mobilePreviewAction")}
+                    >
+                      i
+                    </span>
+                  </span>
+                ) : null}
               </span>
             </button>
           )}
@@ -7969,6 +8791,13 @@ export default function OrbitalMapView({
     closeSelectionHoverPreview();
     onOpenNote(note.id);
   };
+  const handleOverviewRecentItemPreview = (item: OrbitalOverviewRecentItem) => {
+    if (item.kind === "folder") {
+      return;
+    }
+
+    openMobileNotePreview(item.id);
+  };
   const handleOverviewRecentItemContextMenu = (
     item: OrbitalOverviewRecentItem,
     event: ReactMouseEvent<HTMLButtonElement>
@@ -7989,6 +8818,10 @@ export default function OrbitalMapView({
     item: OrbitalOverviewRecentItem,
     event: ReactPointerEvent<HTMLButtonElement>
   ) => {
+    if (!canShowHoverPreview) {
+      return;
+    }
+
     if (item.kind === "folder") {
       return;
     }
@@ -8007,6 +8840,10 @@ export default function OrbitalMapView({
     item: OrbitalOverviewRecentItem,
     event: ReactPointerEvent<HTMLButtonElement>
   ) => {
+    if (!canShowHoverPreview) {
+      return;
+    }
+
     if (item.kind === "folder" || !orbitalData.noteById.has(item.id)) {
       return;
     }
@@ -8016,6 +8853,10 @@ export default function OrbitalMapView({
     });
   };
   const handleOverviewRecentItemPointerLeave = (item: OrbitalOverviewRecentItem) => {
+    if (!canShowHoverPreview) {
+      return;
+    }
+
     if (item.kind !== "folder") {
       scheduleSelectionHoverPreviewClose();
     }
@@ -8094,6 +8935,9 @@ export default function OrbitalMapView({
         onRecentPointerMove={handleOverviewRecentItemPointerMove}
         onRecentPointerLeave={handleOverviewRecentItemPointerLeave}
         onRecentPointerCancel={handleOverviewRecentItemPointerLeave}
+        isTouchLayout={isAndroidTouchLayout}
+        previewLabel={t("orbit.mobilePreviewAction")}
+        onPreviewRecentItem={handleOverviewRecentItemPreview}
         onToggleColorPanel={() => {
           if (!currentProjectId) {
             return;
@@ -8104,6 +8948,38 @@ export default function OrbitalMapView({
       />
     </>
   );
+  const selectedInspectorContextTarget =
+    selectedNode?.kind === "folder" && selectedNode.folder
+      ? ({
+          kind: "folder",
+          folder: selectedNode.folder,
+          label: selectedNode.label,
+          color: selectedNode.folder.color || DEFAULT_FOLDER_COLOR,
+          canCreateFolder: (selectedFolderMeta?.depth ?? 0) < 1
+        } satisfies InspectorContextMenuTarget)
+      : selectedNode?.kind === "note" && selectedNode.note
+        ? buildInspectorNoteContextTarget(selectedNode.note)
+        : null;
+  const mobileSelectedContextTarget = buildSceneNodeContextTarget(selectedNode) ?? selectedInspectorContextTarget;
+  const mobileSelectedTitle = selectedNode?.label ?? t("orbit.mobileNothingSelected");
+  const mobileSelectedKindLabel =
+    selectedNode?.kind === "core"
+      ? labels.system
+      : selectedNode?.kind === "folder"
+        ? labels.folder
+        : selectedNode?.note?.contentType === "canvas"
+          ? labels.canvas
+          : selectedNode?.kind === "note"
+            ? labels.note
+            : labels.vaultOverview;
+  const mobileSelectedCount =
+    activeFolderFilterSet.size + activeNoteFilterSet.size + activeAssetFilterSet.size;
+  const mobileMoveDestinationKindLabel =
+    mobileMoveDestination?.kind === "project"
+      ? labels.project
+      : mobileMoveDestination?.kind === "folder"
+        ? labels.folder
+        : null;
   const inspectorMenuBody =
     effectiveInspectorMenu === "overview" ? null : (
       <>
@@ -8211,6 +9087,90 @@ export default function OrbitalMapView({
           }
         />
 
+        {isAndroidMobileShell ? (
+          <div className="orbital-mobile-inspector-actions">
+            {mobileMoveItems.length > 0 ? (
+              <div className="orbital-mobile-move-panel">
+                <div className="orbital-mobile-move-copy">
+                  <span className="orbital-mobile-inspector-status">
+                    {t("orbit.mobileMoveActive", { count: mobileMoveItems.length })}
+                  </span>
+                  <strong>{t("orbit.mobileMoveTitle")}</strong>
+                  <small>{t("orbit.mobileMovePickDestination")}</small>
+                </div>
+                <div
+                  className={`orbital-mobile-move-destination ${
+                    mobileMoveDestination?.issue ? "is-invalid" : ""
+                  }`}
+                  style={
+                    mobileMoveDestination
+                      ? ({ "--mobile-move-accent": mobileMoveDestination.color } as CSSProperties)
+                      : undefined
+                  }
+                >
+                  <span>{t("orbit.mobileMoveDestination")}</span>
+                  <strong>
+                    {mobileMoveDestination
+                      ? `${mobileMoveDestination.label} · ${mobileMoveDestinationKindLabel ?? ""}`
+                      : t("orbit.mobileMoveNoDestination")}
+                  </strong>
+                  {mobileMoveDestination?.issue ? <small>{mobileMoveDestination.issue}</small> : null}
+                </div>
+                <div className="orbital-mobile-move-actions">
+                  <button type="button" onClick={cancelMobileMoveSelection}>
+                    {labels.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    className="is-primary"
+                    disabled={!mobileMoveDestination || Boolean(mobileMoveDestination.issue)}
+                    onClick={() => {
+                      if (!mobileMoveDestination) {
+                        return;
+                      }
+
+                      void performMobileMove(mobileMoveDestination);
+                    }}
+                  >
+                    {t("orbit.mobileMoveConfirm")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={isMobileSelectionMode ? "is-active" : ""}
+                  onClick={() => setIsMobileSelectionMode((current) => !current)}
+                  aria-pressed={isMobileSelectionMode}
+                >
+                  {isMobileSelectionMode ? t("orbit.mobileDone") : t("orbit.mobileSelect")}
+                </button>
+                {selectedNode?.note ? (
+                  <button type="button" onClick={openSelectedMobileEntry}>
+                    {selectedNode.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
+                  </button>
+                ) : null}
+                {selectedNode?.note ? (
+                  <button type="button" onClick={() => openMobileNotePreview(selectedNode.note!.id)}>
+                    {t("orbit.mobilePreviewAction")}
+                  </button>
+                ) : null}
+                {mobileSelectedContextTarget ? (
+                  <button
+                    type="button"
+                    onClick={() => openInspectorContextMenu(mobileSelectedContextTarget, "sheet", null)}
+                  >
+                    {mobileSelectedCount > 1
+                      ? t("orbit.selectedCount", { count: mobileSelectedCount })
+                      : t("orbit.mobileActions")}
+                  </button>
+                ) : null}
+              </>
+            )}
+          </div>
+        ) : null}
+
         {renderFolderDraftErrorMessage()}
 
         <div
@@ -8234,7 +9194,7 @@ export default function OrbitalMapView({
                       closeSelectionHoverPreview();
                       onOpenNote(note.id);
                     },
-                    onPointerEnter: isMobilePreviewMode
+                    onPointerEnter: !canShowHoverPreview
                       ? undefined
                       : (event) => {
                           openSelectionHoverPreview(
@@ -8247,18 +9207,21 @@ export default function OrbitalMapView({
                             }
                           );
                         },
-                    onPointerMove: isMobilePreviewMode
+                    onPointerMove: !canShowHoverPreview
                       ? undefined
                       : (event) => {
                           updateSelectionHoverPreviewCursor(event.clientX, event.clientY, {
                             anchorRect: toHoverPreviewAnchorRect(event.currentTarget.getBoundingClientRect())
                           });
                         },
-                    onPointerLeave: isMobilePreviewMode ? undefined : scheduleSelectionHoverPreviewClose,
-                    onPointerCancel: isMobilePreviewMode ? undefined : scheduleSelectionHoverPreviewClose,
+                    onPointerLeave: !canShowHoverPreview ? undefined : scheduleSelectionHoverPreviewClose,
+                    onPointerCancel: !canShowHoverPreview ? undefined : scheduleSelectionHoverPreviewClose,
                     title: getNoteInspectorTitle(note),
                     kindLabel: note.contentType === "canvas" ? labels.canvas : labels.note,
                     contextMenuTarget: buildInspectorNoteContextTarget(note),
+                    onPreview: () => openMobileNotePreview(note.id),
+                    previewLabel: t("orbit.mobilePreviewAction"),
+                    openLabel: note.contentType === "canvas" ? labels.openCanvas : labels.openNote,
                     icon: renderInspectorItemIcon(
                       note.contentType === "canvas" ? "canvas" : "note",
                       note.color || DEFAULT_NOTE_COLOR
@@ -8279,20 +9242,20 @@ export default function OrbitalMapView({
                         preserveProjectContext: true
                       });
 
-                      if (isMobilePreviewMode) {
+                      if (isMobilePreviewMode && !isAndroidTouchLayout) {
                         onOpenNote(note.id);
                         return;
                       }
 
                       setHierarchyFocusedEntityId(`note:${note.id}`);
                     },
-                    onDoubleClick: isMobilePreviewMode
+                    onDoubleClick: isMobilePreviewMode && !isAndroidTouchLayout
                       ? undefined
                       : () => {
                           closeSelectionHoverPreview();
                           onOpenNote(note.id);
                         },
-                    onPointerEnter: isMobilePreviewMode
+                    onPointerEnter: !canShowHoverPreview
                       ? undefined
                       : (event) => {
                           openSelectionHoverPreview(
@@ -8305,18 +9268,21 @@ export default function OrbitalMapView({
                             }
                           );
                         },
-                    onPointerMove: isMobilePreviewMode
+                    onPointerMove: !canShowHoverPreview
                       ? undefined
                       : (event) => {
                           updateSelectionHoverPreviewCursor(event.clientX, event.clientY, {
                             anchorRect: toHoverPreviewAnchorRect(event.currentTarget.getBoundingClientRect())
                           });
                         },
-                    onPointerLeave: isMobilePreviewMode ? undefined : scheduleSelectionHoverPreviewClose,
-                    onPointerCancel: isMobilePreviewMode ? undefined : scheduleSelectionHoverPreviewClose,
+                    onPointerLeave: !canShowHoverPreview ? undefined : scheduleSelectionHoverPreviewClose,
+                    onPointerCancel: !canShowHoverPreview ? undefined : scheduleSelectionHoverPreviewClose,
                     title: getNoteInspectorTitle(note),
                     kindLabel: note.contentType === "canvas" ? labels.canvas : labels.note,
                     contextMenuTarget: buildInspectorNoteContextTarget(note),
+                    onPreview: () => openMobileNotePreview(note.id),
+                    previewLabel: t("orbit.mobilePreviewAction"),
+                    openLabel: note.contentType === "canvas" ? labels.openCanvas : labels.openNote,
                     icon: renderInspectorItemIcon(
                       note.contentType === "canvas" ? "canvas" : "note",
                       note.color || DEFAULT_NOTE_COLOR
@@ -8364,7 +9330,7 @@ export default function OrbitalMapView({
                       closeSelectionHoverPreview();
                       onOpenNote(asset.noteId);
                     },
-                    onPointerEnter: isMobilePreviewMode
+                    onPointerEnter: !canShowHoverPreview
                       ? undefined
                       : (event) => {
                           openAssetHoverPreview(
@@ -8377,17 +9343,20 @@ export default function OrbitalMapView({
                             }
                           );
                         },
-                    onPointerMove: isMobilePreviewMode
+                    onPointerMove: !canShowHoverPreview
                       ? undefined
                       : (event) => {
                           updateSelectionHoverPreviewCursor(event.clientX, event.clientY, {
                             anchorRect: toHoverPreviewAnchorRect(event.currentTarget.getBoundingClientRect())
                           });
                         },
-                    onPointerLeave: isMobilePreviewMode ? undefined : scheduleSelectionHoverPreviewClose,
-                    onPointerCancel: isMobilePreviewMode ? undefined : scheduleSelectionHoverPreviewClose,
+                    onPointerLeave: !canShowHoverPreview ? undefined : scheduleSelectionHoverPreviewClose,
+                    onPointerCancel: !canShowHoverPreview ? undefined : scheduleSelectionHoverPreviewClose,
                     title: assetDisplayNamesById.get(asset.id) ?? getAssetDisplayName(asset),
                     meta: orbitalData.noteById.get(asset.noteId)?.title ?? null,
+                    onPreview: () => openMobileAssetPreview(asset.id),
+                    previewLabel: t("orbit.mobilePreviewAction"),
+                    openLabel: labels.openNote,
                     icon: renderInspectorItemIcon(
                       "file",
                       orbitalData.noteById.get(asset.noteId)?.color || DEFAULT_NOTE_COLOR
@@ -8429,18 +9398,6 @@ export default function OrbitalMapView({
         </div>
       </>
     );
-  const selectedInspectorContextTarget =
-    selectedNode?.kind === "folder" && selectedNode.folder
-      ? ({
-          kind: "folder",
-          folder: selectedNode.folder,
-          label: selectedNode.label,
-          color: selectedNode.folder.color || DEFAULT_FOLDER_COLOR,
-          canCreateFolder: (selectedFolderMeta?.depth ?? 0) < 1
-        } satisfies InspectorContextMenuTarget)
-      : selectedNode?.kind === "note" && selectedNode.note
-        ? buildInspectorNoteContextTarget(selectedNode.note)
-        : null;
   const contextMenuTarget = contextMenuState?.target ?? null;
   const contextMenuOperationTargets = contextMenuTarget
     ? getContextOperationTargets(contextMenuTarget)
@@ -8473,6 +9430,81 @@ export default function OrbitalMapView({
         onUpdateNoteColor(contextMenuTarget.note.id, color);
       }
     : undefined;
+  const androidBackLayer = mobileMoveConflictState
+    ? "mobile-move-conflict"
+    : isAndroidTouchLayout && (hoverPreviewNote || hoverPreviewAsset)
+      ? "mobile-preview"
+      : mobileMoveItems.length > 0
+        ? "mobile-move"
+        : contextMenuState
+    ? "context-menu"
+    : isOverviewColorPanelOpen
+      ? "color-panel"
+      : isMobileMenuOpen
+        ? "mobile-menu"
+        : activeModal
+          ? "utility-modal"
+          : editorOpen
+            ? "editor"
+            : isAndroidMobileShell && selectedEntityId
+              ? "map-selection"
+              : isAndroidMobileShell && mobileSection !== "vault"
+                ? "mobile-section"
+                : null;
+
+  useAndroidBackHandler(Boolean(androidBackLayer), () => {
+    if (androidBackLayer === "mobile-move-conflict") {
+      setMobileMoveConflictState(null);
+      return;
+    }
+
+    if (androidBackLayer === "mobile-preview") {
+      closeSelectionHoverPreview();
+      return;
+    }
+
+    if (androidBackLayer === "mobile-move") {
+      cancelMobileMoveSelection();
+      return;
+    }
+
+    if (androidBackLayer === "context-menu") {
+      closeInspectorContextMenu();
+      return;
+    }
+
+    if (androidBackLayer === "color-panel") {
+      setIsOverviewColorPanelOpen(false);
+      return;
+    }
+
+    if (androidBackLayer === "mobile-menu") {
+      setIsMobileMenuOpen(false);
+      return;
+    }
+
+    if (androidBackLayer === "utility-modal") {
+      setActiveModal(null);
+      return;
+    }
+
+    if (androidBackLayer === "editor") {
+      onCloseEditor();
+      return;
+    }
+
+    if (androidBackLayer === "map-selection") {
+      setSelectedEntityId(null);
+      return;
+    }
+
+    if (androidBackLayer === "mobile-section") {
+      setMobileSection("vault");
+      return;
+    }
+
+    onClose();
+  });
 
   function renderFolderDraftErrorMessage() {
     if (isFolderDraftOpen || !folderDraftError) {
@@ -8484,13 +9516,106 @@ export default function OrbitalMapView({
 
   return (
     <section
-      className="orbital-overlay"
+      className={`orbital-overlay ${isAndroidLayout ? "is-android-runtime" : ""} ${
+        isAndroidMobileShell ? "is-android-mobile-shell" : ""
+      } ${isAndroidPhoneShell ? "is-android-phone-shell" : ""} ${
+        isAndroidTabletPortraitShell ? "is-android-tablet-portrait-shell" : ""
+      } ${isAndroidTabletLandscapeShell ? "is-android-tablet-landscape-shell" : ""} ${
+        isAndroidMobileShell ? `is-mobile-section-${mobileSection}` : ""
+      } ${isMobileMenuOpen ? "is-mobile-menu-open" : ""} ${
+        mobileMoveItems.length > 0 ? "is-mobile-move-mode" : ""
+      } ${isMobileSelectionMode ? "is-mobile-select-mode" : ""}`}
       role="dialog"
       aria-modal="true"
       onPointerDown={markOrbitInteraction}
       onWheel={markOrbitInteraction}
     >
       <div className="orbital-backdrop" aria-hidden="true" />
+
+      {isAndroidMobileShell ? (
+        <header className={`orbital-mobile-topbar ${mobileSection === "map" ? "is-map-section" : ""}`}>
+          <div className="orbital-mobile-vault">
+            <LocalVaultSwitcher
+              label={labels.localVault}
+              activeLabel={t("sync.localVaultActive")}
+              items={localVaultOptions}
+              activeVaultId={activeLocalVaultId}
+              onSelect={onSelectLocalVault}
+              onCreate={onCreateLocalVault}
+            />
+          </div>
+
+          {mobileSection === "map" ? (
+            <button
+              type="button"
+              className="orbital-mobile-animation-action"
+              onClick={() => {
+                setIsPaused(false);
+                onOrbitalAnimationModeChange(isOrbitalMotionEnabled ? "reduced" : "full");
+              }}
+              aria-pressed={!isOrbitalMotionEnabled}
+              aria-label={isOrbitalMotionEnabled ? labels.pause : labels.resume}
+              title={isOrbitalMotionEnabled ? labels.pause : labels.resume}
+            >
+              <span className="orbital-mobile-animation-dot" />
+              <span>{isOrbitalMotionEnabled ? labels.pause : labels.resume}</span>
+            </button>
+          ) : null}
+        </header>
+      ) : null}
+
+      {isAndroidMobileShell && isMobileMenuOpen ? (
+        <div className="orbital-mobile-menu-layer">
+          <button
+            type="button"
+            className="orbital-mobile-menu-backdrop"
+            aria-label={labels.cancel}
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <section className="orbital-mobile-menu-card">
+            <div className="orbital-mobile-menu-head">
+              <div>
+                <p className="panel-kicker">{labels.title}</p>
+                <h2>{t("orbit.mobileMenu")}</h2>
+              </div>
+              <button
+                type="button"
+                className="orbital-mobile-menu-close"
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-label={labels.cancel}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="orbital-mobile-menu-grid">
+              {[
+                t("orbit.mobileMenuImportExport"),
+                t("orbit.mobileMenuBackup"),
+                t("orbit.mobileMenuAi"),
+                t("orbit.sync"),
+                t("orbit.mobileMenuThemes"),
+                t("orbit.mobileMenuAbout")
+              ].map((item) => (
+                <button key={item} type="button" onClick={openMobileSettings}>
+                  <span>{item}</span>
+                </button>
+              ))}
+              {trashModalSlot ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setActiveModal("trash");
+                  }}
+                >
+                  <span>{labels.trash}</span>
+                </button>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <header className="orbital-command-bar">
         <div className="orbital-command-content">
@@ -8561,9 +9686,17 @@ export default function OrbitalMapView({
             <button
               type="button"
               className="orbital-command-button"
-              onClick={() => setIsPaused((current) => !current)}
+              onClick={() => {
+                if (!isOrbitalMotionEnabled) {
+                  onOrbitalAnimationModeChange("full");
+                  setIsPaused(false);
+                  return;
+                }
+
+                setIsPaused((current) => !current);
+              }}
             >
-              {isPaused ? labels.resume : labels.pause}
+              {!isOrbitalMotionEnabled || isPaused ? labels.resume : labels.pause}
             </button>
           </div>
 
@@ -8742,7 +9875,7 @@ export default function OrbitalMapView({
                       </div>
                     </div>
 
-                    {selectedNode.kind === "note" && selectedNode.note && !isMobilePreviewMode ? (
+                    {selectedNode.kind === "note" && selectedNode.note && canShowHoverPreview ? (
                       <>
                         <div className="orbital-selection-preview orbital-selection-preview-note-shell">
                           {renderEntryPreviewActions(selectedNode.note, {
@@ -8957,6 +10090,45 @@ export default function OrbitalMapView({
           className="orbital-scene-wrap"
           style={{ "--orbital-scene-accent": currentProject?.color ?? DEFAULT_INTERFACE_ACCENT } as CSSProperties}
         >
+          {isAndroidMobileShell ? (
+            <div className="orbital-mobile-map-controls" aria-label={labels.title}>
+              <button
+                type="button"
+                onClick={() => {
+                  stopCameraAnimation();
+                  setCamera((current) => ({
+                    ...current,
+                    scale: clamp(current.scale * 0.9, CAMERA_MIN_SCALE, CAMERA_MAX_SCALE)
+                  }));
+                }}
+                aria-label={labels.zoomOut}
+                title={labels.zoomOut}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  stopCameraAnimation();
+                  setCamera((current) => ({
+                    ...current,
+                    scale: clamp(current.scale * 1.12, CAMERA_MIN_SCALE, CAMERA_MAX_SCALE)
+                  }));
+                }}
+                aria-label={labels.zoomIn}
+                title={labels.zoomIn}
+              >
+                +
+              </button>
+              <button type="button" onClick={handleCenterSelection}>
+                {labels.centerSelection}
+              </button>
+              <button type="button" onClick={handleResetCamera}>
+                {labels.resetView}
+              </button>
+            </div>
+          ) : null}
+
           <div className="orbital-filter-dock">
             <div className="orbital-filter-shell">
               <div className="orbital-filter-topline">
@@ -9069,12 +10241,13 @@ export default function OrbitalMapView({
                   showSelectedVisuals ||
                   nodeTone === "primary" ||
                   nodeTone === "direct" ||
-                  (nodeTone === "secondary" && !isMobilePreviewMode) ||
+                  (nodeTone === "secondary" && canShowHoverPreview) ||
                   (!isSceneBudgetConstrained &&
                     (node.depth === 0 ||
                       (isRootFolder && node.radius >= 24) ||
                       (isRootEntry && node.radius >= 13.5) ||
                       (isSubfolder && node.radius >= 30)));
+                const sceneContextTarget = buildSceneNodeContextTarget(node);
 
                 return (
                   <g
@@ -9088,6 +10261,14 @@ export default function OrbitalMapView({
                     style={{ "--node-color": node.color } as CSSProperties}
                     transform={`translate(${node.x} ${node.y})`}
                     onPointerDown={(event) => {
+                      if (sceneContextTarget) {
+                        handleInspectorContextPointerDown(sceneContextTarget, event);
+                      }
+
+                      if (event.pointerType === "touch" || isAndroidTouchLayout) {
+                        return;
+                      }
+
                       if (node.kind !== "core" || !node.project) {
                         return;
                       }
@@ -9160,8 +10341,13 @@ export default function OrbitalMapView({
                         }, 560);
                       }
                     }}
+                    onPointerUp={(event) => {
+                      if (sceneContextTarget) {
+                        handleInspectorContextPointerEnd(event.pointerId);
+                      }
+                    }}
                     onPointerEnter={
-                      node.note
+                      node.note && canShowHoverPreview
                         ? (event) => {
                             openSelectionHoverPreview(
                               node.note!.id,
@@ -9175,29 +10361,33 @@ export default function OrbitalMapView({
                           }
                         : undefined
                     }
-                    onPointerMove={
-                      node.note
-                        ? (event) => {
+                    onPointerMove={(event) => {
+                      if (sceneContextTarget) {
+                        handleInspectorContextPointerMove(event);
+                      }
+
+                      if (node.note && canShowHoverPreview) {
                             updateSelectionHoverPreviewCursor(event.clientX, event.clientY, {
                               sceneAnchorElement: event.currentTarget
                             });
                           }
-                        : undefined
-                    }
-                    onPointerLeave={
-                      node.note
-                        ? () => {
+                    }}
+                    onPointerLeave={(event) => {
+                      if (node.note && canShowHoverPreview) {
                             scheduleSelectionHoverPreviewClose();
                           }
-                        : undefined
-                    }
-                    onPointerCancel={
-                      node.note
-                        ? () => {
+                      if (sceneContextTarget) {
+                        handleInspectorContextPointerEnd(event.pointerId);
+                      }
+                    }}
+                    onPointerCancel={(event) => {
+                      if (node.note && canShowHoverPreview) {
                             scheduleSelectionHoverPreviewClose();
                           }
-                        : undefined
-                    }
+                      if (sceneContextTarget) {
+                        handleInspectorContextPointerEnd(event.pointerId);
+                      }
+                    }}
                   >
                     <title>{node.label}</title>
                     <circle
@@ -9396,11 +10586,129 @@ export default function OrbitalMapView({
               })}
             </g>
           </svg>
+
+          {isAndroidMobileShell && mobileSection === "map" && selectedNode ? (
+            <section
+              className="orbital-mobile-selection-sheet"
+              style={{ "--mobile-selection-accent": selectedNode.color } as CSSProperties}
+            >
+              <div className="orbital-mobile-selection-copy">
+                <span>{mobileSelectedKindLabel}</span>
+                <strong>{mobileSelectedTitle}</strong>
+              </div>
+              <div className="orbital-mobile-selection-actions">
+                {selectedNode.note ? (
+                  <button type="button" onClick={openSelectedMobileEntry}>
+                    {selectedNode.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
+                  </button>
+                ) : null}
+                {selectedNode.note ? (
+                  <button type="button" onClick={() => openMobileNotePreview(selectedNode.note!.id)}>
+                    {t("orbit.mobilePreviewAction")}
+                  </button>
+                ) : null}
+                {mobileSelectedContextTarget ? (
+                  <button
+                    type="button"
+                    onClick={() => openInspectorContextMenu(mobileSelectedContextTarget, "sheet", null)}
+                  >
+                    {t("orbit.mobileActions")}
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
         </div>
 
       </div>
 
-      {!isMobilePreviewMode && hoverPreviewPosition && (hoverPreviewNote || hoverPreviewAsset) ? (
+      {isAndroidMobileShell ? (
+        <nav className="orbital-mobile-bottom-nav" aria-label={t("orbit.mobileNavigation")}>
+          {[
+            ["vault", labels.hierarchyScopeVault],
+            ["documents", labels.documentsMenu],
+            ["map", t("orbit.mobileMap")],
+            ["pinned", labels.pinnedMenu]
+          ].map(([section, label]) => (
+            <button
+              key={section}
+              type="button"
+              className={mobileSection === section ? "is-active" : ""}
+              onClick={() => openMobileSection(section as OrbitalMobileSection)}
+              aria-pressed={mobileSection === section}
+            >
+              {renderMobileNavGlyph(section as OrbitalMobileSection)}
+              <span>{label}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className={activeModal === "settings" ? "is-active" : ""}
+            onClick={openMobileSettings}
+            aria-pressed={activeModal === "settings"}
+          >
+            {renderMobileNavGlyph("settings")}
+            <span>{labels.settings}</span>
+          </button>
+        </nav>
+      ) : null}
+
+      {isAndroidMobileShell && mobileMoveConflictState ? (
+        <div className="orbital-mobile-conflict-layer" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="orbital-mobile-conflict-backdrop"
+            onClick={clearMobileMoveState}
+            aria-label={labels.cancel}
+          />
+          <div className="orbital-mobile-conflict-card">
+            <div className="orbital-mobile-conflict-head">
+              <p className="panel-kicker">{t("orbit.mobileMoveConflictTitle")}</p>
+              <h3>{mobileMoveConflictState.destination.label}</h3>
+              <p>
+                {t("orbit.mobileMoveConflictDescription", {
+                  count: mobileMoveConflictState.conflicts.length
+                })}
+              </p>
+            </div>
+            <div className="orbital-mobile-conflict-list">
+              {mobileMoveConflictState.conflicts.slice(0, 4).map((conflict) => (
+                <div
+                  className="orbital-mobile-conflict-item"
+                  key={getMobileMoveItemEntityId(conflict.item)}
+                >
+                  <span>{conflict.currentName}</span>
+                  <strong>{conflict.suggestedName}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="orbital-mobile-conflict-actions">
+              <button type="button" onClick={clearMobileMoveState}>
+                {labels.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void performMobileMove(mobileMoveConflictState.destination, "copy");
+                }}
+              >
+                {t("orbit.mobileMoveCopy")}
+              </button>
+              <button
+                type="button"
+                className="is-primary"
+                onClick={() => {
+                  void performMobileMove(mobileMoveConflictState.destination, "rename");
+                }}
+              >
+                {t("orbit.mobileMoveRename")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {canShowHoverPreview && hoverPreviewPosition && (hoverPreviewNote || hoverPreviewAsset) ? (
           <div
             ref={hoverPreviewCardRef}
             className={`orbital-note-hovercard ${hoverPreviewAsset ? "orbital-file-hovercard" : ""}`}
@@ -9499,6 +10807,95 @@ export default function OrbitalMapView({
             ) : null}
           </div>
         ) : null}
+
+      {isAndroidTouchLayout && (hoverPreviewNote || hoverPreviewAsset) ? (
+        <div
+          className={`orbital-mobile-preview-layer ${hoverPreviewAsset ? "is-file" : "is-note"}`}
+          style={{ "--hovercard-accent": hoverPreviewAccent } as CSSProperties}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            className="orbital-mobile-preview-backdrop"
+            onClick={closeSelectionHoverPreview}
+            aria-label={labels.close}
+          />
+          <div className="orbital-mobile-preview-card">
+            {hoverPreviewNote ? (
+              <>
+                <div className="orbital-note-hovercard-head">
+                  <div className="orbital-note-hovercard-topline">
+                    <p className="panel-kicker">{t("orbit.mobilePreviewTitle")}</p>
+                    {renderEntryPreviewActions(hoverPreviewNote, {
+                      className: "orbital-note-hovercard-actions",
+                      closeHoverPreviewOnAction: true
+                    })}
+                  </div>
+                  <h3>{hoverPreviewNote.title}</h3>
+                  <div className="orbital-note-hovercard-meta">
+                    <span>{hoverPreviewFolder}</span>
+                    <span>{labels.updated}: {formatTimestamp(hoverPreviewNote.updatedAt, language)}</span>
+                  </div>
+                </div>
+                <div className="orbital-note-hovercard-scroll" ref={noteHoverPreviewScrollRef}>
+                  <EntryStaticPreview
+                    note={hoverPreviewNote}
+                    emptyLabel={labels.empty}
+                    resolveFileUrl={onResolveFileUrl}
+                    interactive
+                    onChecklistItemToggle={(blockId, checked) =>
+                      onToggleNoteChecklistItem?.(hoverPreviewNote.id, blockId, checked)
+                    }
+                    className="orbital-note-hovercard-copy"
+                    labels={{
+                      canvas: labels.canvas,
+                      elements: labels.elementsStat,
+                      images: labels.assetsStat,
+                      emptyCanvas: labels.emptyCanvas,
+                      previewHint: labels.canvasPreviewHint
+                    }}
+                  />
+                </div>
+              </>
+            ) : hoverPreviewAsset ? (
+              <>
+                <div className="orbital-note-hovercard-head">
+                  <div className="orbital-note-hovercard-topline">
+                    <p className="panel-kicker">{labels.filesMenu}</p>
+                  </div>
+                  <h3>{hoverPreviewAssetDisplayName}</h3>
+                  <div className="orbital-note-hovercard-meta">
+                    {hoverPreviewAssetNote ? <span>{hoverPreviewAssetNote.title}</span> : null}
+                    {hoverPreviewAssetMeta ? <span>{hoverPreviewAssetMeta}</span> : null}
+                  </div>
+                </div>
+                <div
+                  className="orbital-note-hovercard-scroll orbital-file-hovercard-scroll"
+                  ref={noteHoverPreviewScrollRef}
+                >
+                  {hoverPreviewAsset.kind === "image" && hoverPreviewAssetUrl ? (
+                    <figure className="orbital-file-hovercard-figure">
+                      <img
+                        src={hoverPreviewAssetUrl}
+                        alt={hoverPreviewAssetDisplayName}
+                        className="orbital-file-hovercard-image"
+                        loading="lazy"
+                      />
+                    </figure>
+                  ) : (
+                    <div className="orbital-file-hovercard-fallback">
+                      {renderInspectorItemIcon("file", hoverPreviewAccent)}
+                      <span>{hoverPreviewAssetDisplayName}</span>
+                      {hoverPreviewAssetMeta ? <small>{hoverPreviewAssetMeta}</small> : null}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {isOverviewColorPanelOpen && overviewColorPanelStyle && currentProject ? (
         <div

@@ -168,6 +168,23 @@ const ru = {
     typographyMode: "Режим типографики",
     typographyFocus: "Фокус",
     typographyReading: "Чтение",
+    mobileBack: "Назад",
+    mobileMore: "Параметры заметки",
+    mobileFocusShort: "Ф",
+    mobileReadingShort: "Чт",
+    mobileMenuTitle: "Параметры заметки",
+    mobileMenuSubtitle: "Папка, теги, цвет, экспорт и действия текущей заметки.",
+    mobileFormatToolbar: "Быстрое форматирование",
+    mobileParagraph: "Текст",
+    mobileHeading: "Заголовок",
+    mobileBulletList: "Список",
+    mobileNumberedList: "Нумерация",
+    mobileChecklist: "Чеклист",
+    mobileQuote: "Цитата",
+    mobileStyle: "Стиль",
+    mobileInsert: "Вставка",
+    mobileInsertMenuTitle: "Добавить блок",
+    mobileInsertMenuSubtitle: "Выбери тип нового блока под текущей строкой.",
     markdownActions: "Markdown действия",
     transferButton: "Экспорт / импорт",
     transferKicker: "Документ",
@@ -568,6 +585,10 @@ const ru = {
       "Для Google Drive сначала задай VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID для desktop-сборок или VITE_GOOGLE_DRIVE_CLIENT_ID для web-сборки.",
     googleDriveDesktopConfigInvalid:
       "Google отклонил desktop OAuth-запрос. Проверь, что в desktop-сборке задан именно VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID от клиента типа Desktop app, а не web client ID.",
+    googleDriveAndroidConfigInvalid:
+      "Google отклонил Android OAuth-запрос. Проверь Android OAuth client: package com.locoris.android для release или com.locoris.android.debug для debug, SHA-1 сертификата APK и тот же Google Cloud project, где включен Drive API.",
+    googleDriveOAuthFailed:
+      "Google Drive авторизация не завершилась. Проверь OAuth consent screen, тестовых пользователей, Google Drive API и попробуй подключить Google Drive снова.",
     googleDriveAuthRequired:
       "Сессия Google Drive истекла. Обнови авторизацию, чтобы снова загружать удаленные хранилища.",
     googleDriveConnected: "Google Drive подключен.",
@@ -576,6 +597,8 @@ const ru = {
     googleDrivePreparing: "Подготавливаем авторизацию Google. Подожди секунду и попробуй снова.",
     googleDriveSdkFailed:
       "Не удалось подготовить авторизацию Google на этом устройстве. Проверь сеть и попробуй снова.",
+    googleDrivePlayServicesUnavailable:
+      "На этом Android-устройстве недоступны сервисы Google Play. Обнови Google Play Services или проверь, что эмулятор создан с Google APIs.",
     googleDriveRedirectTimeout:
       "Авторизация Google не была завершена в браузере. Запусти подключение снова и выдай доступ Google Drive.",
     googleDriveRedirectFailed:
@@ -637,7 +660,7 @@ const ru = {
   settings: {
     kicker: "Настройки",
     title: "Настройки",
-    caption: "Язык интерфейса, цветовые акценты, обновления приложения и синхронизация хранилищ.",
+    caption: "Язык интерфейса, внешний вид, обновления приложения и синхронизация хранилищ.",
     networkOnline: "NET",
     networkOffline: "OFF",
     general: "Общее",
@@ -648,17 +671,29 @@ const ru = {
       "При первом запуске язык определяется автоматически, но в любой момент его можно переключить вручную.",
     languageEnglish: "Английский",
     languageRussian: "Русский",
-    accentTheme: "Акценты интерфейса",
+    accentTheme: "Интерфейс",
     accentThemeDescription:
-      "Локальная тема клиента: меняет системные цвета приложения, не затрагивая цвета проектов, заметок и текста внутри документов.",
-    accentThemeAriaLabel: "Цветовые акценты приложения",
+      "Цветовые пресеты и движение орбитальной карты. Это локальные настройки клиента, они не меняют данные хранилища.",
+    accentThemeAriaLabel: "Цветовые пресеты приложения",
     accentThemePanelCaption:
-      "Выбери один из встроенных темных пресетов. Каждый меняет поверхности, границы, подсветку и системные акценты интерфейса.",
-    accentThemeChoose: "Палитра",
+      "Настрой внешний вид Locoris: темный пресет интерфейса и поведение анимации на орбитальной карте.",
+    accentThemeChoose: "Цветовой пресет",
     accentThemeClassic: "Locris",
     accentThemeGraphite: "Графит",
     accentThemeVerdant: "Вердант",
     accentThemeEmber: "Эмбер",
+    interfaceMotionKicker: "Карта",
+    interfaceMotionTitle: "Анимация орбитальной карты",
+    interfaceMotionDescription:
+      "Полный режим сохраняет живое движение активных объектов. Упрощенный режим полностью выключает движение объектов на карте и снижает расход батареи.",
+    interfaceMotionFullTitle: "Полный режим",
+    interfaceMotionFullChip: "Живой",
+    interfaceMotionFullDescription:
+      "Объекты мягко движутся, а активные проекты и избранное остаются визуально живыми.",
+    interfaceMotionReducedTitle: "Упрощенный режим",
+    interfaceMotionReducedChip: "Статика",
+    interfaceMotionReducedDescription:
+      "Объекты остаются на месте. Лучше для телефона, слабого устройства или долгой работы от батареи.",
     aiTitle: "AI-интеграция",
     aiDescription: "Подключи Gemini API для улучшения, перевода и форматирования заметок.",
     aiPanelCaption:
@@ -878,7 +913,7 @@ const ru = {
     desktopUpdateChipTitle: "Доступна версия {{version}}. Открой настройки, чтобы установить обновление.",
     desktopUpdateIssueChip: "Проблема с обновлением",
     desktopUpdateIssueChipTitle:
-      "Последняя попытка desktop-обновления для версии {{version}} требует внимания. Открой настройки, чтобы выбрать следующий шаг.",
+      "Последняя попытка обновления до версии {{version}} требует внимания. Открой настройки, чтобы выбрать следующий шаг.",
     desktopUpdateHint:
       "После успешной установки приложение перезапустится автоматически. Если автоустановка не смогла завершиться, здесь можно повторить попытку или открыть страницу релиза и установить ту же версию вручную.",
     desktopUpdatePublished: "Опубликовано {{date}}.",
@@ -893,6 +928,15 @@ const ru = {
     desktopUpdateIssueInstallFailed: "Скачанное обновление не удалось применить.",
     desktopUpdateIssueInstallNotApplied:
       "Приложение перезапустилось, но не переключилось на версию {{version}}.",
+    androidUpdatePermissionRequired:
+      "Android пока не разрешает Locoris устанавливать скачанные APK-обновления.",
+    androidUpdateReleaseOnly:
+      "Android-обновления доступны только в release-сборке Locoris.",
+    androidUpdateAllowInstall: "Разрешить установку",
+    androidUpdateInstallerOpened:
+      "Системный установщик Android открыт. Подтверди установку обновления в появившемся окне.",
+    androidUpdateHint:
+      "Android попросит подтвердить установку APK вручную. Если разрешение на установку из этого источника отключено, приложение откроет нужный системный экран.",
     syncKicker: "Синхронизация",
     syncManagerIntro:
       "Подключай каждое локальное хранилище к одному удаленному способу. Один способ синхронизации может обслуживать несколько хранилищ, а все связи видны прямо в этом экране.",
@@ -991,16 +1035,16 @@ const ru = {
     googleDriveClientMissing:
       "Сначала задай desktop Google OAuth client ID для нативной сборки или web client ID для браузерной версии.",
     googleDriveModalDescription:
-      "Locoris откроет системный браузер, завершит авторизацию Google через защищённый локальный callback и будет хранить каждое удалённое хранилище внутри Google Drive appDataFolder.",
+      "Locoris запросит доступ к Google Drive через системную авторизацию Google и будет хранить каждое удалённое хранилище внутри Drive appDataFolder.",
     googleDriveConnect: "Подключить Google Drive",
     googleDriveAppFolder: "appDataFolder",
     googleDriveAppFolderDescription:
       "Файлы там скрыты от обычного интерфейса Drive и доступны только этому приложению.",
     googleDriveSessionReady: "OAuth-сессия готова для доступа к Drive appDataFolder.",
     googleDriveSdkLoading:
-      "Подготавливаем нативную авторизацию Google. Как только она будет готова, кнопку подключения можно нажать.",
+      "Подготавливаем авторизацию Google для этого устройства. Как только она будет готова, кнопку подключения можно нажать.",
     googleDriveSdkReady:
-      "Авторизация Google готова. Locoris откроет системный браузер и продолжит подключение после локального callback Google.",
+      "Авторизация Google готова. Locoris запросит только доступ к скрытой папке приложения в Google Drive.",
     selfHostedModalDescription:
       "Укажи адрес персонального сервера и management token. После этого можно сразу подключать хранилища прямо на этом экране.",
     hostedModalDescription:
@@ -1188,6 +1232,7 @@ const ru = {
     copyAction: "Копировать",
     pasteAction: "Вставить",
     duplicateAction: "Дублировать",
+    moveAction: "Переместить",
     goToLocationAction: "Перейти к расположению",
     duplicateSuffix: "копия",
     selectedCount: "Выбрано: {{count}}",
@@ -1195,6 +1240,32 @@ const ru = {
     moveBlockedDepth: "Действие невозможно: разрешен только один уровень подпапок.",
     moveBlockedInvalid: "Действие невозможно: папку нельзя переместить внутрь самой себя.",
     moveBlockedMissingTarget: "Действие невозможно: папка назначения не найдена.",
+    mobileNavigation: "Мобильная навигация",
+    mobileMap: "Карта",
+    mobileMenu: "Меню",
+    mobileActions: "Действия",
+    mobileSelect: "Выбрать",
+    mobileDone: "Готово",
+    mobileNothingSelected: "Ничего не выбрано",
+    mobileMoveChooseDestination: "Выбери папку или проект, куда переместить элементы.",
+    mobileMoveDestinationHint: "Нажми на папку или проект, чтобы переместить выбранное.",
+    mobileMoveActive: "Перемещение: {{count}}",
+    mobileMoveTitle: "Выбери новое место",
+    mobileMovePickDestination: "Нажми на папку или проект в иерархии, проверь назначение и подтверди перенос.",
+    mobileMoveDestination: "Куда переместить",
+    mobileMoveNoDestination: "Место еще не выбрано",
+    mobileMoveConfirm: "Переместить",
+    mobileMoveConflictTitle: "Есть совпадения имен",
+    mobileMoveConflictDescription: "В выбранном месте уже есть {{count}} элемент(ов) с такими именами.",
+    mobileMoveRename: "Переименовать и переместить",
+    mobileMoveCopy: "Создать копию",
+    mobilePreviewAction: "Предпросмотр",
+    mobilePreviewTitle: "Предпросмотр",
+    mobileMenuImportExport: "Импорт / экспорт",
+    mobileMenuBackup: "Бэкап",
+    mobileMenuAi: "AI настройки",
+    mobileMenuThemes: "Темы",
+    mobileMenuAbout: "О приложении / обновление",
     deleteSelection: "Удалить выбранное",
     maxDepthReached: "Разрешен только один уровень подпапок.",
     trashEmptyTitle: "Корзина пуста",

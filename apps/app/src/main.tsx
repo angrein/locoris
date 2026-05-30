@@ -68,15 +68,12 @@ import { initializeDesktopWindowStatePersistence } from "./lib/desktopWindowStat
 import { initializeVaultEncryptionSessions } from "./lib/e2eeSession";
 import { listLocalVaultProfiles } from "./lib/localVaults";
 import { initializePersistentClientStorage } from "./lib/persistentClientStorage";
+import { isDesktopRuntime } from "./lib/runtime";
 import {
   listAppSettingsSecretKeys,
   preloadSecureSecrets
 } from "./lib/secureSecretStore";
 import { initializeSecureSyncRegistryState } from "./lib/syncRegistry";
-
-function isDesktopRuntime() {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
 
 const LEGACY_PWA_RETIREMENT_STORAGE_KEY = "locoris:legacy-pwa-retired:v1";
 

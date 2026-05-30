@@ -1,5 +1,3 @@
-import { isTauri } from "@tauri-apps/api/core";
-
 import type { AppLanguage, NoteContent } from "../types";
 import {
   AI_EDITOR_STRUCTURED_OUTPUT_SCHEMA,
@@ -18,6 +16,7 @@ import {
   readPersistentString,
   writePersistentString
 } from "./persistentClientStorage";
+import { isWebRuntime } from "./runtime";
 
 export type GeminiAiAction = "beautify" | "improve" | "fix" | "translate" | "custom";
 export type GeminiAiScope = "note" | "selection";
@@ -865,7 +864,7 @@ export function writeStoredGeminiCanvasGenerationMode(mode: GeminiCanvasGenerati
 }
 
 function canUseBrowserGeminiKeyFallback() {
-  return typeof window !== "undefined" && !isTauri();
+  return isWebRuntime();
 }
 
 export async function readGeminiApiKey() {

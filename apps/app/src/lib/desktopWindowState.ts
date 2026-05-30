@@ -1,13 +1,10 @@
-import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { saveWindowState, StateFlags } from "@tauri-apps/plugin-window-state";
 
+import { isDesktopRuntime } from "./runtime";
+
 const DESKTOP_WINDOW_STATE_FLAGS =
   StateFlags.SIZE | StateFlags.POSITION | StateFlags.MAXIMIZED | StateFlags.FULLSCREEN;
-
-function isDesktopRuntime() {
-  return isTauri();
-}
 
 export async function saveDesktopWindowState() {
   if (!isDesktopRuntime()) {

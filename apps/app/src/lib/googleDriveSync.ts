@@ -6,6 +6,12 @@ import {
   prepareGoogleDriveDesktopOAuth,
   refreshGoogleDriveDesktopAccountSession
 } from "./googleDriveDesktopOAuth";
+import {
+  androidGoogleDriveOAuthReady,
+  isAndroidGoogleDriveOauthRuntime,
+  prepareGoogleDriveAndroidOAuth,
+  requestGoogleDriveAndroidAccessToken
+} from "./googleDriveAndroidOAuth";
 import type {
   SyncChangeFeed,
   SyncChangeSet,
@@ -175,6 +181,10 @@ function getClientIdFromEnv() {
     return desktopClientId;
   }
 
+  if (isAndroidGoogleDriveOauthRuntime()) {
+    return "";
+  }
+
   return webClientId;
 }
 
@@ -183,6 +193,10 @@ export function getGoogleDriveClientId() {
 }
 
 export function isGoogleDriveConfigured() {
+  if (isAndroidGoogleDriveOauthRuntime()) {
+    return true;
+  }
+
   return Boolean(getClientIdFromEnv());
 }
 
@@ -457,12 +471,20 @@ export function googleDriveOAuthReady() {
     return desktopGoogleDriveOAuthReady(getClientIdFromEnv());
   }
 
+  if (isAndroidGoogleDriveOauthRuntime()) {
+    return androidGoogleDriveOAuthReady();
+  }
+
   return Boolean(getGoogleIdentityApi());
 }
 
 export async function prepareGoogleDriveOAuth() {
   if (isDesktopGoogleDriveOauthRuntime()) {
     return prepareGoogleDriveDesktopOAuth();
+  }
+
+  if (isAndroidGoogleDriveOauthRuntime()) {
+    return prepareGoogleDriveAndroidOAuth();
   }
 
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -569,6 +591,13 @@ function requestGoogleDriveAccessToken(options?: {
   loginHint?: string;
   silent?: boolean;
 }) {
+  if (isAndroidGoogleDriveOauthRuntime()) {
+    return requestGoogleDriveAndroidAccessToken({
+      scopes: [GOOGLE_DRIVE_APP_DATA_SCOPE],
+      silent: options?.silent === true
+    });
+  }
+
   const google = getGoogleIdentityApi();
   const clientId = ensureClientId(options?.clientId);
   const silent = options?.silent === true;

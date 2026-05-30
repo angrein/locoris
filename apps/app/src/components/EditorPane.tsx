@@ -20,6 +20,7 @@ import { TextSelection } from "prosemirror-state";
 import { useTranslation } from "react-i18next";
 
 import "./EditorPane.css";
+import "./EditorPane.mobile.css";
 import ConfirmDialog from "./ConfirmDialog";
 import EditorFormattingToolbar from "./EditorFormattingToolbar";
 import FolderPicker from "./FolderPicker";
@@ -66,6 +67,7 @@ import {
   openTextFileWithDialog,
   saveBlobFileWithDialog
 } from "../lib/nativeFileIntegration";
+import { useAndroidBackHandler } from "../lib/useAndroidBackHandler";
 import {
   createNoteDocxBlob,
   createNoteHtmlBlob,
@@ -190,6 +192,13 @@ type ListContinuationStyleSeed = {
 type FloatingMediaSelectionSnapshot = {
   blockId: string;
 };
+type MobileQuickBlockType =
+  | "paragraph"
+  | "heading"
+  | "bulletListItem"
+  | "numberedListItem"
+  | "checkListItem"
+  | "quote";
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -206,6 +215,36 @@ function AiSparkleGlyph() {
         d="M19 16.75l.58 1.67 1.67.58-1.67.58L19 21.25l-.58-1.67-1.67-.58 1.67-.58.58-1.67ZM5.25 3.5l.82 2.18 2.18.82-2.18.82L5.25 9.5l-.82-2.18-2.18-.82 2.18-.82.82-2.18Z"
         fill="currentColor"
         opacity="0.72"
+      />
+    </svg>
+  );
+}
+
+function MobileBackGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M14.75 5.25 8 12l6.75 6.75M8.75 12H20"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.9"
+      />
+    </svg>
+  );
+}
+
+function MobileMoreGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M5.75 12h.01M12 12h.01M18.25 12h.01"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="3.2"
       />
     </svg>
   );
@@ -871,6 +910,7 @@ interface EditorPaneProps {
   onResolveFileUrl: (url: string) => Promise<string>;
   privateVaultWarningContext?: PrivateVaultWarningContext | null;
   immersive?: boolean;
+  onClose?: () => void;
 }
 
 export default function EditorPane({
@@ -892,7 +932,8 @@ export default function EditorPane({
   onUploadFile,
   onResolveFileUrl,
   privateVaultWarningContext = null,
-  immersive = false
+  immersive = false,
+  onClose
 }: EditorPaneProps) {
   const { t } = useTranslation();
   const [titleDraft, setTitleDraft] = useState(note.title);
@@ -908,6 +949,8 @@ export default function EditorPane({
     useState<NoteExportFormat | "copy" | "import" | null>(null);
   const [pendingMarkdownImport, setPendingMarkdownImport] =
     useState<PendingMarkdownImport | null>(null);
+  const [mobileNoteMenuOpen, setMobileNoteMenuOpen] = useState(false);
+  const [mobileInsertMenuOpen, setMobileInsertMenuOpen] = useState(false);
   const [aiPanel, setAiPanel] = useState<AiPanelState | null>(null);
   const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
   const aiPanelRef = useRef<HTMLDivElement | null>(null);
@@ -954,6 +997,8 @@ export default function EditorPane({
     setNoteTransferOpen(false);
     setNoteTransferStatus(null);
     setNoteTransferBusy(null);
+    setMobileNoteMenuOpen(false);
+    setMobileInsertMenuOpen(false);
     setAiPanel(null);
     setAiPreview(null);
     checklistStableOrderRef.current = new Map();
@@ -2159,6 +2204,125 @@ export default function EditorPane({
     }
   };
 
+  const getMobileBlockCarryProps = (block: StoredBlock) => {
+    const sourceProps = block.props ?? {};
+    const nextProps: Record<string, unknown> = {};
+
+    for (const key of ["textColor", "backgroundColor", "textAlignment"]) {
+      if (key in sourceProps) {
+        nextProps[key] = sourceProps[key];
+      }
+    }
+
+    return nextProps;
+  };
+
+  const applyMobileQuickBlock = (type: MobileQuickBlockType) => {
+    try {
+      const activeBlock = editor.getTextCursorPosition().block as unknown as StoredBlock;
+
+      if (typeof activeBlock.id !== "string") {
+        return;
+      }
+
+      const preservedProps = getMobileBlockCarryProps(activeBlock);
+      const nextBlock: StoredBlock = {
+        type,
+        props:
+          type === "heading"
+            ? { ...preservedProps, level: 2 }
+            : type === "checkListItem"
+              ? { ...preservedProps, checked: Boolean(activeBlock.props?.checked) }
+              : preservedProps
+      };
+
+      editor.updateBlock(activeBlock.id, nextBlock as any);
+      editor.setTextCursorPosition(activeBlock.id, "end");
+    } catch {
+      // Mobile quick actions are best-effort; BlockNote keeps the current edit state.
+    }
+  };
+
+  const getMobileQuickBlockLabel = (type: MobileQuickBlockType) => {
+    switch (type) {
+      case "heading":
+        return t("note.mobileHeading");
+      case "bulletListItem":
+        return t("note.mobileBulletList");
+      case "numberedListItem":
+        return t("note.mobileNumberedList");
+      case "checkListItem":
+        return t("note.mobileChecklist");
+      case "quote":
+        return t("note.mobileQuote");
+      case "paragraph":
+      default:
+        return t("note.mobileParagraph");
+    }
+  };
+
+  const getMobileQuickBlockGlyph = (type: MobileQuickBlockType) => {
+    switch (type) {
+      case "heading":
+        return "H";
+      case "bulletListItem":
+        return "-";
+      case "numberedListItem":
+        return "1";
+      case "checkListItem":
+        return "[]";
+      case "quote":
+        return ">";
+      case "paragraph":
+      default:
+        return "P";
+    }
+  };
+
+  const buildMobileQuickBlock = (type: MobileQuickBlockType, sourceBlock: StoredBlock) => {
+    const preservedProps = getMobileBlockCarryProps(sourceBlock);
+
+    return {
+      type,
+      props:
+        type === "heading"
+          ? { ...preservedProps, level: 2 }
+          : type === "checkListItem"
+            ? { ...preservedProps, checked: false }
+            : preservedProps,
+      content: ""
+    } as StoredBlock;
+  };
+
+  const insertMobileBlockAfterCursor = (type: MobileQuickBlockType) => {
+    try {
+      const activeBlock = editor.getTextCursorPosition().block as unknown as StoredBlock;
+      const insertedBlocks = editor.insertBlocks(
+        [buildMobileQuickBlock(type, activeBlock) as any],
+        activeBlock as any,
+        "after"
+      );
+      const insertedBlock = insertedBlocks[0] as StoredBlock | undefined;
+
+      if (typeof insertedBlock?.id === "string") {
+        editor.setTextCursorPosition(insertedBlock.id, "end");
+      }
+
+      setMobileInsertMenuOpen(false);
+    } catch {
+      // The slash menu and regular Enter behavior remain available.
+    }
+  };
+
+  const showMobileFormattingToolbar = () => {
+    try {
+      editor.focus();
+      editor.getExtension(FormattingToolbarExtension)?.store.setState(true);
+    } catch {
+      // Formatting toolbar visibility is controlled by BlockNote when unavailable.
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (titleTimeoutRef.current) {
@@ -2186,14 +2350,130 @@ export default function EditorPane({
   }, []);
 
   const aiPanelBusy = aiPanel?.status === "generating" || aiPanel?.status === "applying";
+  const androidBackLayer = aiPreview
+    ? "ai-preview"
+    : aiPanel
+      ? "ai-panel"
+      : pendingMarkdownImport
+        ? "markdown-import"
+        : noteTransferOpen
+          ? "transfer"
+          : mobileInsertMenuOpen
+            ? "mobile-insert-menu"
+            : mobileNoteMenuOpen
+              ? "mobile-note-menu"
+              : null;
+
+  useAndroidBackHandler(Boolean(androidBackLayer), () => {
+    if (androidBackLayer === "ai-preview") {
+      if (aiPreview?.status !== "applying") {
+        setAiPreview(null);
+      }
+
+      return;
+    }
+
+    if (androidBackLayer === "ai-panel") {
+      setAiPanel(null);
+      return;
+    }
+
+    if (androidBackLayer === "markdown-import") {
+      setPendingMarkdownImport(null);
+      return;
+    }
+
+    if (androidBackLayer === "transfer") {
+      setNoteTransferOpen(false);
+      return;
+    }
+
+    if (androidBackLayer === "mobile-insert-menu") {
+      setMobileInsertMenuOpen(false);
+      return;
+    }
+
+    if (androidBackLayer === "mobile-note-menu") {
+      setMobileNoteMenuOpen(false);
+    }
+  });
 
   return (
     <section
       className={`editor-pane ${immersive ? "is-immersive" : ""} ${
         typographyMode === "reading" ? "is-reading" : ""
-      }`}
+      } ${mobileNoteMenuOpen ? "is-mobile-note-menu-open" : ""}`}
       style={{ "--note-accent": note.color || DEFAULT_NOTE_COLOR } as CSSProperties}
     >
+      <div className="editor-pane-mobile-header">
+        <button
+          type="button"
+          className="editor-pane-mobile-icon-action"
+          onClick={onClose}
+          aria-label={t("note.mobileBack")}
+          title={t("note.mobileBack")}
+        >
+          <MobileBackGlyph />
+        </button>
+
+        <input
+          value={titleDraft}
+          onChange={(event) => handleTitleChange(event.target.value)}
+          onFocus={() => {
+            isTitleFieldFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            isTitleFieldFocusedRef.current = false;
+            flushTitleDraft();
+          }}
+          className="note-title-input editor-pane-mobile-title-field"
+          placeholder={t("note.titlePlaceholder")}
+        />
+
+        <button
+          type="button"
+          className="editor-pane-mobile-ai-action"
+          onClick={() => openAiPanel("note")}
+          aria-label={t("note.aiNote")}
+          title={t("note.aiNote")}
+        >
+          <AiSparkleGlyph />
+        </button>
+
+        <div
+          className="editor-pane-mobile-mode-switch"
+          role="group"
+          aria-label={t("note.typographyMode")}
+        >
+          <button
+            type="button"
+            className={typographyMode === "focus" ? "is-active" : ""}
+            aria-pressed={typographyMode === "focus"}
+            onClick={() => setTypographyMode("focus")}
+          >
+            {t("note.mobileFocusShort")}
+          </button>
+          <button
+            type="button"
+            className={typographyMode === "reading" ? "is-active" : ""}
+            aria-pressed={typographyMode === "reading"}
+            onClick={() => setTypographyMode("reading")}
+          >
+            {t("note.mobileReadingShort")}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className="editor-pane-mobile-icon-action"
+          onClick={() => setMobileNoteMenuOpen(true)}
+          aria-label={t("note.mobileMore")}
+          title={t("note.mobileMore")}
+        >
+          <MobileMoreGlyph />
+        </button>
+      </div>
+
       <div className="editor-pane-toolbar">
         <div className="editor-pane-toolbar-main">
           <div className="editor-pane-title-stack">
@@ -2446,20 +2726,31 @@ export default function EditorPane({
       ) : null}
 
       {aiPanel ? (
-        <div
-          ref={aiPanelRef}
-          className={`editor-ai-panel ${aiPanel.anchor ? "is-floating" : "is-docked"} is-${
-            aiPanel.scope
-          } is-${aiPanel.anchor?.placement ?? "bottom"}`}
-          style={
-            aiPanel.anchor
-              ? ({
-                  top: aiPanel.anchor.top,
-                  left: aiPanel.anchor.left
-                } as CSSProperties)
-              : undefined
-          }
-        >
+        <>
+          <button
+            type="button"
+            className="editor-ai-mobile-backdrop"
+            aria-label={t("note.aiClose")}
+            onClick={() => {
+              if (!aiPanelBusy) {
+                setAiPanel(null);
+              }
+            }}
+          />
+          <div
+            ref={aiPanelRef}
+            className={`editor-ai-panel ${aiPanel.anchor ? "is-floating" : "is-docked"} is-${
+              aiPanel.scope
+            } is-${aiPanel.anchor?.placement ?? "bottom"}`}
+            style={
+              aiPanel.anchor
+                ? ({
+                    top: aiPanel.anchor.top,
+                    left: aiPanel.anchor.left
+                  } as CSSProperties)
+                : undefined
+            }
+          >
           <div className="editor-ai-prompt-card">
             <span className="editor-ai-prompt-icon" aria-hidden="true">
               <AiSparkleGlyph />
@@ -2637,6 +2928,46 @@ export default function EditorPane({
               <p className="editor-ai-message is-error">{aiPanel.error}</p>
             ) : null}
           </div>
+          </div>
+        </>
+      ) : null}
+
+      {mobileNoteMenuOpen ? (
+        <button
+          type="button"
+          className="editor-pane-mobile-sheet-backdrop"
+          aria-label={t("dialog.cancel")}
+          onClick={() => setMobileNoteMenuOpen(false)}
+        />
+      ) : null}
+
+      {mobileInsertMenuOpen ? (
+        <div className="editor-pane-mobile-insert-layer" role="presentation">
+          <button
+            type="button"
+            className="editor-pane-mobile-insert-backdrop"
+            aria-label={t("dialog.cancel")}
+            onClick={() => setMobileInsertMenuOpen(false)}
+          />
+          <section
+            className="editor-pane-mobile-insert-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("note.mobileInsertMenuTitle")}
+          >
+            <div className="editor-pane-mobile-insert-head">
+              <span>{t("note.mobileInsertMenuTitle")}</span>
+              <p>{t("note.mobileInsertMenuSubtitle")}</p>
+            </div>
+            <div className="editor-pane-mobile-insert-grid">
+              {(["paragraph", "heading", "bulletListItem", "numberedListItem", "checkListItem", "quote"] as MobileQuickBlockType[]).map((type) => (
+                <button key={type} type="button" onClick={() => insertMobileBlockAfterCursor(type)}>
+                  <span>{getMobileQuickBlockGlyph(type)}</span>
+                  <strong>{getMobileQuickBlockLabel(type)}</strong>
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
       ) : null}
 
@@ -2719,6 +3050,21 @@ export default function EditorPane({
         </div>
 
         <aside className="editor-sidepanel">
+          <div className="editor-pane-mobile-sheet-head">
+            <div>
+              <span>{t("note.mobileMenuTitle")}</span>
+              <p>{t("note.mobileMenuSubtitle")}</p>
+            </div>
+            <button
+              type="button"
+              className="editor-pane-mobile-sheet-close"
+              onClick={() => setMobileNoteMenuOpen(false)}
+              aria-label={t("dialog.cancel")}
+            >
+              <MobileMoreGlyph />
+            </button>
+          </div>
+
           <section className="editor-pane-detail-card">
             <div className="editor-pane-detail-field">
               <span className="editor-pane-detail-label">{t("note.folder")}</span>
@@ -2781,6 +3127,16 @@ export default function EditorPane({
             <div className="editor-pane-action-grid">
               <button
                 type="button"
+                className="micro-action editor-pane-mobile-only-action"
+                onClick={() => {
+                  setMobileNoteMenuOpen(false);
+                  setNoteTransferOpen(true);
+                }}
+              >
+                {t("note.transferButton")}
+              </button>
+              <button
+                type="button"
                 className={`micro-action ${note.pinned || note.favorite ? "is-active" : ""}`}
                 onClick={onTogglePin}
               >
@@ -2797,6 +3153,33 @@ export default function EditorPane({
             </div>
           </section>
         </aside>
+      </div>
+
+      <div className="editor-pane-mobile-formatbar" aria-label={t("note.mobileFormatToolbar")}>
+        <button type="button" onClick={() => applyMobileQuickBlock("paragraph")}>
+          <span>P</span>
+          <small>{t("note.mobileParagraph")}</small>
+        </button>
+        <button type="button" onClick={() => applyMobileQuickBlock("heading")}>
+          <span>H</span>
+          <small>{t("note.mobileHeading")}</small>
+        </button>
+        <button type="button" onClick={() => applyMobileQuickBlock("bulletListItem")}>
+          <span>-</span>
+          <small>{t("note.mobileBulletList")}</small>
+        </button>
+        <button type="button" onClick={() => applyMobileQuickBlock("checkListItem")}>
+          <span>[]</span>
+          <small>{t("note.mobileChecklist")}</small>
+        </button>
+        <button type="button" onClick={() => showMobileFormattingToolbar()}>
+          <span>A</span>
+          <small>{t("note.mobileStyle")}</small>
+        </button>
+        <button type="button" onClick={() => setMobileInsertMenuOpen(true)}>
+          <span>+</span>
+          <small>{t("note.mobileInsert")}</small>
+        </button>
       </div>
     </section>
   );

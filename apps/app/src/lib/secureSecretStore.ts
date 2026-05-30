@@ -1,4 +1,4 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 
 import {
   isDesktopPersistentStorageActive,
@@ -6,6 +6,10 @@ import {
   removePersistentString,
   writePersistentString
 } from "./persistentClientStorage";
+import {
+  isDesktopRuntime,
+  isTauriRuntime
+} from "./runtime";
 import type {
   AppSettings,
   SyncConnection,
@@ -36,10 +40,6 @@ export const SYNC_BINDING_SECRET_FIELDS = [
 export type AppSettingsSecretField = (typeof APP_SETTINGS_SECRET_FIELDS)[number];
 export type SyncConnectionSecretField = (typeof SYNC_CONNECTION_SECRET_FIELDS)[number];
 export type SyncBindingSecretField = (typeof SYNC_BINDING_SECRET_FIELDS)[number];
-
-function isDesktopSecureRuntime() {
-  return typeof window !== "undefined" && isTauri();
-}
 
 function normalizeSecretValue(value: string | null | undefined) {
   return typeof value === "string" ? value.trim() : "";
@@ -81,7 +81,7 @@ function notifySecureSecretListeners() {
 }
 
 async function readNativeSecureSecret(key: string) {
-  if (!isDesktopSecureRuntime()) {
+  if (!isTauriRuntime()) {
     return null;
   }
 
@@ -91,7 +91,7 @@ async function readNativeSecureSecret(key: string) {
 }
 
 async function writeNativeSecureSecret(key: string, value: string) {
-  if (!isDesktopSecureRuntime()) {
+  if (!isTauriRuntime()) {
     return;
   }
 
@@ -134,7 +134,7 @@ async function ensureSecureSecretLoaded(key: string) {
     writeDesktopSecretFallback(normalizedKey, nativeValue);
   }
 
-  if (!nativeValue && fallbackValue && isDesktopSecureRuntime()) {
+  if (!nativeValue && fallbackValue && isDesktopRuntime()) {
     void writeNativeSecureSecret(normalizedKey, fallbackValue).catch(() => {
       // Keep the fallback copy in the desktop store even if the native secure backend is unavailable.
     });
@@ -193,7 +193,7 @@ export async function writeSecureSecret(key: string, value: string) {
   setCachedSecureSecret(normalizedKey, normalizedValue);
   writeDesktopSecretFallback(normalizedKey, normalizedValue);
 
-  if (!isDesktopSecureRuntime()) {
+  if (!isTauriRuntime()) {
     return;
   }
 
@@ -216,7 +216,7 @@ export async function deleteSecureSecret(key: string) {
   setCachedSecureSecret(normalizedKey, "");
   writeDesktopSecretFallback(normalizedKey, "");
 
-  if (!isDesktopSecureRuntime()) {
+  if (!isTauriRuntime()) {
     return;
   }
 

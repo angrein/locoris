@@ -1,9 +1,10 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 
 import {
   buildSyncConnectionSecretKey,
   readSecureSecret
 } from "./secureSecretStore";
+import { isDesktopRuntime } from "./runtime";
 
 const GOOGLE_DRIVE_APP_DATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const GOOGLE_DRIVE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about";
@@ -82,7 +83,7 @@ async function focusDesktopWindow() {
 }
 
 function isDesktopGoogleDriveRuntime() {
-  return typeof window !== "undefined" && isTauri();
+  return isDesktopRuntime();
 }
 
 function base64UrlEncode(bytes: Uint8Array) {

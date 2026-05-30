@@ -1,7 +1,7 @@
 {
   "name": "@locoris/app",
   "private": true,
-  "version": "1.0.23",
+  "version": "1.0.24",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,12 @@
     "desktop:dev": "node ./scripts/run-tauri.mjs dev",
     "desktop:build": "node ./scripts/run-tauri.mjs build",
     "desktop:build:debug": "node ./scripts/run-tauri.mjs build --debug",
-    "desktop:info": "tauri info"
+    "desktop:info": "tauri info",
+    "android:init": "tauri android init --ci",
+    "android:dev": "tauri android dev",
+    "android:studio": "tauri android dev --open",
+    "android:build:apk": "tauri android build --apk --ci",
+    "android:build:apk:debug": "tauri android build --debug --apk --ci"
   },
   "dependencies": {
     "@blocknote/core": "^0.47.3",

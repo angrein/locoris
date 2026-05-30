@@ -1,7 +1,7 @@
 {
   "name": "locoris",
   "private": true,
-  "version": "1.0.23",
+  "version": "1.0.24",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -21,6 +21,11 @@
     "desktop:build": "npm run desktop:build --workspace @locoris/app",
     "desktop:build:debug": "npm run desktop:build:debug --workspace @locoris/app",
     "desktop:info": "npm run desktop:info --workspace @locoris/app",
+    "android:init": "npm run android:init --workspace @locoris/app",
+    "android:dev": "npm run android:dev --workspace @locoris/app",
+    "android:studio": "npm run android:studio --workspace @locoris/app",
+    "android:build:apk": "npm run android:build:apk --workspace @locoris/app",
+    "android:build:apk:debug": "npm run android:build:apk:debug --workspace @locoris/app",
     "desktop:uninstall:macos": "bash ./scripts/macos/uninstall-locoris.sh /Applications/Locoris.app",
     "desktop:uninstall:macos:wipe": "LOCORIS_WIPE_DATA=1 bash ./scripts/macos/uninstall-locoris.sh /Applications/Locoris.app",
     "sync-server": "npm run start --workspace @locoris/personal-server",

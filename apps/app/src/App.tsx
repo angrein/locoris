@@ -3,6 +3,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 
 import ConfirmDialog from "./components/ConfirmDialog";
+import "./components/AdaptiveAppShell.css";
+import "./components/AndroidEditorCanvas.css";
 import FolderPanel from "./components/FolderPanel";
 import KnowledgeMap from "./components/KnowledgeMap";
 import NotesPanel from "./components/NotesPanel";
@@ -60,6 +62,13 @@ import {
   type AppAccentThemeId
 } from "./lib/accentThemes";
 import {
+  ORBITAL_ANIMATION_MODE_STORAGE_KEY,
+  readStoredOrbitalAnimationMode,
+  resolveOrbitalAnimationMode,
+  writeStoredOrbitalAnimationMode,
+  type OrbitalAnimationMode
+} from "./lib/interfacePreferences";
+import {
   hasVaultEncryptionSession,
   getVaultEncryptionSessionPassphrase,
   lockVaultEncryptionSession,
@@ -96,13 +105,13 @@ import {
   hasExplicitDisplayName
 } from "./lib/displayNames";
 import {
-  initializeDesktopUpdateState,
-  readDesktopUpdateSnapshot,
-  startAutomaticDesktopUpdateCheck,
-  subscribeDesktopUpdateState,
-  supportsDesktopUpdates,
-  type DesktopUpdateSnapshot
-} from "./lib/desktopUpdates";
+  initializeAppUpdateState,
+  readAppUpdateSnapshot,
+  startAutomaticAppUpdateCheck,
+  subscribeAppUpdateState,
+  supportsAppUpdates,
+  type AppUpdateSnapshot
+} from "./lib/appUpdates";
 import {
   connectGoogleDriveAccount,
   deleteHostedVault,
@@ -136,6 +145,8 @@ import {
 } from "./lib/syncRegistry";
 import { subscribeSecureSecretChanges } from "./lib/secureSecretStore";
 import { DEFAULT_NOTE_COLOR } from "./lib/palette";
+import { getErrorMessage } from "./lib/errors";
+import { useAdaptiveLayout } from "./lib/useAdaptiveLayout";
 import { hasMeaningfulCanvasContent } from "./lib/canvas";
 import { hasMeaningfulNoteContent } from "./lib/notes";
 import i18n from "./i18n";
@@ -188,6 +199,7 @@ function useOnlineStatus() {
 
 export default function App() {
   const { t } = useTranslation();
+  const adaptiveLayout = useAdaptiveLayout();
   const online = useOnlineStatus();
   const [activeLocalVaultId, setActiveLocalVaultId] = useState(() => getStoredActiveLocalVaultId());
   const [localVaults, setLocalVaults] = useState(() => listLocalVaultProfiles());
@@ -195,6 +207,8 @@ export default function App() {
   const [accentThemeId, setAccentThemeId] = useState<AppAccentThemeId>(() =>
     readStoredAppAccentThemeId()
   );
+  const [orbitalAnimationMode, setOrbitalAnimationMode] =
+    useState<OrbitalAnimationMode>(() => readStoredOrbitalAnimationMode());
   const [syncConnections, setSyncConnections] = useState(() => listSyncConnections());
   const [syncBindings, setSyncBindings] = useState(() => listSyncBindings());
   const [vaultEncryptionById, setVaultEncryptionById] = useState<Record<string, VaultEncryptionSummary>>({});
@@ -229,7 +243,7 @@ export default function App() {
     title: string;
   } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
-  const [desktopUpdateChip, setDesktopUpdateChip] = useState<
+  const [appUpdateChip, setAppUpdateChip] = useState<
     | {
         kind: "available" | "issue";
         version: string | null;
@@ -258,14 +272,14 @@ export default function App() {
   }, [t]);
 
   useEffect(() => {
-    if (!supportsDesktopUpdates()) {
-      setDesktopUpdateChip(null);
+    if (!supportsAppUpdates()) {
+      setAppUpdateChip(null);
       return () => undefined;
     }
 
-    const syncDesktopUpdateChip = (snapshot: DesktopUpdateSnapshot) => {
+    const syncAppUpdateChip = (snapshot: AppUpdateSnapshot) => {
       if (snapshot.phase === "available" && snapshot.availableVersion) {
-        setDesktopUpdateChip({
+        setAppUpdateChip({
           kind: "available",
           version: snapshot.availableVersion
         });
@@ -278,20 +292,20 @@ export default function App() {
         snapshot.issueCode !== "check-failed" &&
         snapshot.issueCode !== "unsupported"
       ) {
-        setDesktopUpdateChip({
+        setAppUpdateChip({
           kind: "issue",
           version: snapshot.availableVersion ?? snapshot.lastAttemptedVersion
         });
         return;
       }
 
-      setDesktopUpdateChip(null);
+      setAppUpdateChip(null);
     };
 
-    void initializeDesktopUpdateState();
-    syncDesktopUpdateChip(readDesktopUpdateSnapshot());
+    void initializeAppUpdateState();
+    syncAppUpdateChip(readAppUpdateSnapshot());
 
-    return subscribeDesktopUpdateState(syncDesktopUpdateChip);
+    return subscribeAppUpdateState(syncAppUpdateChip);
   }, []);
 
   useEffect(() => {
@@ -511,11 +525,13 @@ export default function App() {
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
-      if (event.key !== APP_ACCENT_THEME_STORAGE_KEY) {
-        return;
+      if (event.key === APP_ACCENT_THEME_STORAGE_KEY) {
+        setAccentThemeId(resolveAppAccentThemeId(event.newValue));
       }
 
-      setAccentThemeId(resolveAppAccentThemeId(event.newValue));
+      if (event.key === ORBITAL_ANIMATION_MODE_STORAGE_KEY) {
+        setOrbitalAnimationMode(resolveOrbitalAnimationMode(event.newValue));
+      }
     };
 
     window.addEventListener("storage", handleStorage);
@@ -537,11 +553,11 @@ export default function App() {
   }, [settings]);
 
   useEffect(() => {
-    if (!online || !supportsDesktopUpdates()) {
+    if (!online || !supportsAppUpdates()) {
       return;
     }
 
-    void startAutomaticDesktopUpdateCheck();
+    void startAutomaticAppUpdateCheck();
   }, [online]);
 
   useEffect(() => {
@@ -660,7 +676,7 @@ export default function App() {
       error: unknown,
       provider: "selfHosted" | "hosted" | "googleDrive" | null = null
     ) => {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
 
       switch (message) {
         case "SELF_HOSTED_URL_REQUIRED":
@@ -679,6 +695,10 @@ export default function App() {
           return t("sync.googleDriveAuthRequired");
         case "GOOGLE_DRIVE_CLIENT_ID_REQUIRED":
           return t("sync.googleDriveClientIdRequired");
+        case "GOOGLE_OAUTH_ANDROID_CONFIG_INVALID":
+          return t("sync.googleDriveAndroidConfigInvalid");
+        case "GOOGLE_OAUTH_INVALID_REQUEST":
+          return t("sync.googleDriveDesktopConfigInvalid");
         case "GOOGLE_OAUTH_POPUP_CLOSED":
         case "GOOGLE_OAUTH_ACCESS_DENIED":
           return t("sync.googleDrivePopupClosed");
@@ -695,7 +715,12 @@ export default function App() {
           return t("sync.googleDriveAuthInProgress");
         case "GOOGLE_OAUTH_SCRIPT_FAILED":
         case "GOOGLE_OAUTH_UNAVAILABLE":
+        case "NETWORK_ERROR":
           return t("sync.googleDriveSdkFailed");
+        case "GOOGLE_OAUTH_FAILED":
+          return t("sync.googleDriveOAuthFailed");
+        case "GOOGLE_PLAY_SERVICES_UNAVAILABLE":
+          return t("sync.googleDrivePlayServicesUnavailable");
         case "ENCRYPTED_SYNC_NOT_IMPLEMENTED":
           return t("sync.googleDriveEncryptedPending");
         case "VAULT_ENCRYPTION_LOCKED":
@@ -1109,7 +1134,7 @@ export default function App() {
         refreshSyncRegistryState();
         return true;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "SYNC_FAILED";
+        const errorMessage = getErrorMessage(error);
 
         if (targetConnection.provider !== "googleDrive" || errorMessage !== "GOOGLE_DRIVE_AUTH_REQUIRED") {
           throw error;
@@ -1233,7 +1258,7 @@ export default function App() {
         try {
           result = await runSyncCycle(targetConnection);
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : "SYNC_FAILED";
+          const errorMessage = getErrorMessage(error);
 
           if (targetConnection.provider !== "googleDrive" || errorMessage !== "GOOGLE_DRIVE_AUTH_REQUIRED") {
             throw error;
@@ -1278,7 +1303,7 @@ export default function App() {
 
         return true;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "SYNC_FAILED";
+        const errorMessage = getErrorMessage(error);
         updateSyncBindingState(localVaultId, {
           syncStatus: errorMessage === "VAULT_ENCRYPTION_LOCKED" ? "idle" : "error",
           lastError: errorMessage
@@ -1984,6 +2009,12 @@ export default function App() {
     setAccentThemeId(nextThemeId);
   };
 
+  const handleChangeOrbitalAnimationMode = (mode: OrbitalAnimationMode) => {
+    const nextMode = resolveOrbitalAnimationMode(mode);
+    writeStoredOrbitalAnimationMode(nextMode);
+    setOrbitalAnimationMode(nextMode);
+  };
+
   const getVaultDescriptor = (localVaultId: string) => {
     const vault =
       localVaults.find((entry) => entry.id === localVaultId) ??
@@ -2488,7 +2519,7 @@ export default function App() {
       renameLocalVaultProfile(localVaultId, previousName);
       setLocalVaults(listLocalVaultProfiles());
 
-      const errorMessage = error instanceof Error ? error.message : "SYNC_FAILED";
+      const errorMessage = getErrorMessage(error);
       updateSyncBindingState(localVaultId, {
         syncStatus: "error",
         lastError: errorMessage
@@ -3085,8 +3116,18 @@ export default function App() {
 
   return (
     <Suspense fallback={null}>
-      <>
+      <div
+        className="locoris-adaptive-shell"
+        data-runtime-kind={adaptiveLayout.runtimeKind}
+        data-layout-device={adaptiveLayout.device}
+        data-layout-orientation={adaptiveLayout.orientation}
+        data-pointer-mode={adaptiveLayout.pointer}
+        data-mobile-shell={adaptiveLayout.isMobileShell ? "true" : "false"}
+      >
         <OrbitalMapView
+        adaptiveLayout={adaptiveLayout}
+        orbitalAnimationMode={orbitalAnimationMode}
+        onOrbitalAnimationModeChange={handleChangeOrbitalAnimationMode}
         projects={projects}
         folders={folders}
         notes={notes}
@@ -3215,6 +3256,7 @@ export default function App() {
                 onUploadFile={(file) => handleStoreAsset(orbitalEditorEntry.id, file)}
                 onResolveFileUrl={resolveAssetUrl}
                 privateVaultWarningContext={activePrivateVaultWarningContext}
+                onClose={handleCloseOrbitalEditor}
               />
             )
           ) : null
@@ -3247,6 +3289,7 @@ export default function App() {
           <SettingsPanel
             settings={settings}
             accentThemeId={accentThemeId}
+            orbitalAnimationMode={orbitalAnimationMode}
             online={online}
             localVaults={localVaults}
             activeLocalVaultId={activeLocalVaultId}
@@ -3256,6 +3299,7 @@ export default function App() {
             vaultEncryptionById={vaultEncryptionById}
             syncFeedback={syncFeedback}
             onAccentThemeChange={handleChangeAccentTheme}
+            onOrbitalAnimationModeChange={handleChangeOrbitalAnimationMode}
             onLanguageChange={(language) => void handleChangeLanguage(language)}
             onSelectLocalVault={(localVaultId) => setSelectedSyncVaultId(localVaultId)}
             onCreateLocalVault={(input) => handleCreateLocalVault(input)}
@@ -3289,21 +3333,21 @@ export default function App() {
         syncStatusChip={activeVaultSyncChip}
         syncTransportChip={activeSyncTransportChip}
         updateChip={
-          desktopUpdateChip
+          appUpdateChip
             ? {
                 text:
-                  desktopUpdateChip.kind === "issue"
+                  appUpdateChip.kind === "issue"
                     ? t("settings.desktopUpdateIssueChip")
                     : t("settings.desktopUpdateChip", {
-                        version: desktopUpdateChip.version ?? "—"
+                        version: appUpdateChip.version ?? "—"
                       }),
                 title:
-                  desktopUpdateChip.kind === "issue"
+                  appUpdateChip.kind === "issue"
                     ? t("settings.desktopUpdateIssueChipTitle", {
-                        version: desktopUpdateChip.version ?? "—"
+                        version: appUpdateChip.version ?? "—"
                       })
                     : t("settings.desktopUpdateChipTitle", {
-                        version: desktopUpdateChip.version ?? "—"
+                        version: appUpdateChip.version ?? "—"
                       })
               }
             : null
@@ -3489,7 +3533,7 @@ export default function App() {
           onConfirm={() => closeConfirmDialog(true)}
           onCancel={() => closeConfirmDialog(false)}
         />
-      </>
+      </div>
     </Suspense>
   );
 }

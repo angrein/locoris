@@ -1,0 +1,152 @@
+name: Tauri Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "android-v*"
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  LOCORIS_ANDROID_BUILD: "true"
+  JAVA_VERSION: "17"
+  ANDROID_NDK_VERSION: "27.0.12077973"
+  VITE_GOOGLE_DRIVE_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_CLIENT_ID }}
+  VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID }}
+
+jobs:
+  build-android-apk:
+    name: Build Android release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;${ANDROID_NDK_VERSION}"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> apps/app/src-tauri/target
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --workspace @locoris/app
+
+      - name: Build web assets
+        run: npm run build --workspace @locoris/app
+
+      - name: Validate Android release signing secrets
+        run: |
+          missing=()
+          [ -n "${ANDROID_RELEASE_KEYSTORE_BASE64}" ] || missing+=("ANDROID_RELEASE_KEYSTORE_BASE64")
+          [ -n "${ANDROID_RELEASE_KEYSTORE_PASSWORD}" ] || missing+=("ANDROID_RELEASE_KEYSTORE_PASSWORD")
+          [ -n "${ANDROID_RELEASE_KEY_ALIAS}" ] || missing+=("ANDROID_RELEASE_KEY_ALIAS")
+          [ -n "${ANDROID_RELEASE_KEY_PASSWORD}" ] || missing+=("ANDROID_RELEASE_KEY_PASSWORD")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing GitHub Actions secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+
+      - name: Decode Android release keystore
+        run: |
+          mkdir -p "${RUNNER_TEMP}/android-signing"
+          printf '%s' "${ANDROID_RELEASE_KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/android-signing/locoris-release.keystore"
+          chmod 600 "${RUNNER_TEMP}/android-signing/locoris-release.keystore"
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+
+      - name: Build signed Android APK
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.ANDROID_NDK_VERSION }}
+          ANDROID_SIGNING_KEYSTORE_PATH: ${{ runner.temp }}/android-signing/locoris-release.keystore
+          ANDROID_SIGNING_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: npm run android:build:apk --workspace @locoris/app
+
+      - name: Package release assets
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./apps/app/package.json').version")"
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME:-}" == android-v* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="android-v${VERSION}"
+          fi
+          APK_SOURCE="$(find apps/app/src-tauri/gen/android/app/build/outputs/apk -type f -path '*/universal/release/*.apk' -name '*.apk' | sort | head -n 1)"
+          if [ -z "${APK_SOURCE}" ]; then
+            APK_SOURCE="$(find apps/app/src-tauri/gen/android/app/build/outputs/apk -type f -name '*release*.apk' | sort | head -n 1)"
+          fi
+          if [ -z "${APK_SOURCE}" ]; then
+            echo "Could not find signed release APK." >&2
+            exit 1
+          fi
+          mkdir -p dist/android-release
+          APK_NAME="Locoris-Android-${VERSION}.apk"
+          cp "${APK_SOURCE}" "dist/android-release/${APK_NAME}"
+          if command -v sha256sum >/dev/null 2>&1; then
+            SHA256="$(sha256sum "dist/android-release/${APK_NAME}" | awk '{print $1}')"
+          else
+            SHA256="$(shasum -a 256 "dist/android-release/${APK_NAME}" | awk '{print $1}')"
+          fi
+          printf '%s  %s\n' "${SHA256}" "${APK_NAME}" > "dist/android-release/${APK_NAME}.sha256"
+          node -e "const fs=require('fs'); const data={version:process.argv[1],tag:process.argv[2],packageName:'com.locoris.android',apk:process.argv[3],sha256:process.argv[4],publishedAt:new Date().toISOString()}; fs.writeFileSync('dist/android-release/android-latest.json', JSON.stringify(data,null,2)+'\\n');" "${VERSION}" "${TAG}" "${APK_NAME}" "${SHA256}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "apk_name=${APK_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: locoris-android-release-apk
+          path: dist/android-release/*
+          if-no-files-found: error
+
+      - name: Publish Android GitHub release
+        if: startsWith(github.ref, 'refs/tags/android-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.package.outputs.tag }}
+          name: Locoris Android ${{ steps.package.outputs.version }}
+          body: |
+            Android APK release for Locoris ${{ steps.package.outputs.version }}.
+
+            Install the APK manually on Android devices with "Install unknown apps" enabled for the app that opens the file.
+          draft: false
+          prerelease: false
+          files: dist/android-release/*

@@ -7,6 +7,7 @@ import {
   resolveAppAccentThemeId,
   type AppAccentThemeId
 } from "../lib/accentThemes";
+import type { OrbitalAnimationMode } from "../lib/interfacePreferences";
 import {
   deleteGeminiApiKey,
   GEMINI_MODEL_OPTIONS,
@@ -29,15 +30,16 @@ import {
 } from "../lib/aiIntegration";
 import type { LocalVaultKind, LocalVaultProfile } from "../lib/localVaults";
 import {
-  checkForDesktopUpdate,
-  initializeDesktopUpdateState,
-  installAvailableDesktopUpdate,
-  openDesktopUpdateReleasePage,
-  readDesktopUpdateSnapshot,
-  retryFailedDesktopUpdateInstall,
-  subscribeDesktopUpdateState,
-  supportsDesktopUpdates
-} from "../lib/desktopUpdates";
+  checkForAppUpdate,
+  initializeAppUpdateState,
+  installAvailableAppUpdate,
+  openAppUpdateReleasePage,
+  readAppUpdateSnapshot,
+  resolveAppUpdatePermissionIssue,
+  retryFailedAppUpdateInstall,
+  subscribeAppUpdateState,
+  supportsAppUpdates
+} from "../lib/appUpdates";
 import type {
   AppLanguage,
   AppSettings,
@@ -64,6 +66,7 @@ type AiModelCheckFeedbackState = {
 interface SettingsPanelProps {
   settings: AppSettings;
   accentThemeId: AppAccentThemeId;
+  orbitalAnimationMode: OrbitalAnimationMode;
   online: boolean;
   localVaults: LocalVaultProfile[];
   activeLocalVaultId: string;
@@ -73,6 +76,7 @@ interface SettingsPanelProps {
   vaultEncryptionById: Record<string, VaultEncryptionSummary>;
   syncFeedback?: SyncFeedbackState;
   onAccentThemeChange: (themeId: AppAccentThemeId) => void;
+  onOrbitalAnimationModeChange: (mode: OrbitalAnimationMode) => void;
   onLanguageChange: (language: AppLanguage) => void;
   onSelectLocalVault: (localVaultId: string) => void;
   onCreateLocalVault: (input: {
@@ -237,6 +241,7 @@ function UpdateGlyph() {
 export default function SettingsPanel({
   settings,
   accentThemeId,
+  orbitalAnimationMode,
   online,
   localVaults,
   activeLocalVaultId,
@@ -246,6 +251,7 @@ export default function SettingsPanel({
   vaultEncryptionById,
   syncFeedback = null,
   onAccentThemeChange,
+  onOrbitalAnimationModeChange,
   onLanguageChange,
   onSelectLocalVault,
   onCreateLocalVault,
@@ -269,7 +275,7 @@ export default function SettingsPanel({
   const { t } = useTranslation();
   const [view, setView] = useState<SettingsView>("root");
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  const [desktopUpdateState, setDesktopUpdateState] = useState(() => readDesktopUpdateSnapshot());
+  const [appUpdateState, setAppUpdateState] = useState(() => readAppUpdateSnapshot());
   const [aiKeyDraft, setAiKeyDraft] = useState("");
   const [aiModelId, setAiModelId] = useState(() => readStoredGeminiModel());
   const [aiModelDraft, setAiModelDraft] = useState(() => readStoredGeminiModel());
@@ -289,7 +295,7 @@ export default function SettingsPanel({
   const [aiInstructionsOpen, setAiInstructionsOpen] = useState(false);
   const [aiModelPickerOpen, setAiModelPickerOpen] = useState(false);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
-  const desktopUpdatesEnabled = supportsDesktopUpdates();
+  const appUpdatesEnabled = supportsAppUpdates();
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -319,22 +325,22 @@ export default function SettingsPanel({
   }, [aiInstructionsOpen, aiModelPickerOpen]);
 
   useEffect(() => {
-    if (!desktopUpdatesEnabled) {
+    if (!appUpdatesEnabled) {
       return;
     }
 
-    void initializeDesktopUpdateState();
+    void initializeAppUpdateState();
 
-    return subscribeDesktopUpdateState(setDesktopUpdateState);
-  }, [desktopUpdatesEnabled]);
+    return subscribeAppUpdateState(setAppUpdateState);
+  }, [appUpdatesEnabled]);
 
   useEffect(() => {
-    if (!desktopUpdatesEnabled || desktopUpdateState.phase !== "idle") {
+    if (!appUpdatesEnabled || appUpdateState.phase !== "idle") {
       return;
     }
 
-    void handleCheckDesktopUpdates();
-  }, [desktopUpdatesEnabled, desktopUpdateState.phase]);
+    void handleCheckAppUpdates();
+  }, [appUpdatesEnabled, appUpdateState.phase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -357,110 +363,126 @@ export default function SettingsPanel({
     };
   }, []);
 
-  const handleCheckDesktopUpdates = async () => {
-    await checkForDesktopUpdate();
+  const handleCheckAppUpdates = async () => {
+    await checkForAppUpdate();
   };
 
-  const handleInstallDesktopUpdate = async () => {
-    await installAvailableDesktopUpdate();
+  const handleInstallAppUpdate = async () => {
+    await installAvailableAppUpdate();
   };
 
-  const handleRetryDesktopUpdate = async () => {
-    await retryFailedDesktopUpdateInstall();
+  const handleRetryAppUpdate = async () => {
+    await retryFailedAppUpdateInstall();
   };
 
-  const handleOpenDesktopReleasePage = async () => {
-    await openDesktopUpdateReleasePage(
-      desktopUpdateState.availableVersion ?? desktopUpdateState.lastAttemptedVersion
+  const handleOpenAppReleasePage = async () => {
+    await openAppUpdateReleasePage(
+      appUpdateState.availableVersion ?? appUpdateState.lastAttemptedVersion
     );
   };
 
-  const desktopUpdateCurrentVersion = desktopUpdateState.currentVersion;
-  const desktopUpdatePublishedLabel = desktopUpdateState.releaseDate
+  const handleResolveAppUpdatePermissionIssue = async () => {
+    await resolveAppUpdatePermissionIssue();
+  };
+
+  const appUpdateCurrentVersion = appUpdateState.currentVersion;
+  const appUpdatePublishedLabel = appUpdateState.releaseDate
     ? new Intl.DateTimeFormat(settings.language === "ru" ? "ru-RU" : "en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit"
-      }).format(new Date(desktopUpdateState.releaseDate))
+      }).format(new Date(appUpdateState.releaseDate))
     : null;
 
-  const desktopUpdateIssueText =
-    desktopUpdateState.issueCode === "unsupported"
-      ? t("settings.desktopUpdateUnsupported")
-      : desktopUpdateState.issueCode === "metadata-invalid"
+  const appUpdateIssueText =
+    appUpdateState.issueCode === "unsupported"
+      ? appUpdateState.kind === "android"
+        ? t("settings.androidUpdateReleaseOnly")
+        : t("settings.desktopUpdateUnsupported")
+      : appUpdateState.issueCode === "metadata-invalid"
       ? t("settings.desktopUpdateIssueMetadataInvalid")
-      : desktopUpdateState.issueCode === "download-failed"
+      : appUpdateState.issueCode === "download-failed"
       ? t("settings.desktopUpdateIssueDownloadFailed")
-      : desktopUpdateState.issueCode === "install-failed"
+      : appUpdateState.issueCode === "install-failed"
       ? t("settings.desktopUpdateIssueInstallFailed")
-      : desktopUpdateState.issueCode === "install-not-applied"
+      : appUpdateState.issueCode === "install-not-applied"
       ? t("settings.desktopUpdateIssueInstallNotApplied", {
           version:
-            desktopUpdateState.availableVersion ??
-            desktopUpdateState.lastAttemptedVersion ??
+            appUpdateState.availableVersion ??
+            appUpdateState.lastAttemptedVersion ??
             "—"
         })
-      : desktopUpdateState.issueCode === "check-failed"
+      : appUpdateState.issueCode === "android-install-permission-required"
+      ? t("settings.androidUpdatePermissionRequired")
+      : appUpdateState.issueCode === "check-failed"
       ? t("settings.desktopUpdateIssueCheckFailed")
       : null;
 
-  const desktopUpdateDescription =
-    desktopUpdateState.phase === "checking"
+  const appUpdateDescription =
+    appUpdateState.phase === "checking"
       ? t("settings.desktopUpdateChecking")
-      : desktopUpdateState.phase === "upToDate"
+      : appUpdateState.phase === "upToDate"
       ? t("settings.desktopUpdateUpToDate", {
-          version: desktopUpdateCurrentVersion ?? "—"
+          version: appUpdateCurrentVersion ?? "—"
         })
-      : desktopUpdateState.phase === "available"
+      : appUpdateState.phase === "available"
       ? t("settings.desktopUpdateAvailable", {
-          version: desktopUpdateState.availableVersion ?? "—"
+          version: appUpdateState.availableVersion ?? "—"
         })
-      : desktopUpdateState.phase === "downloading"
+      : appUpdateState.phase === "downloading"
       ? t("settings.desktopUpdateDownloading", {
           progress:
-            desktopUpdateState.progress === null
+            appUpdateState.progress === null
               ? ""
-              : ` ${desktopUpdateState.progress}%`
+              : ` ${appUpdateState.progress}%`
         })
-      : desktopUpdateState.phase === "restarting"
-      ? t("settings.desktopUpdateRestarting")
-      : desktopUpdateState.phase === "failed"
-      ? desktopUpdateIssueText ?? t("settings.desktopUpdateError")
-      : desktopUpdateCurrentVersion
+      : appUpdateState.phase === "restarting"
+      ? appUpdateState.kind === "android"
+        ? t("settings.androidUpdateInstallerOpened")
+        : t("settings.desktopUpdateRestarting")
+      : appUpdateState.phase === "failed"
+      ? appUpdateIssueText ?? t("settings.desktopUpdateError")
+      : appUpdateCurrentVersion
       ? t("settings.desktopUpdateCurrent", {
-          version: desktopUpdateCurrentVersion
+          version: appUpdateCurrentVersion
         })
       : t("settings.desktopUpdateCurrentUnknown");
 
-  const desktopUpdatePrimaryActionLabel =
-    desktopUpdateState.phase === "checking"
+  const appUpdatePrimaryActionLabel =
+    appUpdateState.phase === "checking"
       ? t("settings.desktopUpdateCheckingAction")
-      : desktopUpdateState.phase === "available"
+      : appUpdateState.phase === "available"
       ? t("settings.desktopUpdateInstall")
-      : desktopUpdateState.phase === "downloading" ||
-        desktopUpdateState.phase === "restarting"
+      : appUpdateState.phase === "downloading" ||
+        appUpdateState.phase === "restarting"
       ? t("settings.desktopUpdateInstalling")
-      : desktopUpdateState.phase === "failed" && desktopUpdateState.canRetryInstall
+      : appUpdateState.phase === "failed" &&
+        appUpdateState.issueCode === "android-install-permission-required"
+      ? t("settings.androidUpdateAllowInstall")
+      : appUpdateState.phase === "failed" && appUpdateState.canRetryInstall
       ? t("settings.desktopUpdateRetry")
       : t("settings.desktopUpdateCheck");
 
-  const desktopUpdatePrimaryAction =
-    desktopUpdateState.phase === "available"
-      ? handleInstallDesktopUpdate
-      : desktopUpdateState.phase === "failed" && desktopUpdateState.canRetryInstall
-      ? handleRetryDesktopUpdate
-      : handleCheckDesktopUpdates;
+  const appUpdatePrimaryAction =
+    appUpdateState.phase === "available"
+      ? handleInstallAppUpdate
+      : appUpdateState.phase === "failed" &&
+        appUpdateState.issueCode === "android-install-permission-required"
+      ? handleResolveAppUpdatePermissionIssue
+      : appUpdateState.phase === "failed" && appUpdateState.canRetryInstall
+      ? handleRetryAppUpdate
+      : handleCheckAppUpdates;
 
-  const desktopUpdatePrimaryActionDisabled =
-    desktopUpdateState.phase === "checking" ||
-    desktopUpdateState.phase === "downloading" ||
-    desktopUpdateState.phase === "restarting";
+  const appUpdatePrimaryActionDisabled =
+    appUpdateState.phase === "checking" ||
+    appUpdateState.phase === "downloading" ||
+    appUpdateState.phase === "restarting";
 
   const shouldShowOpenReleaseAction =
-    desktopUpdateState.canOpenReleasePage &&
-    (desktopUpdateState.phase === "available" || desktopUpdateState.phase === "failed");
+    appUpdateState.canOpenReleasePage &&
+    (appUpdateState.phase === "available" || appUpdateState.phase === "failed");
   const currentAccentThemeId = resolveAppAccentThemeId(accentThemeId);
   const currentAccentTheme = getAppAccentTheme(currentAccentThemeId);
   const hasGeminiKey = aiKeyDraft.trim().length > 0;
@@ -788,6 +810,53 @@ export default function SettingsPanel({
       })}
     </div>
   );
+
+  const renderOrbitalAnimationOptions = () => {
+    const options: Array<{
+      mode: OrbitalAnimationMode;
+      title: string;
+      chip: string;
+      description: string;
+    }> = [
+      {
+        mode: "full",
+        title: t("settings.interfaceMotionFullTitle"),
+        chip: t("settings.interfaceMotionFullChip"),
+        description: t("settings.interfaceMotionFullDescription")
+      },
+      {
+        mode: "reduced",
+        title: t("settings.interfaceMotionReducedTitle"),
+        chip: t("settings.interfaceMotionReducedChip"),
+        description: t("settings.interfaceMotionReducedDescription")
+      }
+    ];
+
+    return (
+      <div className="settings-interface-motion-grid" role="radiogroup" aria-label={t("settings.interfaceMotionTitle")}>
+        {options.map((option) => {
+          const active = orbitalAnimationMode === option.mode;
+
+          return (
+            <button
+              key={option.mode}
+              type="button"
+              className={`settings-interface-motion-option ${active ? "is-active" : ""}`}
+              onClick={() => onOrbitalAnimationModeChange(option.mode)}
+              role="radio"
+              aria-checked={active}
+            >
+              <span className="settings-interface-motion-option-head">
+                <strong>{option.title}</strong>
+                <span>{option.chip}</span>
+              </span>
+              <p>{option.description}</p>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   if (view === "sync") {
     return (
@@ -1372,6 +1441,18 @@ export default function SettingsPanel({
 
             {renderAccentThemeOptions(true)}
           </section>
+
+          <section className="settings-panel-block settings-panel-block-primary settings-interface-motion-block">
+            <div className="settings-panel-block-head">
+              <div>
+                <p className="panel-kicker settings-panel-block-kicker">{t("settings.interfaceMotionKicker")}</p>
+                <h3 className="settings-interface-motion-title">{t("settings.interfaceMotionTitle")}</h3>
+                <p className="settings-interface-motion-caption">{t("settings.interfaceMotionDescription")}</p>
+              </div>
+            </div>
+
+            {renderOrbitalAnimationOptions()}
+          </section>
         </div>
       </section>
     );
@@ -1542,7 +1623,7 @@ export default function SettingsPanel({
           </div>
         </section>
 
-        {desktopUpdatesEnabled ? (
+        {appUpdatesEnabled ? (
           <section className="settings-panel-block settings-panel-block-updater">
             <div className="settings-panel-block-head">
               <p className="panel-kicker settings-panel-block-kicker">{t("settings.app")}</p>
@@ -1555,48 +1636,52 @@ export default function SettingsPanel({
                 </span>
                 <div className="settings-row-copy settings-update-copy">
                   <strong>{t("settings.desktopUpdateTitle")}</strong>
-                  <span>{desktopUpdateDescription}</span>
-                  {desktopUpdateState.releaseBody ? (
-                    <p className="settings-update-note">{desktopUpdateState.releaseBody}</p>
+                  <span>{appUpdateDescription}</span>
+                  {appUpdateState.releaseBody ? (
+                    <p className="settings-update-note">{appUpdateState.releaseBody}</p>
                   ) : null}
-                  {desktopUpdatePublishedLabel ? (
+                  {appUpdatePublishedLabel ? (
                     <p className="settings-update-meta">
                       {t("settings.desktopUpdatePublished", {
-                        date: desktopUpdatePublishedLabel
+                        date: appUpdatePublishedLabel
                       })}
                     </p>
                   ) : null}
-                  {desktopUpdateState.phase === "failed" && desktopUpdateIssueText ? (
-                    <p className="settings-update-error">{desktopUpdateIssueText}</p>
+                  {appUpdateState.phase === "failed" && appUpdateIssueText ? (
+                    <p className="settings-update-error">{appUpdateIssueText}</p>
                   ) : null}
-                  {desktopUpdateState.issueDetail ? (
+                  {appUpdateState.issueDetail ? (
                     <p className="settings-update-detail">
                       {t("settings.desktopUpdateDetail", {
-                        detail: desktopUpdateState.issueDetail
+                        detail: appUpdateState.issueDetail
                       })}
                     </p>
                   ) : null}
-                  {desktopUpdateState.phase === "downloading" &&
-                  desktopUpdateState.progress !== null ? (
+                  {appUpdateState.phase === "downloading" &&
+                  appUpdateState.progress !== null ? (
                     <div
                       className="settings-update-progress"
                       role="progressbar"
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-valuenow={desktopUpdateState.progress}
+                      aria-valuenow={appUpdateState.progress}
                     >
                       <span
                         className="settings-update-progress-fill"
-                        style={{ width: `${desktopUpdateState.progress}%` }}
+                        style={{ width: `${appUpdateState.progress}%` }}
                       />
                     </div>
                   ) : null}
-                  <p className="settings-update-hint">{t("settings.desktopUpdateHint")}</p>
+                  <p className="settings-update-hint">
+                    {appUpdateState.kind === "android"
+                      ? t("settings.androidUpdateHint")
+                      : t("settings.desktopUpdateHint")}
+                  </p>
                 </div>
                 <div className="settings-update-side">
                   <span className="settings-row-count">
                     {t("settings.appVersionChip", {
-                      version: desktopUpdateCurrentVersion ?? "—"
+                      version: appUpdateCurrentVersion ?? "—"
                     })}
                   </span>
                   <div className="settings-update-actions">
@@ -1604,20 +1689,20 @@ export default function SettingsPanel({
                       type="button"
                       className="settings-row-action"
                       onClick={() => {
-                        void desktopUpdatePrimaryAction();
+                        void appUpdatePrimaryAction();
                       }}
-                      disabled={desktopUpdatePrimaryActionDisabled}
+                      disabled={appUpdatePrimaryActionDisabled}
                     >
-                      <span>{desktopUpdatePrimaryActionLabel}</span>
+                      <span>{appUpdatePrimaryActionLabel}</span>
                     </button>
                     {shouldShowOpenReleaseAction ? (
                       <button
                         type="button"
                         className="settings-row-action settings-row-action-secondary"
                         onClick={() => {
-                          void handleOpenDesktopReleasePage();
+                          void handleOpenAppReleasePage();
                         }}
-                        disabled={desktopUpdatePrimaryActionDisabled}
+                        disabled={appUpdatePrimaryActionDisabled}
                       >
                         <span>{t("settings.desktopUpdateOpenRelease")}</span>
                       </button>

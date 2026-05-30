@@ -5,7 +5,6 @@ import {
   removeDataStore,
   type DataStoreIdentifier
 } from "@tauri-apps/api/app";
-import { isTauri } from "@tauri-apps/api/core";
 import { BaseDirectory, mkdir, readDir, remove } from "@tauri-apps/plugin-fs";
 
 import {
@@ -24,11 +23,8 @@ import {
 } from "./desktopRuntimeLayout";
 import { listLocalVaultProfiles } from "./localVaults";
 import { readDesktopVaultBackup } from "./desktopVaultBackups";
+import { isDesktopRuntime } from "./runtime";
 import { writeNativeVaultSnapshot } from "./nativeVaultStore";
-
-function isDesktopRuntime() {
-  return isTauri() && typeof window !== "undefined";
-}
 
 function isWindowsDesktopRuntime() {
   return isDesktopRuntime() && /Windows/i.test(window.navigator.userAgent);

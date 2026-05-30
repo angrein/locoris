@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.locoris.android",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Locoris",
+        "url": "index.html",
+        "create": true,
+        "visible": true,
+        "fullscreen": false,
+        "resizable": true
+      }
+    ]
+  },
+  "bundle": {
+    "android": {
+      "debugApplicationIdSuffix": ".debug",
+      "minSdkVersion": 24
+    }
+  }
+}

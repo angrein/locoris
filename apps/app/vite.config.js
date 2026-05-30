@@ -8,7 +8,9 @@ export default defineConfig(({ mode }) => {
         },
         plugins: [react()],
         server: {
-            port: 4173
+            host: "0.0.0.0",
+            port: 4173,
+            strictPort: true
         }
     };
 });

@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 
 import type { LocalVaultKind, LocalVaultProfile } from "../lib/localVaults";
 import { getDisplayVaultName } from "../lib/displayNames";
+import { getErrorMessage } from "../lib/errors";
 import {
   connectGoogleDriveAccount,
   createHostedVault,
@@ -386,6 +387,8 @@ function translateSyncManagerError(message: string, t: ReturnType<typeof useTran
       return t("sync.googleDriveAuthRequired");
     case "GOOGLE_DRIVE_CLIENT_ID_REQUIRED":
       return t("sync.googleDriveClientIdRequired");
+    case "GOOGLE_OAUTH_ANDROID_CONFIG_INVALID":
+      return t("sync.googleDriveAndroidConfigInvalid");
     case "GOOGLE_OAUTH_INVALID_REQUEST":
       return t("sync.googleDriveDesktopConfigInvalid");
     case "GOOGLE_OAUTH_NOT_READY":
@@ -406,7 +409,12 @@ function translateSyncManagerError(message: string, t: ReturnType<typeof useTran
       return t("sync.googleDriveAuthInProgress");
     case "GOOGLE_OAUTH_SCRIPT_FAILED":
     case "GOOGLE_OAUTH_UNAVAILABLE":
+    case "NETWORK_ERROR":
       return t("sync.googleDriveSdkFailed");
+    case "GOOGLE_OAUTH_FAILED":
+      return t("sync.googleDriveOAuthFailed");
+    case "GOOGLE_PLAY_SERVICES_UNAVAILABLE":
+      return t("sync.googleDrivePlayServicesUnavailable");
     case "ENCRYPTED_SYNC_NOT_IMPLEMENTED":
       return t("sync.googleDriveEncryptedPending");
     case "INVALID_PASSPHRASE":
@@ -685,7 +693,7 @@ export default function SyncSettingsPanel({
         try {
           remoteVaults = await fetchRemoteVaults(targetConnection);
         } catch (error) {
-          const message = error instanceof Error ? error.message : "SYNC_FAILED";
+          const message = getErrorMessage(error);
 
           if (targetConnection.provider === "googleDrive" && message === "GOOGLE_DRIVE_AUTH_REQUIRED") {
             targetConnection = await reauthorizeGoogleDriveConnection(targetConnection, {
@@ -709,7 +717,7 @@ export default function SyncSettingsPanel({
 
         return remoteVaults;
       } catch (error) {
-        const message = error instanceof Error ? error.message : "SYNC_FAILED";
+        const message = getErrorMessage(error);
 
         setRemoteVaultErrors((current) => ({
           ...current,
@@ -899,7 +907,7 @@ export default function SyncSettingsPanel({
           return;
         }
 
-        const message = error instanceof Error ? error.message : "GOOGLE_OAUTH_SCRIPT_FAILED";
+        const message = getErrorMessage(error, "GOOGLE_OAUTH_SCRIPT_FAILED");
         setGoogleDriveOAuthState("error");
         setGoogleDriveOAuthError(translateSyncManagerError(message, t));
       });
@@ -1200,7 +1208,7 @@ export default function SyncSettingsPanel({
       }
       closeModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       showFeedback("error", translateSyncManagerError(message, t));
     }
   };
@@ -1274,7 +1282,7 @@ export default function SyncSettingsPanel({
 
       closeModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       const translated = translateSyncManagerError(message, t);
 
       setSelfHostedDraftError(translated);
@@ -1340,7 +1348,7 @@ export default function SyncSettingsPanel({
       showFeedback("success", hostedMode === "register" ? t("sync.hostedAccountCreated") : t("sync.hostedLoggedIn"));
       closeModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       showFeedback("error", translateSyncManagerError(message, t));
     } finally {
       setBusyKey(null);
@@ -1388,7 +1396,7 @@ export default function SyncSettingsPanel({
       showFeedback("success", t("sync.googleDriveConnected"));
       closeModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       showFeedback("error", translateSyncManagerError(message, t));
     } finally {
       setBusyKey(null);
@@ -1580,7 +1588,7 @@ export default function SyncSettingsPanel({
               })
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : "SYNC_FAILED";
+        const message = getErrorMessage(error);
         showFeedback("error", translateSyncManagerError(message, t));
       } finally {
         setBusyKey(null);
@@ -1617,7 +1625,7 @@ export default function SyncSettingsPanel({
           silent: false
         }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       showFeedback("error", translateSyncManagerError(message, t));
       return;
     }
@@ -1730,7 +1738,7 @@ export default function SyncSettingsPanel({
               })
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : "SYNC_FAILED";
+        const message = getErrorMessage(error);
         showFeedback("error", translateSyncManagerError(message, t));
       } finally {
         setBusyKey(null);
@@ -1815,7 +1823,7 @@ export default function SyncSettingsPanel({
             })
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       showFeedback("error", translateSyncManagerError(message, t));
     } finally {
       setBusyKey(null);
@@ -1936,7 +1944,7 @@ export default function SyncSettingsPanel({
         }));
         showFeedback("success", t("sync.bindingUpdated"));
       } catch (error) {
-        const message = error instanceof Error ? error.message : "SYNC_FAILED";
+        const message = getErrorMessage(error);
         setConnectionAvailability((current) => ({
           ...current,
           [connection.id]:
@@ -2000,7 +2008,7 @@ export default function SyncSettingsPanel({
         }));
         showFeedback("success", t("settings.bindAllCompleted", { count: sortedVaults.length }));
       } catch (error) {
-        const message = error instanceof Error ? error.message : "SYNC_FAILED";
+        const message = getErrorMessage(error);
         setConnectionAvailability((current) => ({
           ...current,
           [connection.id]:
@@ -2163,7 +2171,7 @@ export default function SyncSettingsPanel({
         });
         closeModal();
       } catch (error) {
-        const message = error instanceof Error ? error.message : "SYNC_FAILED";
+        const message = getErrorMessage(error);
         showFeedback("error", translateSyncManagerError(message, t));
       } finally {
         setBusyKey(null);
@@ -2193,7 +2201,7 @@ export default function SyncSettingsPanel({
         }
 
       } catch (error) {
-        const message = error instanceof Error ? error.message : "SYNC_FAILED";
+        const message = getErrorMessage(error);
         showFeedback("error", translateSyncManagerError(message, t));
       } finally {
         setBusyKey(null);
@@ -2242,7 +2250,7 @@ export default function SyncSettingsPanel({
       });
       closeModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       showFeedback("error", translateSyncManagerError(message, t));
     } finally {
       setBusyKey(null);
@@ -2272,7 +2280,7 @@ export default function SyncSettingsPanel({
       });
       closeModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       showFeedback("error", translateSyncManagerError(message, t));
     } finally {
       setBusyKey(null);
@@ -2286,7 +2294,7 @@ export default function SyncSettingsPanel({
       await onLockVaultEncryption(vault.id);
       closeModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       showFeedback("error", translateSyncManagerError(message, t));
     } finally {
       setBusyKey(null);
@@ -2765,7 +2773,7 @@ export default function SyncSettingsPanel({
                                       setBusyKey(`reauth:${connection.id}`);
                                       nextConnection = await reauthorizeGoogleDriveConnection(connection);
                                     } catch (error) {
-                                      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+                                      const message = getErrorMessage(error);
                                       showFeedback("error", translateSyncManagerError(message, t));
                                       setBusyKey(null);
                                       return;
@@ -2857,7 +2865,7 @@ export default function SyncSettingsPanel({
                                           });
                                         } catch (error) {
                                           const message =
-                                            error instanceof Error ? error.message : "SYNC_FAILED";
+                                            getErrorMessage(error);
                                           showFeedback("error", translateSyncManagerError(message, t));
                                         } finally {
                                           setBusyKey((current) =>

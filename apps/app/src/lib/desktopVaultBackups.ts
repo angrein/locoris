@@ -1,7 +1,7 @@
-import { isTauri } from "@tauri-apps/api/core";
 import { BaseDirectory, exists, mkdir, readTextFile, remove, writeTextFile } from "@tauri-apps/plugin-fs";
 
 import { DESKTOP_VAULT_BACKUP_DIRECTORY } from "./desktopRuntimeLayout";
+import { isDesktopRuntime } from "./runtime";
 import type { DesktopLocalVaultBackup } from "../types";
 
 const DESKTOP_VAULT_BACKUP_SCHEMA_VERSION = 1;
@@ -43,7 +43,7 @@ async function ensureDesktopVaultBackupDirectory() {
 }
 
 export function supportsDesktopVaultBackups() {
-  return isTauri();
+  return isDesktopRuntime();
 }
 
 export async function hasDesktopVaultBackup(localVaultId: string) {

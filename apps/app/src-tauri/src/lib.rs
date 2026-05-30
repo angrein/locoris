@@ -1,3 +1,4 @@
+#[cfg(desktop)]
 use keyring::{Entry, Error as KeyringError};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -11,8 +12,11 @@ use std::{
   thread,
   time::{Duration, Instant},
 };
-use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, Runtime, State};
+#[cfg(desktop)]
+use tauri::{WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
+#[cfg(desktop)]
 use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 const DESKTOP_DATA_DIRECTORY: &str = "data";
@@ -72,6 +76,44 @@ struct DesktopGoogleOauthTokenResponse {
   error_description: Option<String>,
 }
 
+#[cfg(target_os = "android")]
+mod android_bridge {
+  use serde::de::DeserializeOwned;
+  use serde_json::Value;
+  use tauri::{
+    plugin::{PluginHandle, TauriPlugin},
+    AppHandle, Manager, Runtime,
+  };
+
+  const PLUGIN_IDENTIFIER: &str = "com.locoris.android";
+
+  pub struct LocorisAndroidPlugin<R: Runtime>(PluginHandle<R>);
+
+  pub fn init<R: Runtime>() -> TauriPlugin<R> {
+    tauri::plugin::Builder::new("locorisAndroid")
+      .setup(|app, api| {
+        let handle = api.register_android_plugin(PLUGIN_IDENTIFIER, "LocorisAndroidPlugin")?;
+        app.manage(LocorisAndroidPlugin(handle));
+        Ok(())
+      })
+      .build()
+  }
+
+  pub fn run<R, T>(app: &AppHandle<R>, command: &str, payload: Value) -> Result<T, String>
+  where
+    R: Runtime,
+    T: DeserializeOwned,
+  {
+    let plugin = app.state::<LocorisAndroidPlugin<R>>();
+    plugin
+      .inner()
+      .0
+      .run_mobile_plugin(command, payload)
+      .map_err(|error| error.to_string())
+  }
+}
+
+#[cfg(desktop)]
 fn secure_secret_service_name(identifier: &str) -> String {
   let normalized_identifier = if identifier.trim().is_empty() {
     "com.locoris.desktop"
@@ -82,6 +124,7 @@ fn secure_secret_service_name(identifier: &str) -> String {
   format!("{normalized_identifier}.secure-secrets")
 }
 
+#[cfg(desktop)]
 fn sanitize_secure_secret_key(key: &str) -> Result<String, String> {
   let normalized_key = key.trim();
 
@@ -92,6 +135,7 @@ fn sanitize_secure_secret_key(key: &str) -> Result<String, String> {
   Ok(normalized_key.to_string())
 }
 
+#[cfg(desktop)]
 fn open_secure_secret_entry<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<Entry, String> {
   Entry::new(
     &secure_secret_service_name(&app.config().identifier),
@@ -164,6 +208,7 @@ fn build_runtime_version_token(identifier: &str, version: &str) -> String {
   .collect()
 }
 
+#[cfg(target_os = "macos")]
 fn fnv1a32(input: &str, seed: u32) -> u32 {
   let mut hash = seed;
 
@@ -175,6 +220,7 @@ fn fnv1a32(input: &str, seed: u32) -> u32 {
   hash
 }
 
+#[cfg(target_os = "macos")]
 fn u32_to_bytes(value: u32) -> [u8; 4] {
   [
     (value & 0xff) as u8,
@@ -184,6 +230,7 @@ fn u32_to_bytes(value: u32) -> [u8; 4] {
   ]
 }
 
+#[cfg(target_os = "macos")]
 fn build_macos_data_store_identifier(identifier: &str, version: &str) -> [u8; 16] {
   let seed_source = format!(
     "{}@{}",
@@ -316,10 +363,12 @@ fn ensure_runtime_layout<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<
   Ok(())
 }
 
+#[cfg(desktop)]
 fn desktop_window_state_flags() -> StateFlags {
   StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED | StateFlags::FULLSCREEN
 }
 
+#[cfg(desktop)]
 fn show_and_focus_window<R: Runtime>(
   window: &WebviewWindow<R>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -329,6 +378,7 @@ fn show_and_focus_window<R: Runtime>(
   Ok(())
 }
 
+#[cfg(desktop)]
 fn restore_and_present_main_window<R: Runtime>(
   window: &WebviewWindow<R>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -339,6 +389,7 @@ fn restore_and_present_main_window<R: Runtime>(
   show_and_focus_window(window)
 }
 
+#[cfg(desktop)]
 fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
   let window_config = app
     .config()
@@ -375,6 +426,7 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std:
   Ok(())
 }
 
+#[cfg(desktop)]
 fn focus_existing_main_window<R: Runtime>(
   app: &AppHandle<R>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -924,6 +976,123 @@ fn native_vault_store_delete<R: Runtime>(
   Ok(())
 }
 
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn android_google_drive_check_availability<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+  let _: Value = android_bridge::run(&app, "googleDriveCheckAvailability", serde_json::json!({}))?;
+  Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+fn android_google_drive_check_availability() -> Result<(), String> {
+  Err("GOOGLE_OAUTH_UNAVAILABLE".into())
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn android_google_drive_authorize<R: Runtime>(
+  app: AppHandle<R>,
+  scopes: Vec<String>,
+  silent: bool,
+) -> Result<Value, String> {
+  android_bridge::run(
+    &app,
+    "googleDriveAuthorize",
+    serde_json::json!({
+      "scopes": scopes,
+      "silent": silent
+    }),
+  )
+}
+
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+fn android_google_drive_authorize(_scopes: Vec<String>, _silent: bool) -> Result<Value, String> {
+  Err("GOOGLE_OAUTH_UNAVAILABLE".into())
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn android_google_drive_clear_token<R: Runtime>(
+  app: AppHandle<R>,
+  token: String,
+) -> Result<(), String> {
+  let _: Value = android_bridge::run(
+    &app,
+    "googleDriveClearToken",
+    serde_json::json!({
+      "token": token
+    }),
+  )?;
+  Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+fn android_google_drive_clear_token(_token: String) -> Result<(), String> {
+  Err("GOOGLE_OAUTH_UNAVAILABLE".into())
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn android_install_apk_update<R: Runtime>(
+  app: AppHandle<R>,
+  url: String,
+  file_name: String,
+  expected_package_name: String,
+) -> Result<Value, String> {
+  android_bridge::run(
+    &app,
+    "installApkUpdate",
+    serde_json::json!({
+      "url": url,
+      "fileName": file_name,
+      "expectedPackageName": expected_package_name
+    }),
+  )
+}
+
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+fn android_install_apk_update(
+  _url: String,
+  _file_name: String,
+  _expected_package_name: String,
+) -> Result<Value, String> {
+  Err("ANDROID_UPDATE_UNAVAILABLE".into())
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn android_open_install_permission_settings<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+  let _: Value = android_bridge::run(
+    &app,
+    "openInstallPermissionSettings",
+    serde_json::json!({}),
+  )?;
+  Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+fn android_open_install_permission_settings() -> Result<(), String> {
+  Err("ANDROID_UPDATE_UNAVAILABLE".into())
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn android_get_package_name<R: Runtime>(app: AppHandle<R>) -> Result<Value, String> {
+  android_bridge::run(&app, "getPackageName", serde_json::json!({}))
+}
+
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+fn android_get_package_name() -> Result<Value, String> {
+  Err("ANDROID_UPDATE_UNAVAILABLE".into())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 fn secure_secret_get<R: Runtime>(app: AppHandle<R>, key: String) -> Result<Option<String>, String> {
   let entry = open_secure_secret_entry(&app, &key)?;
@@ -935,6 +1104,7 @@ fn secure_secret_get<R: Runtime>(app: AppHandle<R>, key: String) -> Result<Optio
   }
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 fn secure_secret_set<R: Runtime>(
   app: AppHandle<R>,
@@ -948,6 +1118,7 @@ fn secure_secret_set<R: Runtime>(
     .map_err(|error| format!("failed to write secure secret: {error}"))
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 fn secure_secret_delete<R: Runtime>(app: AppHandle<R>, key: String) -> Result<(), String> {
   let entry = open_secure_secret_entry(&app, &key)?;
@@ -956,6 +1127,100 @@ fn secure_secret_delete<R: Runtime>(app: AppHandle<R>, key: String) -> Result<()
     Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
     Err(error) => Err(format!("failed to delete secure secret: {error}")),
   }
+}
+
+#[cfg(target_os = "android")]
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AndroidSecureSecretGetResponse {
+  value: Option<String>,
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn secure_secret_get<R: Runtime>(app: AppHandle<R>, key: String) -> Result<Option<String>, String> {
+  if key.trim().is_empty() {
+    return Err("secure secret key is required".into());
+  }
+
+  let response: AndroidSecureSecretGetResponse = android_bridge::run(
+    &app,
+    "secureSecretGet",
+    serde_json::json!({
+      "key": key
+    }),
+  )?;
+
+  Ok(response.value)
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn secure_secret_set<R: Runtime>(
+  app: AppHandle<R>,
+  key: String,
+  value: String,
+) -> Result<(), String> {
+  if key.trim().is_empty() {
+    return Err("secure secret key is required".into());
+  }
+
+  let _: Value = android_bridge::run(
+    &app,
+    "secureSecretSet",
+    serde_json::json!({
+      "key": key,
+      "value": value
+    }),
+  )?;
+  Ok(())
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn secure_secret_delete<R: Runtime>(app: AppHandle<R>, key: String) -> Result<(), String> {
+  if key.trim().is_empty() {
+    return Err("secure secret key is required".into());
+  }
+
+  let _: Value = android_bridge::run(
+    &app,
+    "secureSecretDelete",
+    serde_json::json!({
+      "key": key
+    }),
+  )?;
+  Ok(())
+}
+
+#[cfg(all(not(desktop), not(target_os = "android")))]
+#[tauri::command]
+fn secure_secret_get(key: String) -> Result<Option<String>, String> {
+  if key.trim().is_empty() {
+    return Err("secure secret key is required".into());
+  }
+
+  Ok(None)
+}
+
+#[cfg(all(not(desktop), not(target_os = "android")))]
+#[tauri::command]
+fn secure_secret_set(key: String, _value: String) -> Result<(), String> {
+  if key.trim().is_empty() {
+    return Err("secure secret key is required".into());
+  }
+
+  Ok(())
+}
+
+#[cfg(all(not(desktop), not(target_os = "android")))]
+#[tauri::command]
+fn secure_secret_delete(key: String) -> Result<(), String> {
+  if key.trim().is_empty() {
+    return Err("secure secret key is required".into());
+  }
+
+  Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -985,14 +1250,24 @@ pub fn run() {
     }));
   }
 
-  let builder = builder.manage(DesktopGoogleOauthState::default());
+  #[cfg(target_os = "android")]
+  {
+    builder = builder.plugin(android_bridge::init());
+  }
 
-  builder
+  builder = builder
+    .manage(DesktopGoogleOauthState::default())
     .invoke_handler(tauri::generate_handler![
       desktop_google_oauth_prepare_loopback,
       desktop_google_oauth_wait_for_callback,
       desktop_google_oauth_exchange_code,
       desktop_google_oauth_refresh_token,
+      android_google_drive_check_availability,
+      android_google_drive_authorize,
+      android_google_drive_clear_token,
+      android_install_apk_update,
+      android_open_install_permission_settings,
+      android_get_package_name,
       native_vault_store_read,
       native_vault_store_write,
       native_vault_store_delete,
@@ -1010,21 +1285,30 @@ pub fn run() {
         .build(),
     )
     .plugin(tauri_plugin_opener::init())
-    .plugin(tauri_plugin_process::init())
-    .plugin(tauri_plugin_store::Builder::new().build())
-    .plugin(tauri_plugin_updater::Builder::new().build())
-    .plugin(
-      tauri_plugin_window_state::Builder::default()
-        .with_state_flags(desktop_window_state_flags())
-        .skip_initial_state("main")
-        .build(),
-    )
+    .plugin(tauri_plugin_store::Builder::new().build());
+
+  #[cfg(desktop)]
+  {
+    builder = builder
+      .plugin(tauri_plugin_process::init())
+      .plugin(tauri_plugin_updater::Builder::new().build())
+      .plugin(
+        tauri_plugin_window_state::Builder::default()
+          .with_state_flags(desktop_window_state_flags())
+          .skip_initial_state("main")
+          .build(),
+      );
+  }
+
+  builder
     .setup(|app| {
       ensure_runtime_layout(app)?;
 
+      #[cfg(desktop)]
       create_main_window(&app.handle())?;
+
       Ok(())
     })
     .run(tauri::generate_context!())
-    .expect("error while running Locoris desktop application");
+    .expect("error while running Locoris application");
 }

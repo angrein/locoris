@@ -1,5 +1,3 @@
-import { isTauri } from "@tauri-apps/api/core";
-
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
 import {
   readPersistentString,
@@ -7,6 +5,7 @@ import {
   writePersistentString
 } from "./persistentClientStorage";
 import { saveDesktopWindowState } from "./desktopWindowState";
+import { isDesktopRuntime } from "./runtime";
 
 const DESKTOP_UPDATE_ATTEMPT_STORAGE_KEY = "locoris:desktop-update:attempt";
 const DESKTOP_RELEASE_REPOSITORY = "angrein/locoris";
@@ -63,15 +62,15 @@ type ValidatedAvailableUpdate = {
 const desktopUpdateListeners = new Set<(snapshot: DesktopUpdateSnapshot) => void>();
 
 let desktopUpdateSnapshot: DesktopUpdateSnapshot = {
-  supported: isTauri(),
+  supported: isDesktopRuntime(),
   currentVersion: null,
-  phase: isTauri() ? "idle" : "unsupported",
+  phase: isDesktopRuntime() ? "idle" : "unsupported",
   availableVersion: null,
   releaseBody: null,
   releaseDate: null,
   releaseUrl: null,
   progress: null,
-  issueCode: isTauri() ? null : "unsupported",
+  issueCode: isDesktopRuntime() ? null : "unsupported",
   issueDetail: null,
   checkedAt: null,
   lastAttemptedVersion: null,
@@ -300,7 +299,7 @@ async function getUpdaterApi() {
 }
 
 export function supportsDesktopUpdates() {
-  return isTauri();
+  return isDesktopRuntime();
 }
 
 export async function getDesktopAppVersion() {

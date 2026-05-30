@@ -20,3 +20,13 @@ apps/**/.env.*
 apps/**/.data/
 
 coverage/
+
+# Native build outputs and private signing material
+apps/app/src-tauri/target/
+apps/app/src-tauri/gen/android/**/build/
+apps/app/src-tauri/gen/android/**/.gradle/
+apps/app/src-tauri/gen/android/.idea/
+*.apk
+*.aab
+*.keystore
+*.jks

@@ -1,0 +1,860 @@
+.orbital-overlay.is-android-runtime {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.orbital-overlay.is-android-runtime button,
+.orbital-overlay.is-android-runtime input,
+.orbital-overlay.is-android-runtime textarea,
+.orbital-overlay.is-android-runtime select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.orbital-overlay.is-android-runtime .orbital-command-bar,
+.orbital-overlay.is-android-runtime .orbital-filter-shell,
+.orbital-overlay.is-android-runtime .orbital-filter-dock .orbital-searchbar,
+.orbital-overlay.is-android-runtime .orbital-mobile-topbar,
+.orbital-overlay.is-android-runtime .orbital-mobile-project-chip,
+.orbital-overlay.is-android-runtime .orbital-mobile-map-controls,
+.orbital-overlay.is-android-runtime .orbital-mobile-selection-sheet,
+.orbital-overlay.is-android-runtime .orbital-mobile-bottom-nav,
+.orbital-overlay.is-android-runtime .orbital-mobile-menu-backdrop,
+.orbital-overlay.is-android-runtime .orbital-mobile-menu-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.orbital-overlay.is-android-runtime .orbital-mobile-nav-glyph {
+  filter: none;
+}
+
+.orbital-overlay.is-android-runtime .orbital-scene {
+  shape-rendering: auto;
+  text-rendering: optimizeSpeed;
+}
+
+.orbital-overlay.is-android-runtime .orbital-selection-ring {
+  animation: none;
+}
+
+.orbital-overlay.is-android-runtime .orbital-tree-item,
+.orbital-overlay.is-android-runtime .orbital-menu-compact-item,
+.orbital-overlay.is-android-runtime .orbital-command-button,
+.orbital-overlay.is-android-runtime .orbital-toolbar-action,
+.orbital-overlay.is-android-runtime .toolbar-action,
+.orbital-overlay.is-android-runtime .micro-action {
+  min-height: 44px;
+}
+
+.orbital-overlay.is-android-tablet-landscape-shell .orbital-tree-item,
+.orbital-overlay.is-android-tablet-landscape-shell .orbital-menu-compact-item,
+.orbital-overlay.is-android-tablet-landscape-shell .orbital-command-button,
+.orbital-overlay.is-android-tablet-landscape-shell .orbital-toolbar-action,
+.orbital-overlay.is-android-tablet-landscape-shell .toolbar-action {
+  min-height: 42px;
+}
+
+.orbital-overlay.is-android-mobile-shell {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding:
+    max(10px, env(safe-area-inset-top))
+    max(10px, env(safe-area-inset-right))
+    max(10px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-command-bar {
+  display: none;
+}
+
+.orbital-mobile-topbar,
+.orbital-mobile-bottom-nav,
+.orbital-mobile-menu-layer {
+  position: relative;
+  z-index: 12;
+}
+
+.orbital-mobile-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 9px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 12%, transparent), transparent 44%),
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.74), rgb(var(--surface-deep-rgb) / 0.62)),
+    rgb(var(--surface-deep-rgb) / 0.68);
+  box-shadow:
+    0 18px 46px rgba(2, 5, 15, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  backdrop-filter: blur(20px) saturate(128%);
+}
+
+.orbital-mobile-topbar.is-map-section {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.orbital-mobile-vault {
+  min-width: 0;
+}
+
+.orbital-mobile-vault .vault-switcher-trigger-label {
+  display: none;
+}
+
+.orbital-mobile-vault .vault-switcher {
+  min-width: 0;
+  max-width: none;
+}
+
+.orbital-mobile-vault .vault-switcher-head {
+  display: grid;
+}
+
+.orbital-mobile-vault .vault-switcher-trigger {
+  min-height: 40px;
+}
+
+.orbital-mobile-vault .vault-switcher-trigger-copy strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-mobile-project-chip,
+.orbital-mobile-animation-action,
+.orbital-mobile-search,
+.orbital-mobile-bottom-nav button,
+.orbital-mobile-map-controls button,
+.orbital-mobile-selection-actions button,
+.orbital-mobile-inspector-actions button,
+.orbital-mobile-conflict-actions button,
+.orbital-mobile-menu-grid button,
+.orbital-mobile-menu-close {
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.026);
+  color: var(--text);
+  font: inherit;
+}
+
+.orbital-mobile-project-chip {
+  min-width: 0;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 0 10px;
+  border-radius: 16px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.orbital-mobile-project-chip span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-mobile-project-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--orbital-scene-accent, var(--accent-theme-primary, var(--gold)));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--orbital-scene-accent, var(--accent-theme-primary, var(--gold))) 54%, transparent);
+}
+
+.orbital-mobile-animation-action {
+  min-width: 0;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 11px;
+  border-radius: 16px;
+  color: color-mix(in srgb, var(--text) 84%, var(--accent-theme-primary, var(--gold)) 16%);
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.orbital-mobile-animation-action[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 24%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 13%, transparent), transparent 58%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.orbital-mobile-animation-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--accent-theme-primary, var(--gold));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 54%, transparent);
+}
+
+.orbital-mobile-animation-action[aria-pressed="true"] .orbital-mobile-animation-dot {
+  background: color-mix(in srgb, var(--text-dim) 76%, var(--accent-theme-primary, var(--gold)) 24%);
+  box-shadow: none;
+}
+
+.orbital-mobile-search {
+  grid-column: 1 / -1;
+  min-width: 0;
+  height: 42px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  border-radius: 18px;
+  padding: 0 10px;
+}
+
+.orbital-mobile-search span {
+  color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 72%, white 12%);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.orbital-mobile-search input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.orbital-mobile-search input::placeholder {
+  color: rgba(226, 231, 255, 0.46);
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-layout,
+.orbital-overlay.is-android-mobile-shell .orbital-layout.has-editor {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-inspector.panel,
+.orbital-overlay.is-android-mobile-shell .orbital-scene-wrap {
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-inspector.panel {
+  height: 100%;
+  max-height: none;
+  padding-bottom: 88px;
+  border-radius: 26px;
+  overflow: auto;
+}
+
+.orbital-overlay.is-android-mobile-shell:not(.is-mobile-section-map) .orbital-scene-wrap {
+  display: none;
+}
+
+.orbital-overlay.is-android-mobile-shell.is-mobile-section-map .orbital-inspector.panel {
+  display: none;
+}
+
+.orbital-overlay.is-android-mobile-shell.is-mobile-section-map .orbital-scene-wrap {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  border-radius: 26px;
+  overflow: hidden;
+}
+
+.orbital-overlay.is-android-phone-shell.is-mobile-section-map .orbital-scene-wrap {
+  border-radius: 24px;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-filter-dock {
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  width: auto;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-filter-shell {
+  padding: 8px;
+  border-radius: 18px;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-filter-chiprow {
+  max-width: 100%;
+}
+
+.orbital-mobile-map-controls {
+  position: absolute;
+  z-index: 5;
+  left: 12px;
+  bottom: 16px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  max-width: calc(100% - 24px);
+  padding: 5px;
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.72), rgb(var(--surface-deep-rgb) / 0.62)),
+    rgb(var(--surface-deep-rgb) / 0.64);
+  backdrop-filter: blur(16px) saturate(126%);
+}
+
+.orbital-mobile-map-controls button {
+  min-width: 40px;
+  min-height: 38px;
+  border-radius: 14px;
+  padding: 0 10px;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.orbital-mobile-selection-sheet {
+  position: absolute;
+  z-index: 6;
+  right: 12px;
+  bottom: 72px;
+  left: 12px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--mobile-selection-accent) 28%, rgb(var(--line-rgb) / 0.12));
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--mobile-selection-accent) 12%, transparent), transparent 46%),
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.8), rgb(var(--surface-deep-rgb) / 0.7)),
+    rgb(var(--surface-deep-rgb) / 0.78);
+  box-shadow: 0 22px 64px rgba(2, 5, 15, 0.34);
+  backdrop-filter: blur(20px) saturate(130%);
+}
+
+.orbital-mobile-selection-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.orbital-mobile-selection-copy span,
+.orbital-mobile-inspector-status {
+  color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 58%, rgba(235, 238, 255, 0.82));
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.orbital-mobile-selection-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.98rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-mobile-selection-actions,
+.orbital-mobile-inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.orbital-mobile-selection-actions button,
+.orbital-mobile-inspector-actions button {
+  min-height: 40px;
+  border-radius: 15px;
+  padding: 0 12px;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.orbital-mobile-inspector-actions {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  align-items: center;
+  margin: 8px 0 10px;
+  padding: 8px;
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.72), rgb(var(--surface-deep-rgb) / 0.62)),
+    rgb(var(--surface-deep-rgb) / 0.68);
+  backdrop-filter: blur(16px) saturate(124%);
+}
+
+.orbital-mobile-inspector-actions button.is-active {
+  border-color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 34%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 16%, transparent), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.orbital-mobile-move-panel {
+  width: 100%;
+  display: grid;
+  gap: 9px;
+}
+
+.orbital-mobile-move-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.orbital-mobile-move-copy strong {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.orbital-mobile-move-copy small,
+.orbital-mobile-move-destination small {
+  color: rgba(225, 231, 255, 0.58);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.orbital-mobile-move-destination {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--mobile-move-accent, var(--accent-theme-primary, var(--gold))) 30%, rgb(var(--line-rgb) / 0.12));
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--mobile-move-accent, var(--accent-theme-primary, var(--gold))) 14%, transparent), transparent 58%),
+    rgba(255, 255, 255, 0.028);
+}
+
+.orbital-mobile-move-destination.is-invalid {
+  border-color: color-mix(in srgb, #ff5f86 46%, rgb(var(--line-rgb) / 0.12));
+  background:
+    radial-gradient(circle at top left, rgba(255, 95, 134, 0.14), transparent 58%),
+    rgba(255, 255, 255, 0.026);
+}
+
+.orbital-mobile-move-destination span {
+  color: color-mix(in srgb, var(--mobile-move-accent, var(--accent-theme-primary, var(--gold))) 72%, rgba(238, 241, 255, 0.76));
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.orbital-mobile-move-destination strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-mobile-move-actions,
+.orbital-mobile-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.orbital-mobile-move-actions button.is-primary,
+.orbital-mobile-conflict-actions button.is-primary {
+  border-color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 42%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 28%, transparent), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.orbital-mobile-move-actions button:disabled {
+  opacity: 0.48;
+}
+
+.orbital-menu-compact-preview-mark {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 38%, rgb(var(--line-rgb) / 0.12));
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 72%, white 10%);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.orbital-menu-compact-preview-mark.is-open {
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 20%, transparent), transparent 68%),
+    rgba(255, 255, 255, 0.035);
+  color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 82%, white 14%);
+}
+
+.orbital-menu-compact-preview-mark svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.orbital-mobile-action-glyph-accent {
+  opacity: 0.72;
+}
+
+.orbital-tree-touch-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.orbital-mobile-bottom-nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.72), rgb(var(--surface-deep-rgb) / 0.64)),
+    rgb(var(--surface-deep-rgb) / 0.72);
+  box-shadow:
+    0 18px 44px rgba(2, 5, 15, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  backdrop-filter: blur(20px) saturate(130%);
+}
+
+.orbital-mobile-bottom-nav button {
+  min-width: 0;
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  border-radius: 18px;
+  padding: 5px 2px;
+  color: rgba(229, 234, 255, 0.68);
+  font-size: 0.64rem;
+  font-weight: 850;
+  line-height: 1.05;
+}
+
+.orbital-mobile-bottom-nav button.is-active {
+  border-color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 34%, rgb(var(--line-rgb) / 0.12));
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 18%, transparent), transparent 62%),
+    rgba(255, 255, 255, 0.035);
+  color: var(--text);
+}
+
+.orbital-mobile-nav-glyph {
+  width: 22px;
+  height: 22px;
+  display: block;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 76%, rgba(238, 241, 255, 0.9));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 22%, transparent));
+}
+
+.orbital-mobile-nav-glyph path,
+.orbital-mobile-nav-glyph circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.orbital-mobile-nav-glyph-accent {
+  opacity: 0.72;
+}
+
+.orbital-mobile-nav-glyph-dot {
+  fill: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 58%, rgba(255, 255, 255, 0.08));
+  stroke: currentColor;
+}
+
+.orbital-mobile-bottom-nav button.is-active .orbital-mobile-nav-glyph {
+  color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 88%, white 18%);
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 34%, transparent));
+}
+
+.orbital-mobile-menu-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  align-items: end;
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+}
+
+.orbital-mobile-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(var(--surface-deep-rgb) / 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.orbital-mobile-menu-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 14px;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 16px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 14%, transparent), transparent 42%),
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.84), rgb(var(--surface-deep-rgb) / 0.76)),
+    rgb(var(--surface-deep-rgb) / 0.86);
+  box-shadow: 0 28px 90px rgba(2, 5, 15, 0.46);
+  backdrop-filter: blur(24px) saturate(132%);
+}
+
+.orbital-mobile-menu-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.orbital-mobile-menu-head h2 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-family: var(--font-ui-display);
+  font-size: 1rem;
+  line-height: 1.12;
+}
+
+.orbital-mobile-menu-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.orbital-mobile-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.orbital-mobile-menu-grid button {
+  min-height: 46px;
+  justify-content: flex-start;
+  border-radius: 17px;
+  padding: 0 12px;
+  text-align: left;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-modal-layer {
+  padding:
+    max(8px, env(safe-area-inset-top))
+    max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-modal-window,
+.orbital-overlay.is-android-mobile-shell .orbital-context-menu-card.is-sheet {
+  max-height: calc(100dvh - max(20px, env(safe-area-inset-top)) - max(20px, env(safe-area-inset-bottom)));
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-editor-modal-window {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 26px;
+}
+
+.orbital-overlay.is-android-mobile-shell.is-mobile-move-mode .orbital-tree-item {
+  cursor: pointer;
+}
+
+.orbital-overlay.is-android-mobile-shell.is-mobile-move-mode .orbital-tree-item:not(.is-editing) {
+  border-color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 18%, rgb(var(--line-rgb) / 0.12));
+}
+
+.orbital-mobile-conflict-layer,
+.orbital-mobile-preview-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 82;
+  display: grid;
+  align-items: end;
+  padding:
+    max(12px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+}
+
+.orbital-mobile-conflict-backdrop,
+.orbital-mobile-preview-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(var(--surface-deep-rgb) / 0.34);
+  backdrop-filter: blur(15px);
+}
+
+.orbital-mobile-conflict-card,
+.orbital-mobile-preview-card {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  max-height: min(680px, calc(100dvh - 28px));
+  margin: 0 auto;
+  border: 1px solid color-mix(in srgb, var(--hovercard-accent, var(--accent-theme-primary, var(--gold))) 24%, rgb(var(--line-rgb) / 0.12));
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--hovercard-accent, var(--accent-theme-primary, var(--gold))) 14%, transparent), transparent 44%),
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.86), rgb(var(--surface-deep-rgb) / 0.78)),
+    rgb(var(--surface-deep-rgb) / 0.88);
+  box-shadow: 0 28px 90px rgba(2, 5, 15, 0.48);
+  backdrop-filter: blur(24px) saturate(132%);
+}
+
+.orbital-mobile-conflict-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.orbital-mobile-conflict-head {
+  display: grid;
+  gap: 5px;
+}
+
+.orbital-mobile-conflict-head h3,
+.orbital-mobile-conflict-head p {
+  margin: 0;
+}
+
+.orbital-mobile-conflict-head h3 {
+  color: var(--text);
+  font-family: var(--font-ui-display);
+  font-size: 1rem;
+  line-height: 1.18;
+}
+
+.orbital-mobile-conflict-head p {
+  color: rgba(225, 231, 255, 0.64);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.orbital-mobile-conflict-list {
+  display: grid;
+  gap: 7px;
+}
+
+.orbital-mobile-conflict-item {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid rgb(var(--line-rgb) / 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.026);
+}
+
+.orbital-mobile-conflict-item span,
+.orbital-mobile-conflict-item strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-mobile-conflict-item span {
+  color: rgba(225, 231, 255, 0.62);
+  font-size: 0.72rem;
+}
+
+.orbital-mobile-conflict-item strong {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.orbital-mobile-conflict-actions button {
+  min-height: 40px;
+  border-radius: 15px;
+  padding: 0 12px;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.orbital-mobile-preview-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  padding: 14px;
+}
+
+.orbital-mobile-preview-card .orbital-note-hovercard-scroll {
+  max-height: min(520px, calc(100dvh - 210px));
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 420px) {
+  .orbital-mobile-topbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .orbital-mobile-project-chip {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .orbital-mobile-menu-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .orbital-mobile-bottom-nav button {
+    font-size: 0.58rem;
+  }
+}
+
+.orbital-overlay.is-android-tablet-portrait-shell .orbital-inspector.panel {
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.orbital-overlay.is-android-tablet-portrait-shell.is-mobile-section-map .orbital-scene-wrap {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}

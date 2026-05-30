@@ -1,0 +1,28 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "android",
+  "description": "enables Android-safe permissions for the main Locoris webview",
+  "platforms": [
+    "android"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
+    "fs:allow-applocaldata-write-recursive",
+    "fs:allow-appcache-write-recursive",
+    "fs:allow-applog-write-recursive",
+    "fs:scope-appdata-recursive",
+    "fs:scope-appcache-recursive",
+    "fs:scope-applocaldata-recursive",
+    "fs:scope-applog-recursive",
+    "opener:default",
+    "store:default"
+  ]
+}

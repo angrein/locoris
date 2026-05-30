@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { getErrorMessage } from "../lib/errors";
 import type { LocalVaultKind } from "../lib/localVaults";
 import "./LocalVaultSwitcher.css";
 
@@ -118,12 +119,9 @@ export default function LocalVaultSwitcher({
     };
   }, []);
 
-  if (!activeItem) {
-    return null;
-  }
-
-  const triggerProviderLabel = activeItem.providerLabel ?? t("sync.localOnlyShort");
-  const activeDisplayName = activeItem.displayName ?? activeItem.name;
+  const triggerProviderLabel = activeItem?.providerLabel ?? t("sync.localOnlyShort");
+  const triggerProviderTone = activeItem?.providerTone ?? "local";
+  const activeDisplayName = (activeItem?.displayName ?? activeItem?.name ?? "").trim() || label;
 
   const resetCreateDraft = () => {
     setCreateVaultKind("regular");
@@ -178,7 +176,7 @@ export default function LocalVaultSwitcher({
       setCreateOpen(false);
       setOpen(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "SYNC_FAILED";
+      const message = getErrorMessage(error);
       setCreateError(
         message === "VAULT_ENCRYPTION_PASSPHRASE_REQUIRED"
           ? t("sync.vaultEncryptionPassphraseRequired")
@@ -201,11 +199,14 @@ export default function LocalVaultSwitcher({
           type="button"
           className="vault-switcher-trigger"
           onClick={() => {
-            setOpen((current) => !current);
+            if (items.length > 0) {
+              setOpen((current) => !current);
+            }
             setCreateOpen(false);
           }}
           aria-haspopup="listbox"
           aria-expanded={open}
+          disabled={items.length === 0 && !onCreate}
         >
           <span className="vault-switcher-trigger-icon" aria-hidden="true">
             <VaultGlyph />
@@ -214,10 +215,10 @@ export default function LocalVaultSwitcher({
               <span className="vault-switcher-trigger-label">{label}</span>
               <span className="vault-switcher-trigger-titleline">
               <strong title={activeDisplayName}>{activeDisplayName}</strong>
-              <span className={`vault-switcher-chip vault-switcher-trigger-provider is-provider-${activeItem.providerTone}`}>
+              <span className={`vault-switcher-chip vault-switcher-trigger-provider is-provider-${triggerProviderTone}`}>
                 {triggerProviderLabel}
               </span>
-              {activeItem.encryptionState !== "disabled" ? (
+              {activeItem && activeItem.encryptionState !== "disabled" ? (
                 <span
                   className={`vault-switcher-lock-badge is-${activeItem.encryptionState}`}
                   aria-hidden="true"

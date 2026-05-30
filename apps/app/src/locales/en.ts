@@ -168,6 +168,23 @@ const en = {
     typographyMode: "Typography mode",
     typographyFocus: "Focus",
     typographyReading: "Reading",
+    mobileBack: "Back",
+    mobileMore: "Note options",
+    mobileFocusShort: "F",
+    mobileReadingShort: "R",
+    mobileMenuTitle: "Note options",
+    mobileMenuSubtitle: "Folder, tags, color, export, and actions for this note.",
+    mobileFormatToolbar: "Quick formatting",
+    mobileParagraph: "Text",
+    mobileHeading: "Heading",
+    mobileBulletList: "List",
+    mobileNumberedList: "Numbered",
+    mobileChecklist: "Checklist",
+    mobileQuote: "Quote",
+    mobileStyle: "Style",
+    mobileInsert: "Insert",
+    mobileInsertMenuTitle: "Add block",
+    mobileInsertMenuSubtitle: "Choose the type of the new block below the current line.",
     markdownActions: "Markdown actions",
     transferButton: "Export / import",
     transferKicker: "Document",
@@ -566,6 +583,10 @@ const en = {
       "Set VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID for desktop builds or VITE_GOOGLE_DRIVE_CLIENT_ID for web before connecting Google Drive.",
     googleDriveDesktopConfigInvalid:
       "Google rejected the desktop OAuth request. Make sure the desktop build uses VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID from a Desktop app client, not a web client ID.",
+    googleDriveAndroidConfigInvalid:
+      "Google rejected the Android OAuth request. Check the Android OAuth client: package com.locoris.android for release or com.locoris.android.debug for debug, the APK certificate SHA-1, and the same Google Cloud project where Drive API is enabled.",
+    googleDriveOAuthFailed:
+      "Google Drive authorization did not complete. Check the OAuth consent screen, test users, Google Drive API, and try connecting Google Drive again.",
     googleDriveAuthRequired:
       "Google Drive session expired. Refresh the authorization to continue loading remote vaults.",
     googleDriveConnected: "Google Drive connected.",
@@ -574,6 +595,8 @@ const en = {
     googleDrivePreparing: "Preparing Google authorization. Give it a moment and try again.",
     googleDriveSdkFailed:
       "Google authorization could not be prepared on this device. Check your network and try again.",
+    googleDrivePlayServicesUnavailable:
+      "Google Play Services are unavailable on this Android device. Update Google Play Services or use an emulator image with Google APIs.",
     googleDriveRedirectTimeout:
       "Google authorization was not completed in the browser. Start the connection again and grant Google Drive access.",
     googleDriveRedirectFailed:
@@ -635,7 +658,7 @@ const en = {
   settings: {
     kicker: "Preferences",
     title: "Settings",
-    caption: "Interface language, color accents, app updates, and vault synchronization.",
+    caption: "Interface language, appearance, app updates, and vault synchronization.",
     networkOnline: "NET",
     networkOffline: "OFF",
     general: "General",
@@ -646,17 +669,29 @@ const en = {
       "Detected automatically on first launch, but you can switch it manually whenever you want.",
     languageEnglish: "English",
     languageRussian: "Russian",
-    accentTheme: "Interface accents",
+    accentTheme: "Interface",
     accentThemeDescription:
-      "A local client theme: changes the app's system colors without touching project colors, note colors, or document text.",
-    accentThemeAriaLabel: "App color accents",
+      "Color presets and orbital map motion. These are local client preferences and do not change vault data.",
+    accentThemeAriaLabel: "App color presets",
     accentThemePanelCaption:
-      "Choose one of the built-in dark presets. Each one changes surfaces, borders, highlights, and system accents.",
-    accentThemeChoose: "Palette",
+      "Tune Locoris appearance: the dark interface preset and orbital map animation behavior.",
+    accentThemeChoose: "Color preset",
     accentThemeClassic: "Locris",
     accentThemeGraphite: "Graphite",
     accentThemeVerdant: "Verdant",
     accentThemeEmber: "Ember",
+    interfaceMotionKicker: "Map",
+    interfaceMotionTitle: "Orbital map animation",
+    interfaceMotionDescription:
+      "Full mode keeps active objects alive. Reduced mode fully disables object motion on the map and lowers battery usage.",
+    interfaceMotionFullTitle: "Full mode",
+    interfaceMotionFullChip: "Live",
+    interfaceMotionFullDescription:
+      "Objects move softly, while active projects and favorites keep their premium living feel.",
+    interfaceMotionReducedTitle: "Reduced mode",
+    interfaceMotionReducedChip: "Static",
+    interfaceMotionReducedDescription:
+      "Objects stay still. Better for phones, weaker devices, or long battery sessions.",
     aiTitle: "AI integration",
     aiDescription: "Connect Gemini API for note rewriting, translation, and formatting.",
     aiPanelCaption:
@@ -876,7 +911,7 @@ const en = {
     desktopUpdateChipTitle: "Version {{version}} is available. Open settings to install the update.",
     desktopUpdateIssueChip: "Update issue",
     desktopUpdateIssueChipTitle:
-      "The last desktop update attempt for {{version}} needs attention. Open settings to review recovery options.",
+      "The last update attempt for {{version}} needs attention. Open settings to review recovery options.",
     desktopUpdateHint:
       "The app restarts automatically after a successful install. If automatic installation cannot finish, retry it here or open the release page and install the same version manually.",
     desktopUpdatePublished: "Published {{date}}.",
@@ -890,6 +925,15 @@ const en = {
     desktopUpdateIssueInstallFailed: "The downloaded update could not be applied.",
     desktopUpdateIssueInstallNotApplied:
       "The app restarted without switching to version {{version}}.",
+    androidUpdatePermissionRequired:
+      "Android has not allowed Locoris to install downloaded APK updates yet.",
+    androidUpdateReleaseOnly:
+      "Android updates are available only in the Locoris release build.",
+    androidUpdateAllowInstall: "Allow install",
+    androidUpdateInstallerOpened:
+      "The Android system installer is open. Confirm the update installation in the system prompt.",
+    androidUpdateHint:
+      "Android asks you to confirm APK installation manually. If installing from this source is disabled, the app opens the required system settings screen.",
     syncKicker: "Synchronization",
     syncManagerIntro:
       "Connect each local vault to one remote method. A single sync method can hold many vaults, and every link is visualized directly in this layout.",
@@ -988,16 +1032,16 @@ const en = {
     googleDriveClientMissing:
       "Set the desktop Google OAuth client ID first for native builds, or the web client ID for browser builds.",
     googleDriveModalDescription:
-      "Locoris opens your system browser, completes Google authorization with a secure local callback, and stores each remote vault inside Google Drive appDataFolder.",
+      "Locoris requests Google Drive access through system Google authorization and stores each remote vault inside Drive appDataFolder.",
     googleDriveConnect: "Connect Google Drive",
     googleDriveAppFolder: "appDataFolder",
     googleDriveAppFolderDescription:
       "Files stored there stay hidden from the regular Drive UI and are scoped to this app.",
     googleDriveSessionReady: "OAuth session ready for Drive appDataFolder access.",
     googleDriveSdkLoading:
-      "Preparing native Google authorization. As soon as it is ready, the connect button becomes available.",
+      "Preparing Google authorization for this device. As soon as it is ready, the connect button becomes available.",
     googleDriveSdkReady:
-      "Google authorization is ready. Locoris will open your system browser and continue after Google returns to the local callback.",
+      "Google authorization is ready. Locoris will request access only to the hidden app folder in Google Drive.",
     selfHostedModalDescription:
       "Enter the personal server endpoint and management token. After that the server will be ready for vault connections.",
     hostedModalDescription:
@@ -1185,6 +1229,7 @@ const en = {
     copyAction: "Copy",
     pasteAction: "Paste",
     duplicateAction: "Duplicate",
+    moveAction: "Move",
     goToLocationAction: "Go to location",
     duplicateSuffix: "copy",
     selectedCount: "Selected: {{count}}",
@@ -1192,6 +1237,32 @@ const en = {
     moveBlockedDepth: "Action unavailable: only one subfolder level is allowed.",
     moveBlockedInvalid: "Action unavailable: a folder cannot be moved into itself.",
     moveBlockedMissingTarget: "Action unavailable: destination folder was not found.",
+    mobileNavigation: "Mobile navigation",
+    mobileMap: "Map",
+    mobileMenu: "Menu",
+    mobileActions: "Actions",
+    mobileSelect: "Select",
+    mobileDone: "Done",
+    mobileNothingSelected: "Nothing selected",
+    mobileMoveChooseDestination: "Choose a destination folder or project.",
+    mobileMoveDestinationHint: "Tap a folder or project to move the selection.",
+    mobileMoveActive: "Move {{count}} item(s)",
+    mobileMoveTitle: "Choose a new place",
+    mobileMovePickDestination: "Tap a folder or project in the hierarchy, review the destination, then confirm the move.",
+    mobileMoveDestination: "Move to",
+    mobileMoveNoDestination: "No destination selected yet",
+    mobileMoveConfirm: "Move",
+    mobileMoveConflictTitle: "Name conflicts",
+    mobileMoveConflictDescription: "{{count}} item(s) already use these names in the chosen location.",
+    mobileMoveRename: "Rename and move",
+    mobileMoveCopy: "Create copy",
+    mobilePreviewAction: "Preview",
+    mobilePreviewTitle: "Preview",
+    mobileMenuImportExport: "Import / export",
+    mobileMenuBackup: "Backup",
+    mobileMenuAi: "AI settings",
+    mobileMenuThemes: "Themes",
+    mobileMenuAbout: "About / update",
     deleteSelection: "Delete selected",
     maxDepthReached: "Only one level of subfolders is allowed.",
     trashEmptyTitle: "Trash is empty",

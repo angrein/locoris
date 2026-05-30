@@ -51,6 +51,7 @@ import {
   createCanvasPdfBlob,
   type CanvasExportFormat
 } from "../lib/exportImport/canvasExport";
+import { useAndroidBackHandler } from "../lib/useAndroidBackHandler";
 import { sanitizeExportFileName } from "../lib/exportImport/filenames";
 import {
   generateGeminiCanvasMermaid,
@@ -2411,6 +2412,39 @@ export default function CanvasPane({
   const canvasAiRenderContext = isCanvasAiOpen ? getCanvasAiContext() : undefined;
   const canvasAiValidationWarning = getCanvasAiValidationError(canvasAiRenderContext);
   const canvasAiRunDisabled = canvasAiBusy;
+  const androidBackLayer = canvasAiPreview
+    ? "ai-preview"
+    : isCanvasAiOpen
+      ? "ai-panel"
+      : isClearCanvasDialogOpen
+        ? "clear-canvas"
+        : activeSurface === "info"
+          ? "details"
+          : null;
+
+  useAndroidBackHandler(Boolean(androidBackLayer), () => {
+    if (androidBackLayer === "ai-preview") {
+      if (canvasAiStatus !== "applying") {
+        handleCancelCanvasAiPreview();
+      }
+
+      return;
+    }
+
+    if (androidBackLayer === "ai-panel") {
+      setIsCanvasAiOpen(false);
+      return;
+    }
+
+    if (androidBackLayer === "clear-canvas") {
+      setIsClearCanvasDialogOpen(false);
+      return;
+    }
+
+    if (androidBackLayer === "details") {
+      setActiveSurface("canvas");
+    }
+  });
 
   return (
     <section

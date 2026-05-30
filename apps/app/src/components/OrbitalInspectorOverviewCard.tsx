@@ -105,6 +105,9 @@ interface OrbitalInspectorOverviewCardProps {
   onRecentPointerMove: (item: OrbitalOverviewRecentItem, event: ReactPointerEvent<HTMLButtonElement>) => void;
   onRecentPointerLeave: (item: OrbitalOverviewRecentItem) => void;
   onRecentPointerCancel: (item: OrbitalOverviewRecentItem) => void;
+  isTouchLayout?: boolean;
+  previewLabel?: string;
+  onPreviewRecentItem?: (item: OrbitalOverviewRecentItem) => void;
   onToggleColorPanel: () => void;
 }
 
@@ -722,6 +725,9 @@ export default function OrbitalInspectorOverviewCard({
   onRecentPointerMove,
   onRecentPointerLeave,
   onRecentPointerCancel,
+  isTouchLayout = false,
+  previewLabel,
+  onPreviewRecentItem,
   onToggleColorPanel
 }: OrbitalInspectorOverviewCardProps) {
   const [isRecentExpanded, setIsRecentExpanded] = useState(false);
@@ -848,7 +854,20 @@ export default function OrbitalInspectorOverviewCard({
                 type="button"
                 className="orbital-inspector-overview-recent-item"
                 style={{ "--overview-card-accent": item.color } as CSSProperties}
-                onClick={() => onSelectRecentItem(item)}
+                onClick={(event) => {
+                  const previewTarget = (event.target as HTMLElement | null)?.closest(
+                    "[data-overview-preview-action]"
+                  );
+
+                  if (previewTarget && onPreviewRecentItem) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onPreviewRecentItem(item);
+                    return;
+                  }
+
+                  onSelectRecentItem(item);
+                }}
                 onDoubleClick={() => onOpenRecentItem(item)}
                 onContextMenu={(event) => onRecentContextMenu(item, event)}
                 onPointerEnter={(event) => onRecentPointerEnter(item, event)}
@@ -866,6 +885,16 @@ export default function OrbitalInspectorOverviewCard({
                     {getItemKindLabel(item.kind, labels)} - {item.meta}
                   </span>
                 </span>
+                {isTouchLayout && item.kind !== "folder" && onPreviewRecentItem ? (
+                  <span
+                    className="orbital-menu-compact-preview-mark"
+                    data-overview-preview-action="true"
+                    aria-label={previewLabel}
+                    title={previewLabel}
+                  >
+                    i
+                  </span>
+                ) : null}
               </button>
             ))}
           </div>

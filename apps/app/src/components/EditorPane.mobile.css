@@ -1,0 +1,578 @@
+.editor-pane-mobile-header,
+.editor-pane-mobile-formatbar,
+.editor-pane-mobile-sheet-backdrop,
+.editor-pane-mobile-sheet-head,
+.editor-pane-mobile-insert-layer,
+.editor-ai-mobile-backdrop,
+.editor-pane-mobile-only-action {
+  display: none;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topbar.is-note-mode {
+  display: none;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  padding:
+    max(8px, env(safe-area-inset-top))
+    max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-modal-window.is-note-mode .editor-pane {
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-toolbar {
+  display: none;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-header {
+  grid-row: 1;
+  min-width: 0;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px auto 40px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px;
+  border-radius: 23px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 22%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 10%, transparent), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.066), rgba(255, 255, 255, 0.018)),
+    rgb(var(--surface-deep-rgb) / 0.82);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 40px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-title-field {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgb(var(--line-rgb) / 0.11));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.016)),
+    rgba(7, 9, 20, 0.72);
+  color: var(--text);
+  font-family: var(--editor-title-font);
+  font-size: 0.96rem;
+  font-weight: 650;
+  line-height: 1.2;
+  outline: none;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-title-field:focus {
+  border-color: color-mix(in srgb, var(--editor-accent) 42%, rgb(var(--cyan-rgb) / 0.2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--editor-accent) 18%, transparent);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-icon-action,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-ai-action,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-mode-switch button,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-close {
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.026);
+  color: var(--text);
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-icon-action svg,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-ai-action svg,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-ai-action {
+  border-color: color-mix(in srgb, var(--editor-accent) 34%, rgb(var(--line-rgb) / 0.14));
+  color: color-mix(in srgb, var(--text) 88%, var(--editor-accent) 12%);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 20%, transparent), transparent 64%),
+    rgba(255, 255, 255, 0.032);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-mode-switch {
+  min-width: 66px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: 17px;
+  border: 1px solid rgb(var(--line-rgb) / 0.12);
+  background: rgba(255, 255, 255, 0.026);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-mode-switch button {
+  min-width: 28px;
+  min-height: 30px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-mode-switch button.is-active {
+  color: color-mix(in srgb, var(--text) 86%, var(--editor-accent) 14%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--editor-accent) 15%, rgba(255, 255, 255, 0.02));
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-shell {
+  grid-row: 2;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-column,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-frame {
+  min-height: 0;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-frame,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane.is-immersive .editor-stage-frame {
+  height: 100%;
+  min-height: 0;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell {
+  height: 100%;
+  min-height: 0;
+  border-radius: 24px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-editor {
+  padding:
+    22px
+    max(16px, env(safe-area-inset-right))
+    calc(118px + env(safe-area-inset-bottom))
+    max(42px, calc(env(safe-area-inset-left) + 34px));
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-side-menu {
+  opacity: 1;
+  margin-left: 4px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-side-menu button,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar button,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-file-panel button,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-link-toolbar button,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-floating-toolbar-popover button {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-floating-toolbar-popover {
+  position: fixed !important;
+  inset:
+    auto
+    max(8px, env(safe-area-inset-right))
+    max(82px, calc(env(safe-area-inset-bottom) + 78px))
+    max(8px, env(safe-area-inset-left)) !important;
+  width: auto !important;
+  max-width: none !important;
+  transform: none !important;
+  z-index: 1400 !important;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-formatting-toolbar,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-formatting-toolbar::-webkit-scrollbar,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell [data-file-block],
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-block-content[data-content-type="image"],
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-block-content[data-content-type="video"] {
+  touch-action: manipulation;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-sidepanel,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane.is-mobile-note-menu-open .editor-sidepanel {
+  display: none;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane.is-mobile-note-menu-open .editor-sidepanel {
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 1320;
+  max-height: min(82vh, calc(100vh - max(18px, env(safe-area-inset-top))));
+  max-height: min(82dvh, calc(100dvh - max(18px, env(safe-area-inset-top))));
+  display: grid;
+  gap: 10px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 26%, rgb(var(--line-rgb) / 0.13));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 10%, transparent), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.074), rgba(255, 255, 255, 0.022)),
+    rgb(var(--surface-deep-rgb) / 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 26px 64px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(22px);
+  overscroll-behavior: contain;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1310;
+  display: block;
+  border: 0;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 0;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-head span {
+  display: block;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-head p {
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-close {
+  transform: rotate(90deg);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-detail-card {
+  border-radius: 22px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-only-action {
+  display: inline-flex;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar {
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  padding: 6px;
+  border-radius: 23px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 22%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 9%, transparent), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.018)),
+    rgb(var(--surface-deep-rgb) / 0.84);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.046),
+    0 16px 36px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar button {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid rgb(var(--line-rgb) / 0.11);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+  color: var(--text);
+  font: inherit;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  touch-action: manipulation;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar span {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar small {
+  display: block;
+  max-width: 100%;
+  color: var(--text-dim);
+  font-size: 0.52rem;
+  font-weight: 650;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1330;
+  display: block;
+  pointer-events: none;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-menu {
+  position: absolute;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 68px));
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 26px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 26%, rgb(var(--line-rgb) / 0.13));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 10%, transparent), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.074), rgba(255, 255, 255, 0.022)),
+    rgb(var(--surface-deep-rgb) / 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 22px 54px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(22px);
+  pointer-events: auto;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-head {
+  display: grid;
+  gap: 4px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-head span {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-head p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  line-height: 1.38;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid button {
+  min-width: 0;
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border: 1px solid rgb(var(--line-rgb) / 0.11);
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid span {
+  display: block;
+  min-width: 24px;
+  min-height: 20px;
+  color: color-mix(in srgb, var(--text) 84%, var(--editor-accent) 16%);
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1340;
+  display: block;
+  border: 0;
+  background: transparent;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-panel.is-docked,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-panel.is-floating {
+  position: fixed !important;
+  inset:
+    auto
+    max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left)) !important;
+  width: auto;
+  max-height: min(82vh, calc(100vh - 24px));
+  max-height: min(82dvh, calc(100dvh - 24px));
+  overflow: hidden;
+  z-index: 1350;
+  border-radius: 28px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-command-card {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-prompt-card {
+  border-radius: 24px 24px 15px 15px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-command-card {
+  border-radius: 15px 15px 24px 24px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .note-transfer-layer {
+  place-items: end center;
+  padding: 0;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .note-transfer-modal {
+  width: 100%;
+  max-height: min(84vh, calc(100vh - max(18px, env(safe-area-inset-top))));
+  max-height: min(84dvh, calc(100dvh - max(18px, env(safe-area-inset-top))));
+  border-radius: 28px 28px 0 0;
+  padding:
+    16px
+    max(14px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .note-transfer-option-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-layer {
+  padding: 0;
+  place-items: stretch;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-modal {
+  width: 100vw;
+  width: 100dvw;
+  max-width: 100vw;
+  max-width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  padding:
+    max(16px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-grid {
+  max-height: none;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-secondary,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-primary {
+  min-height: 44px;
+}
+
+.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-side-menu button,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-formatting-toolbar button,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-file-panel button,
+.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-link-toolbar button {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+@media (max-width: 430px) {
+  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-header {
+    grid-template-columns: 38px minmax(0, 1fr) 38px minmax(58px, auto) 38px;
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-title-field {
+    font-size: 0.9rem;
+  }
+
+  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar button {
+    min-height: 40px;
+    border-radius: 14px;
+  }
+
+  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar small {
+    display: none;
+  }
+
+  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
