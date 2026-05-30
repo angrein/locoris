@@ -11,6 +11,7 @@
 }
 
 .orbital-overlay.is-android-runtime .orbital-command-bar,
+.orbital-overlay.is-android-runtime .orbital-backdrop,
 .orbital-overlay.is-android-runtime .orbital-filter-shell,
 .orbital-overlay.is-android-runtime .orbital-filter-dock .orbital-searchbar,
 .orbital-overlay.is-android-runtime .orbital-mobile-topbar,
@@ -35,6 +36,34 @@
 
 .orbital-overlay.is-android-runtime .orbital-selection-ring {
   animation: none;
+}
+
+.orbital-overlay.is-orbital-motion-reduced .orbital-selection-ring,
+.orbital-overlay.is-orbital-motion-reduced .orbital-node.is-selected .orbital-folder-core,
+.orbital-overlay.is-orbital-motion-reduced .orbital-node.is-selected .orbital-note-core,
+.orbital-overlay.is-orbital-motion-reduced .orbital-node.is-selected .orbital-canvas-core,
+.orbital-overlay.is-orbital-motion-reduced .orbital-node.is-selected .orbital-core-pulse,
+.orbital-overlay.is-orbital-motion-reduced .orbital-node.is-primary:not(.is-selected) .orbital-folder-core,
+.orbital-overlay.is-orbital-motion-reduced .orbital-node.is-primary:not(.is-selected) .orbital-note-core,
+.orbital-overlay.is-orbital-motion-reduced .orbital-node.is-primary:not(.is-selected) .orbital-canvas-core,
+.orbital-overlay.is-orbital-motion-reduced .orbital-node.is-primary:not(.is-selected) .orbital-core-pulse,
+.orbital-overlay.is-android-runtime .orbital-node.is-selected .orbital-folder-core,
+.orbital-overlay.is-android-runtime .orbital-node.is-selected .orbital-note-core,
+.orbital-overlay.is-android-runtime .orbital-node.is-selected .orbital-canvas-core,
+.orbital-overlay.is-android-runtime .orbital-node.is-selected .orbital-core-pulse,
+.orbital-overlay.is-android-runtime .orbital-node.is-primary:not(.is-selected) .orbital-folder-core,
+.orbital-overlay.is-android-runtime .orbital-node.is-primary:not(.is-selected) .orbital-note-core,
+.orbital-overlay.is-android-runtime .orbital-node.is-primary:not(.is-selected) .orbital-canvas-core,
+.orbital-overlay.is-android-runtime .orbital-node.is-primary:not(.is-selected) .orbital-core-pulse {
+  animation: none;
+}
+
+.orbital-overlay.is-android-mobile-shell.is-mobile-section-map .orbital-scene-wrap::after {
+  display: none;
+}
+
+.orbital-overlay.is-android-mobile-shell.is-mobile-section-map .orbital-scene-wrap::before {
+  opacity: 0.42;
 }
 
 .orbital-overlay.is-android-runtime .orbital-tree-item,
@@ -276,6 +305,7 @@
   min-height: 0;
   border-radius: 26px;
   overflow: hidden;
+  contain: layout paint style;
 }
 
 .orbital-overlay.is-android-phone-shell.is-mobile-section-map .orbital-scene-wrap {

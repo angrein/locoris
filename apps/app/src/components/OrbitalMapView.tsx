@@ -9522,7 +9522,9 @@ export default function OrbitalMapView({
         isAndroidTabletPortraitShell ? "is-android-tablet-portrait-shell" : ""
       } ${isAndroidTabletLandscapeShell ? "is-android-tablet-landscape-shell" : ""} ${
         isAndroidMobileShell ? `is-mobile-section-${mobileSection}` : ""
-      } ${isMobileMenuOpen ? "is-mobile-menu-open" : ""} ${
+      } ${!isOrbitalMotionEnabled || isPaused ? "is-orbital-motion-reduced" : ""} ${
+        isMobileMenuOpen ? "is-mobile-menu-open" : ""
+      } ${
         mobileMoveItems.length > 0 ? "is-mobile-move-mode" : ""
       } ${isMobileSelectionMode ? "is-mobile-select-mode" : ""}`}
       role="dialog"
