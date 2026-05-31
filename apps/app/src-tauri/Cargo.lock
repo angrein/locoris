@@ -2284,7 +2284,7 @@ dependencies = [
 
 [[package]]
 name = "locoris-app"
-version = "1.0.23"
+version = "1.0.26"
 dependencies = [
  "keyring",
  "log",
