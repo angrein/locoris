@@ -10,11 +10,6 @@ import { isAndroidRuntime } from "./runtime";
 const ANDROID_UPDATE_ATTEMPT_STORAGE_KEY = "locoris:android-update:attempt";
 const ANDROID_RELEASE_REPOSITORY = "angrein/locoris";
 const ANDROID_RELEASE_TAG_PREFIX = "app-v";
-const LEGACY_ANDROID_RELEASE_TAG_PREFIX = "android-v";
-const ANDROID_RELEASE_TAG_PREFIXES = [
-  ANDROID_RELEASE_TAG_PREFIX,
-  LEGACY_ANDROID_RELEASE_TAG_PREFIX
-] as const;
 const ANDROID_PACKAGE_NAME = "com.locoris.android";
 const GITHUB_RELEASES_ENDPOINT = `https://api.github.com/repos/${ANDROID_RELEASE_REPOSITORY}/releases?per_page=50`;
 
@@ -272,15 +267,12 @@ function parseAndroidReleaseVersion(tagName: unknown) {
   }
 
   const normalizedTag = tagName.trim();
-  const tagPrefix = ANDROID_RELEASE_TAG_PREFIXES.find((prefix) =>
-    normalizedTag.startsWith(prefix)
-  );
 
-  if (!tagPrefix) {
+  if (!normalizedTag.startsWith(ANDROID_RELEASE_TAG_PREFIX)) {
     return null;
   }
 
-  const version = normalizeVersionToken(normalizedTag.slice(tagPrefix.length));
+  const version = normalizeVersionToken(normalizedTag.slice(ANDROID_RELEASE_TAG_PREFIX.length));
   return /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version) ? version : null;
 }
 
