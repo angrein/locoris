@@ -1313,12 +1313,14 @@ function buildGeminiCanvasSpecPrompt(input: GenerateGeminiCanvasSpecInput) {
     flowchart: [
       "Required useful fields: steps[] and edges[].",
       "Use type=start/end for boundaries, type=decision for choices, type=risk for blockers, type=note for explanations.",
-      "Use tones across the map: primary for the main path, warning for choices/risks, success for outcomes, muted for supporting notes."
+      "Use tones across the map: primary for the main path, warning for choices/risks, success for outcomes, muted for supporting notes.",
+      "For any non-trivial prompt, create 10-26 steps and 12-36 edges. Include branches, side notes, decision diamonds, and converging outcomes like a rich Mermaid flowchart."
     ],
     mindmap: [
       "Required useful fields: root and branches[].",
       "Use 4-8 branches for a rich source. Each branch should have 2-8 nested items when there is enough information.",
-      "Use crossLinks[] only for meaningful relationships between branches."
+      "Use crossLinks[] only for meaningful relationships between branches.",
+      "For any non-trivial prompt, make it feel like a Mermaid mind-map flowchart: central idea, large branches, leaf details, and occasional cross-links."
     ],
     pie: [
       "Required useful fields: center and slices[].",
@@ -1334,7 +1336,8 @@ function buildGeminiCanvasSpecPrompt(input: GenerateGeminiCanvasSpecInput) {
     roadmap: [
       "Required useful fields: phases[].",
       "Use 3-7 phases. Each phase should include milestones[] and may include risks[] and actions[].",
-      "Use dependencies[] for cross-phase dependencies, not only sequential arrows."
+      "Use dependencies[] for cross-phase dependencies, not only sequential arrows.",
+      "For any non-trivial prompt, create a phase-lane roadmap with 3-6 milestones per phase, risks, next actions, and cross-phase dependencies like a detailed Mermaid roadmap."
     ],
     timeline: [
       "Required useful fields: events[].",
@@ -1345,7 +1348,8 @@ function buildGeminiCanvasSpecPrompt(input: GenerateGeminiCanvasSpecInput) {
     concept: [
       "Required useful fields: islands[] and links[].",
       "Use 3-8 islands. Each island should contain items[] with examples, caveats, details, or decisions.",
-      "Use links[] for cross-island relationships with explanatory labels."
+      "Use links[] for cross-island relationships with explanatory labels.",
+      "For any non-trivial prompt, create rich semantic clusters like Mermaid subgraphs: each island needs inner details, examples, caveats, and meaningful cross-links."
     ],
     kanban: [
       "Required useful fields: columns[].",
@@ -1371,6 +1375,9 @@ function buildGeminiCanvasSpecPrompt(input: GenerateGeminiCanvasSpecInput) {
     "- The old generic nodes[] field is only a fallback. Prefer the typed fields listed above for this diagram kind.",
     "- Use varied tones across related items so the local renderer can create a premium multi-color composition.",
     "- Do not force every request into steps/nodes/edges. Use the typed structure that matches the requested kind.",
+    "- Treat this JSON mode as an editable native version of the Mermaid mode. Match Mermaid's richness: subgraph-like groups, branching structure, side-note nodes, labeled relationships, examples, caveats, risks, numbers, decisions, and outcomes.",
+    "- Do not create tiny diagrams. A tiny diagram is acceptable only if the user explicitly asks for a minimal sketch.",
+    "- Prefer a complete, useful, detailed map over a compact summary. The local renderer has room for large diagrams.",
     "",
     "Strict output rules:",
     "- Return only valid JSON matching the schema.",
@@ -1381,6 +1388,9 @@ function buildGeminiCanvasSpecPrompt(input: GenerateGeminiCanvasSpecInput) {
     "- Do not over-compress the source. For detailed notes, create a rich result with enough typed items to preserve meaning.",
     "- For short prompts without source context, still create a complete useful draft with practical details.",
     "- Use concise labels and meaningful body/summary/note text for details, caveats, examples, and decisions.",
+    "- Labels should be short scan targets, ideally 2-8 words. Put long explanations into body, summary, note, risks, actions, or tags.",
+    "- Avoid extremely long unbroken words in labels. If a technical identifier is long, keep it in body and use a readable short label.",
+    "- Arrow/message/link labels must be short relationship phrases, not full sentences. Put extra explanation into notes or body fields.",
     "- Use links/edges/dependencies/messages for real relationships, causes, contrasts, sequence, and next steps.",
     "- Avoid disconnected piles of cards. The structure should be obvious when rendered visually.",
     input.kind === "sequence"
@@ -1539,10 +1549,10 @@ function buildCanvasSpecGenerationConfigs(kind: CanvasDiagramSpecKind): GeminiGe
     kind === "sequence"
       ? 0.48
       : kind === "timeline" || kind === "kanban"
-        ? 0.42
-      : kind === "mindmap" || kind === "concept" || kind === "pie"
-        ? 0.42
-        : 0.32;
+        ? 0.46
+      : kind === "mindmap" || kind === "concept" || kind === "pie" || kind === "roadmap"
+        ? 0.46
+        : 0.42;
   const baseConfig = {
     temperature,
     maxOutputTokens: 24576

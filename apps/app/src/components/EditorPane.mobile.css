@@ -2,17 +2,22 @@
 .editor-pane-mobile-formatbar,
 .editor-pane-mobile-sheet-backdrop,
 .editor-pane-mobile-sheet-head,
+.editor-pane-mobile-options-handle,
+.editor-pane-mobile-options-summary,
+.editor-pane-mobile-options-section-head,
+.editor-pane-mobile-options-field-title,
+.editor-pane-mobile-option-icon,
 .editor-pane-mobile-insert-layer,
 .editor-ai-mobile-backdrop,
 .editor-pane-mobile-only-action {
   display: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topbar.is-note-mode {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topbar.is-note-mode {
   display: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane {
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 8px;
   padding:
@@ -22,15 +27,15 @@
     max(8px, env(safe-area-inset-left));
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-modal-window.is-note-mode .editor-pane {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-modal-window.is-note-mode .editor-pane {
   padding-top: max(8px, env(safe-area-inset-top));
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-toolbar {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-toolbar {
   display: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-header {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-header {
   grid-row: 1;
   min-width: 0;
   min-height: 48px;
@@ -51,7 +56,7 @@
   backdrop-filter: blur(18px);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-title-field {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-title-field {
   width: 100%;
   min-width: 0;
   min-height: 36px;
@@ -69,15 +74,15 @@
   outline: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-title-field:focus {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-title-field:focus {
   border-color: color-mix(in srgb, var(--editor-accent) 42%, rgb(var(--cyan-rgb) / 0.2));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--editor-accent) 18%, transparent);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-icon-action,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-ai-action,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-mode-switch button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-close {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-icon-action,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-ai-action,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-mode-switch button,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-close {
   min-width: 36px;
   min-height: 36px;
   border: 1px solid rgb(var(--line-rgb) / 0.12);
@@ -93,14 +98,14 @@
   touch-action: manipulation;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-icon-action svg,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-ai-action svg,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-close svg {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-icon-action svg,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-ai-action svg,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-close svg {
   width: 18px;
   height: 18px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-ai-action {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-ai-action {
   border-color: color-mix(in srgb, var(--editor-accent) 34%, rgb(var(--line-rgb) / 0.14));
   color: color-mix(in srgb, var(--text) 88%, var(--editor-accent) 12%);
   background:
@@ -108,8 +113,8 @@
     rgba(255, 255, 255, 0.032);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-mode-switch {
-  min-width: 66px;
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-mode-switch {
+  min-width: 74px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 3px;
@@ -119,45 +124,53 @@
   background: rgba(255, 255, 255, 0.026);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-mode-switch button {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-mode-switch button {
   min-width: 28px;
   min-height: 30px;
-  padding: 0 7px;
+  padding: 0;
   border: 0;
   border-radius: 13px;
   background: transparent;
   color: var(--text-dim);
-  font-size: 0.68rem;
-  font-weight: 750;
-  letter-spacing: 0;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-mode-switch button.is-active {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-mode-switch button svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+  opacity: 0.86;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-mode-switch button.is-active {
   color: color-mix(in srgb, var(--text) 86%, var(--editor-accent) 14%);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018)),
     color-mix(in srgb, var(--editor-accent) 15%, rgba(255, 255, 255, 0.02));
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-shell {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-mode-switch button.is-active svg {
+  opacity: 1;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-shell {
   grid-row: 2;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-column,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-frame {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-column,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-frame {
   min-height: 0;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-frame,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane.is-immersive .editor-stage-frame {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-frame,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane.is-immersive .editor-stage-frame {
   height: 100%;
   min-height: 0;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell {
   height: 100%;
   min-height: 0;
   border-radius: 24px;
@@ -165,29 +178,36 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-editor {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-editor {
   padding:
     22px
     max(16px, env(safe-area-inset-right))
     calc(118px + env(safe-area-inset-bottom))
-    max(42px, calc(env(safe-area-inset-left) + 34px));
+    max(74px, calc(env(safe-area-inset-left) + 64px));
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-side-menu {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu {
   opacity: 1;
-  margin-left: 4px;
+  margin-left: 0;
+  z-index: 20;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-side-menu button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-file-panel button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-link-toolbar button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-floating-toolbar-popover button {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu button,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar button,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-file-panel button,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-link-toolbar button,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover button {
   min-width: 40px;
   min-height: 40px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-floating-toolbar-popover {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu button {
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 14px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover {
   position: fixed !important;
   inset:
     auto
@@ -195,61 +215,164 @@
     max(82px, calc(env(safe-area-inset-bottom) + 78px))
     max(8px, env(safe-area-inset-left)) !important;
   width: auto !important;
-  max-width: none !important;
+  max-width: calc(100vw - 16px) !important;
+  max-width: calc(100dvw - 16px) !important;
   transform: none !important;
   z-index: 1400 !important;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 24px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-formatting-toolbar,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .editor-formatting-toolbar-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 24px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-formatting-toolbar,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar {
   max-width: 100%;
   overflow-x: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-formatting-toolbar::-webkit-scrollbar,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar::-webkit-scrollbar {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-formatting-toolbar {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 26%, rgb(var(--line-rgb) / 0.14));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 12%, transparent), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.076), rgba(255, 255, 255, 0.022)),
+    rgb(var(--surface-deep-rgb) / 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.058),
+    0 22px 54px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(22px);
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  touch-action: pan-x;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-formatting-toolbar > * {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .mantine-Button-root,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .mantine-ActionIcon-root {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 15px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .mantine-Button-root {
+  max-width: 118px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .mantine-Button-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-select {
+  max-width: 124px;
+  min-width: 0;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .editor-font-select {
+  max-width: 86px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover .bn-formatting-toolbar::-webkit-scrollbar,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar::-webkit-scrollbar {
   display: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell [data-file-block],
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-block-content[data-content-type="image"],
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-stage-shell .bn-block-content[data-content-type="video"] {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-menu-dropdown,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-form-popover,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-panel-popover {
+  max-width: calc(100vw - 16px);
+  max-width: calc(100dvw - 16px);
+  max-height: min(54vh, 360px);
+  max-height: min(54dvh, 360px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 20px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-form-popover .mantine-TextInput-root,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-form-popover .mantine-FileInput-root {
+  width: min(300px, calc(100vw - 42px));
+  width: min(300px, calc(100dvw - 42px));
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell [data-file-block],
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-block-content[data-content-type="image"],
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-block-content[data-content-type="video"] {
   touch-action: manipulation;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-sidepanel,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane.is-mobile-note-menu-open .editor-sidepanel {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-sidepanel,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane.is-mobile-note-menu-open .editor-sidepanel {
   display: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane.is-mobile-note-menu-open .editor-sidepanel {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane.is-mobile-note-menu-open .editor-sidepanel {
   position: fixed;
   left: max(8px, env(safe-area-inset-left));
   right: max(8px, env(safe-area-inset-right));
   bottom: max(8px, env(safe-area-inset-bottom));
   z-index: 1320;
-  max-height: min(82vh, calc(100vh - max(18px, env(safe-area-inset-top))));
-  max-height: min(82dvh, calc(100dvh - max(18px, env(safe-area-inset-top))));
+  max-height: min(86vh, calc(100vh - max(18px, env(safe-area-inset-top))));
+  max-height: min(86dvh, calc(100dvh - max(18px, env(safe-area-inset-top))));
   display: grid;
-  gap: 10px;
+  grid-auto-rows: min-content;
+  gap: 11px;
   overflow: auto;
-  padding: 12px;
-  border-radius: 28px;
+  width: auto;
+  padding:
+    10px
+    max(12px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  border-radius: 30px;
   border: 1px solid color-mix(in srgb, var(--editor-accent) 26%, rgb(var(--line-rgb) / 0.13));
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 10%, transparent), transparent 44%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.074), rgba(255, 255, 255, 0.022)),
-    rgb(var(--surface-deep-rgb) / 0.94);
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--editor-accent) 16%, transparent), transparent 38%),
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 8%, transparent), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.082), rgba(255, 255, 255, 0.024)),
+    rgb(var(--surface-deep-rgb) / 0.96);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.055),
-    0 26px 64px rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(22px);
+    inset 0 1px 0 rgba(255, 255, 255, 0.062),
+    0 28px 70px rgba(0, 0, 0, 0.44);
+  backdrop-filter: blur(24px);
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--editor-accent) 36%, transparent) transparent;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-backdrop {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-handle {
+  justify-self: center;
+  width: 42px;
+  height: 4px;
+  display: block;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-dim) 38%, transparent);
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1310;
@@ -258,7 +381,7 @@
   background: rgba(0, 0, 0, 0.24);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-head {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -266,7 +389,18 @@
   padding: 2px 2px 0;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-head span {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-head {
+  position: sticky;
+  top: -10px;
+  z-index: 2;
+  align-items: start;
+  padding: 4px 0 8px;
+  background:
+    linear-gradient(180deg, rgb(var(--surface-deep-rgb) / 0.98), rgb(var(--surface-deep-rgb) / 0.84) 72%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-head span {
   display: block;
   color: var(--text);
   font-size: 0.9rem;
@@ -274,26 +408,255 @@
   letter-spacing: 0;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-head p {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-kicker {
+  color: color-mix(in srgb, var(--text) 76%, var(--editor-accent) 24%) !important;
+  font-size: 0.62rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-title {
+  display: block;
+  max-width: min(68vw, 520px);
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 780;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-head p {
   margin: 3px 0 0;
   color: var(--text-dim);
   font-size: 0.72rem;
   line-height: 1.35;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-sheet-close {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-close {
   transform: rotate(90deg);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-detail-card {
-  border-radius: 22px;
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-head .editor-pane-mobile-sheet-close {
+  flex: 0 0 auto;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  transform: none;
+  border-radius: 16px;
+  color: var(--text-dim);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-only-action {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-head .editor-pane-mobile-sheet-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-summary span {
+  min-width: 0;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgb(var(--line-rgb) / 0.1));
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+  color: var(--text-dim);
+  font-size: 0.56rem;
+  font-weight: 680;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-summary strong {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-summary .editor-pane-mobile-options-status {
+  color: color-mix(in srgb, var(--text) 84%, var(--editor-accent) 16%);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 16%, transparent), transparent 68%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-detail-card,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card {
+  gap: 12px;
+  padding: 12px;
+  border-radius: 24px;
+  border-color: color-mix(in srgb, var(--editor-accent) 20%, rgb(var(--line-rgb) / 0.11));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 8%, transparent), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.022);
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-section-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-option-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 30%, rgb(var(--line-rgb) / 0.12));
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--editor-accent) 22%, transparent), transparent 62%),
+    rgba(255, 255, 255, 0.034);
+  color: color-mix(in srgb, var(--text) 82%, var(--editor-accent) 18%);
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-option-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-option-icon.is-small {
+  width: 30px;
+  height: 30px;
+  border-radius: 13px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-option-icon.is-small svg {
+  width: 15px;
+  height: 15px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-section-head strong,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-field-title span:last-child {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 760;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-section-head p {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.66rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-field {
+  gap: 8px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-field-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .editor-pane-detail-label {
+  display: none;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .editor-pane-detail-select,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .tag-input-input,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .orbital-custom-color-control {
+  min-height: 46px;
+  border-radius: 18px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .tag-input-pills {
+  flex-wrap: wrap;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .tag-input-field {
+  min-width: min(160px, 48vw);
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .editor-pane-color-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .color-swatch.compact {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  border-radius: 15px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-only-action {
   display: inline-flex;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-detail-card-actions .editor-pane-action-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-detail-card-actions .micro-action,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row {
+  width: 100%;
+  min-height: 48px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 18px;
+  font-size: 0.76rem;
+  text-align: left;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row .editor-pane-mobile-option-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 14px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row .editor-pane-mobile-option-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row.danger {
+  border-color: color-mix(in srgb, #ff6f8b 34%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(135deg, rgb(255 111 139 / 0.11), transparent 64%),
+    rgba(255, 255, 255, 0.026);
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-formatbar {
   grid-row: 3;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -311,7 +674,7 @@
   backdrop-filter: blur(18px);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar button {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-formatbar button {
   min-width: 0;
   min-height: 42px;
   border: 1px solid rgb(var(--line-rgb) / 0.11);
@@ -327,14 +690,14 @@
   touch-action: manipulation;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar span {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-formatbar span {
   display: block;
   font-size: 0.88rem;
   font-weight: 780;
   line-height: 1;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar small {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-formatbar small {
   display: block;
   max-width: 100%;
   color: var(--text-dim);
@@ -346,7 +709,7 @@
   white-space: nowrap;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-layer {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-layer {
   position: fixed;
   inset: 0;
   z-index: 1330;
@@ -354,7 +717,7 @@
   pointer-events: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-backdrop {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-backdrop {
   position: absolute;
   inset: 0;
   border: 0;
@@ -362,13 +725,16 @@
   pointer-events: auto;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-menu {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-menu {
   position: absolute;
   left: max(8px, env(safe-area-inset-left));
   right: max(8px, env(safe-area-inset-right));
   bottom: max(72px, calc(env(safe-area-inset-bottom) + 68px));
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
+  max-height: min(78vh, calc(100vh - 112px));
+  max-height: min(78dvh, calc(100dvh - 112px));
   padding: 12px;
   border-radius: 26px;
   border: 1px solid color-mix(in srgb, var(--editor-accent) 26%, rgb(var(--line-rgb) / 0.13));
@@ -380,73 +746,133 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.055),
     0 22px 54px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(22px);
+  overflow: hidden;
   pointer-events: auto;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-head {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-head {
   display: grid;
   gap: 4px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-head span {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-head span {
   color: var(--text);
   font-size: 0.86rem;
   font-weight: 760;
   line-height: 1.2;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-head p {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-head p {
   margin: 0;
   color: var(--text-dim);
   font-size: 0.68rem;
   line-height: 1.38;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-scroll {
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 1px 2px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--editor-accent) 34%, transparent) transparent;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-group {
+  min-width: 0;
+  display: grid;
   gap: 7px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid button {
-  min-width: 0;
-  min-height: 56px;
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-group h3 {
+  margin: 0;
+  color: color-mix(in srgb, var(--text) 78%, var(--editor-accent) 22%);
+  font-size: 0.62rem;
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-grid {
   display: grid;
-  place-items: center;
-  gap: 4px;
-  padding: 8px 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-grid button {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
   border: 1px solid rgb(var(--line-rgb) / 0.11);
-  border-radius: 17px;
+  border-radius: 18px;
   background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 8%, transparent), transparent 62%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.014)),
     rgba(255, 255, 255, 0.024);
   color: var(--text);
   font: inherit;
-  text-align: center;
+  text-align: left;
+  touch-action: manipulation;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid span {
-  display: block;
-  min-width: 24px;
-  min-height: 20px;
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-grid button:active {
+  transform: translateY(1px);
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-glyph {
+  width: 34px;
+  height: 34px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 28%, rgb(var(--line-rgb) / 0.13));
+  background:
+    radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--editor-accent) 22%, transparent), transparent 58%),
+    rgba(255, 255, 255, 0.032);
   color: color-mix(in srgb, var(--text) 84%, var(--editor-accent) 16%);
-  font-size: 0.9rem;
+  font-size: 0.68rem;
   font-weight: 800;
   line-height: 1;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid strong {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-grid strong {
   max-width: 100%;
   overflow: hidden;
-  color: var(--text-dim);
-  font-size: 0.58rem;
-  font-weight: 700;
-  line-height: 1.1;
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 760;
+  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-mobile-backdrop {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-grid small {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.58rem;
+  font-weight: 620;
+  line-height: 1.22;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-mobile-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1340;
@@ -455,8 +881,8 @@
   background: transparent;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-panel.is-docked,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-panel.is-floating {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-panel.is-docked,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-panel.is-floating {
   position: fixed !important;
   inset:
     auto
@@ -471,26 +897,26 @@
   border-radius: 28px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-command-card {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-command-card {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-prompt-card {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-prompt-card {
   border-radius: 24px 24px 15px 15px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-command-card {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-command-card {
   border-radius: 15px 15px 24px 24px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .note-transfer-layer {
+.locoris-adaptive-shell[data-mobile-shell="true"] .note-transfer-layer {
   place-items: end center;
   padding: 0;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .note-transfer-modal {
+.locoris-adaptive-shell[data-mobile-shell="true"] .note-transfer-modal {
   width: 100%;
   max-height: min(84vh, calc(100vh - max(18px, env(safe-area-inset-top))));
   max-height: min(84dvh, calc(100dvh - max(18px, env(safe-area-inset-top))));
@@ -502,16 +928,16 @@
     max(14px, env(safe-area-inset-left));
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .note-transfer-option-grid {
+.locoris-adaptive-shell[data-mobile-shell="true"] .note-transfer-option-grid {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-layer {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-preview-layer {
   padding: 0;
   place-items: stretch;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-modal {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-preview-modal {
   width: 100vw;
   width: 100dvw;
   max-width: 100vw;
@@ -529,50 +955,54 @@
     max(14px, env(safe-area-inset-left));
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-grid {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-preview-grid {
   max-height: none;
   grid-template-columns: minmax(0, 1fr);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-secondary,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-ai-preview-primary {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-preview-secondary,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-ai-preview-primary {
   min-height: 44px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-side-menu button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-formatting-toolbar button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-file-panel button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-link-toolbar button {
+.locoris-adaptive-shell[data-pointer-mode="coarse"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-side-menu button,
+.locoris-adaptive-shell[data-pointer-mode="coarse"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-formatting-toolbar button,
+.locoris-adaptive-shell[data-pointer-mode="coarse"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-file-panel button,
+.locoris-adaptive-shell[data-pointer-mode="coarse"][data-layout-device="tablet"][data-layout-orientation="landscape"] .editor-stage-shell .bn-link-toolbar button {
   min-width: 40px;
   min-height: 40px;
 }
 
 @media (max-width: 430px) {
-  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-header {
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-header {
     grid-template-columns: 38px minmax(0, 1fr) 38px minmax(58px, auto) 38px;
     gap: 4px;
     padding: 5px;
   }
 
-  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-title-field {
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-title-field {
     font-size: 0.9rem;
   }
 
-  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar {
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-formatbar {
     gap: 4px;
     padding: 5px;
   }
 
-  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar button {
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-formatbar button {
     min-height: 40px;
     border-radius: 14px;
   }
 
-  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-formatbar small {
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-formatbar small {
     display: none;
   }
 
-  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .editor-pane-mobile-insert-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-insert-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-editor {
+    padding-left: max(68px, calc(env(safe-area-inset-left) + 58px));
   }
 }

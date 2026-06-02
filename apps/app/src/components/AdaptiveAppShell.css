@@ -3,7 +3,8 @@
   min-height: 100dvh;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"] {
+.locoris-adaptive-shell[data-runtime-kind="android"],
+.locoris-adaptive-shell[data-mobile-shell="true"] {
   overflow: hidden;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -13,25 +14,37 @@
 .locoris-adaptive-shell[data-runtime-kind="android"] button,
 .locoris-adaptive-shell[data-runtime-kind="android"] input,
 .locoris-adaptive-shell[data-runtime-kind="android"] textarea,
-.locoris-adaptive-shell[data-runtime-kind="android"] select {
+.locoris-adaptive-shell[data-runtime-kind="android"] select,
+.locoris-adaptive-shell[data-mobile-shell="true"] button,
+.locoris-adaptive-shell[data-mobile-shell="true"] input,
+.locoris-adaptive-shell[data-mobile-shell="true"] textarea,
+.locoris-adaptive-shell[data-mobile-shell="true"] select {
   -webkit-tap-highlight-color: transparent;
 }
 
 .locoris-adaptive-shell[data-runtime-kind="android"] .orbital-command-button,
 .locoris-adaptive-shell[data-runtime-kind="android"] .orbital-toolbar-action,
 .locoris-adaptive-shell[data-runtime-kind="android"] .toolbar-action,
-.locoris-adaptive-shell[data-runtime-kind="android"] .micro-action {
+.locoris-adaptive-shell[data-runtime-kind="android"] .micro-action,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-command-button,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-toolbar-action,
+.locoris-adaptive-shell[data-mobile-shell="true"] .toolbar-action,
+.locoris-adaptive-shell[data-mobile-shell="true"] .micro-action {
   min-height: 40px;
 }
 
 .locoris-adaptive-shell[data-runtime-kind="android"] .orbital-tree-item,
 .locoris-adaptive-shell[data-runtime-kind="android"] .orbital-menu-compact-item,
 .locoris-adaptive-shell[data-runtime-kind="android"] .orbital-overview-link,
-.locoris-adaptive-shell[data-runtime-kind="android"] .orbital-overview-project-card {
+.locoris-adaptive-shell[data-runtime-kind="android"] .orbital-overview-project-card,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-tree-item,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-menu-compact-item,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-overview-link,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-overview-project-card {
   min-height: 44px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-overlay {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-overlay {
   padding:
     max(10px, env(safe-area-inset-top))
     max(10px, env(safe-area-inset-right))
@@ -39,19 +52,19 @@
     max(10px, env(safe-area-inset-left));
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-command-bar {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-command-bar {
   position: relative;
   grid-template-columns: 1fr;
   gap: 8px;
   border-radius: 24px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-command-status {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-command-status {
   align-items: stretch;
   flex-direction: column;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-command-actions {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-command-actions {
   grid-column: 1;
   grid-row: auto;
   width: 100%;
@@ -59,31 +72,22 @@
   justify-content: flex-start;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-layout,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-layout.has-editor {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-layout,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-layout.has-editor {
   grid-template-columns: 1fr;
   min-height: 0;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-scene-wrap {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-scene-wrap {
   min-height: 58dvh;
   border-radius: 26px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="phone"] .orbital-inspector.panel {
-  max-height: min(54dvh, 540px);
-  border-radius: 26px;
-}
-
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="portrait"] .orbital-inspector.panel {
-  max-height: min(46dvh, 620px);
-}
-
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .orbital-overlay {
+.locoris-adaptive-shell[data-pointer-mode="coarse"][data-layout-device="tablet"][data-layout-orientation="landscape"] .orbital-overlay {
   padding: 14px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .orbital-command-button,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-layout-device="tablet"][data-layout-orientation="landscape"] .orbital-toolbar-action {
+.locoris-adaptive-shell[data-pointer-mode="coarse"][data-layout-device="tablet"][data-layout-orientation="landscape"] .orbital-command-button,
+.locoris-adaptive-shell[data-pointer-mode="coarse"][data-layout-device="tablet"][data-layout-orientation="landscape"] .orbital-toolbar-action {
   min-height: 38px;
 }

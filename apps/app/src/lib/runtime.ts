@@ -21,6 +21,7 @@ export type AppRuntimeLayoutSnapshot = {
 };
 
 const PHONE_MAX_SHORT_SIDE = 719;
+const MOBILE_SHELL_MAX_WIDTH = 980;
 const TABLET_LANDSCAPE_MIN_WIDTH = 1024;
 
 function hasWindow() {
@@ -88,8 +89,10 @@ export function getRuntimeLayoutSnapshot(): AppRuntimeLayoutSnapshot {
   const pointer = getPointerMode();
   const shortSide = Math.min(width, height);
   const isAndroid = runtimeKind === "android";
-  const isPhone = isAndroid && shortSide <= PHONE_MAX_SHORT_SIDE;
-  const isTablet = isAndroid && !isPhone;
+  const isWebNarrowShell = runtimeKind === "web" && width <= MOBILE_SHELL_MAX_WIDTH;
+  const usesTouchShell = isAndroid || isWebNarrowShell;
+  const isPhone = usesTouchShell && shortSide <= PHONE_MAX_SHORT_SIDE;
+  const isTablet = usesTouchShell && !isPhone;
   const isTabletLandscape =
     isTablet && orientation === "landscape" && width >= TABLET_LANDSCAPE_MIN_WIDTH;
   const device: AppLayoutDevice = isPhone ? "phone" : isTablet ? "tablet" : "desktop";
@@ -106,6 +109,6 @@ export function getRuntimeLayoutSnapshot(): AppRuntimeLayoutSnapshot {
     isPhone,
     isTablet,
     isTabletLandscape,
-    isMobileShell: isAndroid && !isTabletLandscape
+    isMobileShell: usesTouchShell && !isTabletLandscape
   };
 }

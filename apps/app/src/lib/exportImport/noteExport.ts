@@ -6,10 +6,13 @@ import {
   ImageRun,
   Packer,
   Paragraph,
+  ShadingType,
   Table,
   TableCell,
+  TableLayoutType,
   TableRow,
   TextRun,
+  VerticalAlignTable,
   WidthType
 } from "docx";
 import type { jsPDF as JsPDFDocument } from "jspdf";
@@ -35,6 +38,49 @@ export type NoteDocxAsset = {
 
 const DOCX_MAX_IMAGE_WIDTH = 560;
 const DOCX_MAX_IMAGE_HEIGHT = 720;
+const DOCX_TABLE_WIDTH_TWIPS = 9020;
+const DOCX_TABLE_CELL_MARGIN_TWIPS = 120;
+const DOCX_TABLE_BORDER_COLOR = "CBD5E1";
+const DOCX_TABLE_HEADER_FILL = "F1F5F9";
+const DOCX_TABLE_HEADER_TEXT = "111827";
+
+const DOCX_TEXT_COLORS: Record<string, string> = {
+  gray: "#6B7280",
+  brown: "#8B5E4B",
+  red: "#DC2626",
+  orange: "#EA580C",
+  yellow: "#B45309",
+  green: "#047857",
+  blue: "#0369A1",
+  purple: "#7C3AED",
+  pink: "#DB2777"
+};
+
+const DOCX_BACKGROUND_COLORS: Record<string, string> = {
+  gray: "#F3F4F6",
+  brown: "#F4ECE7",
+  red: "#FEE2E2",
+  orange: "#FFEDD5",
+  yellow: "#FEF3C7",
+  green: "#D1FAE5",
+  blue: "#E0F2FE",
+  purple: "#EDE9FE",
+  pink: "#FCE7F3"
+};
+
+type TableContent = {
+  type?: string;
+  columnWidths?: unknown;
+  headerRows?: unknown;
+  headerCols?: unknown;
+  rows?: Array<{
+    cells?: StoredBlock[];
+  }>;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
 
 function getInlineText(content: unknown): string {
   if (typeof content === "string") {
@@ -68,6 +114,231 @@ function getInlineText(content: unknown): string {
 
 function getBlockProps(block: StoredBlock) {
   return block.props && typeof block.props === "object" ? block.props : {};
+}
+
+function getPositiveInteger(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.max(1, Math.round(value))
+    : fallback;
+}
+
+function normalizeDocxHexColor(value: unknown, palette: Record<string, string> = {}) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const normalized = value.trim();
+
+  if (!normalized || normalized === "default") {
+    return "";
+  }
+
+  const candidate = palette[normalized] ?? normalized;
+  const match = /^#?([0-9a-f]{6})$/i.exec(candidate);
+
+  return match?.[1]?.toUpperCase() ?? "";
+}
+
+function getDocxAlignment(value: unknown) {
+  if (value === "center") {
+    return AlignmentType.CENTER;
+  }
+
+  if (value === "right") {
+    return AlignmentType.RIGHT;
+  }
+
+  if (value === "justify") {
+    return AlignmentType.JUSTIFIED;
+  }
+
+  return AlignmentType.LEFT;
+}
+
+function getTableContent(content: unknown): TableContent | null {
+  if (!isRecord(content) || !Array.isArray(content.rows) || content.rows.length === 0) {
+    return null;
+  }
+
+  return content as TableContent;
+}
+
+function getTableCellSpan(cell: StoredBlock, key: "colspan" | "rowspan") {
+  const props = getBlockProps(cell);
+  return getPositiveInteger(props[key], 1);
+}
+
+function getTableColumnCount(tableContent: TableContent) {
+  return Math.max(
+    1,
+    ...(tableContent.rows ?? []).map((row) =>
+      (row.cells ?? []).reduce((count, cell) => count + getTableCellSpan(cell, "colspan"), 0)
+    )
+  );
+}
+
+function getDocxTableColumnWidths(tableContent: TableContent, columnCount: number) {
+  const rawWidths = Array.isArray(tableContent.columnWidths) ? tableContent.columnWidths : [];
+  const explicitWidths = Array.from({ length: columnCount }, (_, index) => {
+    const value = rawWidths[index];
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+  });
+  const explicitPositiveWidths = explicitWidths.filter((width) => width > 0);
+  const fallbackSourceWidth =
+    explicitPositiveWidths.length > 0
+      ? explicitPositiveWidths.reduce((sum, width) => sum + width, 0) / explicitPositiveWidths.length
+      : 0;
+  const positiveWidths = explicitWidths.map((width) => width || fallbackSourceWidth);
+  const totalWidth = positiveWidths.reduce((sum, width) => sum + width, 0);
+
+  if (totalWidth <= 0) {
+    const baseWidth = Math.floor(DOCX_TABLE_WIDTH_TWIPS / columnCount);
+    return Array.from({ length: columnCount }, (_, index) =>
+      index === columnCount - 1
+        ? DOCX_TABLE_WIDTH_TWIPS - baseWidth * (columnCount - 1)
+        : baseWidth
+    );
+  }
+
+  let usedWidth = 0;
+  return positiveWidths.map((width, index) => {
+    if (index === columnCount - 1) {
+      return Math.max(1, DOCX_TABLE_WIDTH_TWIPS - usedWidth);
+    }
+
+    const nextWidth = Math.max(1, Math.round((width / totalWidth) * DOCX_TABLE_WIDTH_TWIPS));
+    usedWidth += nextWidth;
+    return nextWidth;
+  });
+}
+
+function sumColumnWidths(columnWidths: readonly number[], startIndex: number, span: number) {
+  return columnWidths
+    .slice(startIndex, Math.min(columnWidths.length, startIndex + span))
+    .reduce((sum, width) => sum + width, 0);
+}
+
+function createDocxTableBorders() {
+  return {
+    top: { style: BorderStyle.SINGLE, size: 4, color: DOCX_TABLE_BORDER_COLOR },
+    bottom: { style: BorderStyle.SINGLE, size: 4, color: DOCX_TABLE_BORDER_COLOR },
+    left: { style: BorderStyle.SINGLE, size: 4, color: DOCX_TABLE_BORDER_COLOR },
+    right: { style: BorderStyle.SINGLE, size: 4, color: DOCX_TABLE_BORDER_COLOR },
+    insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: DOCX_TABLE_BORDER_COLOR },
+    insideVertical: { style: BorderStyle.SINGLE, size: 4, color: DOCX_TABLE_BORDER_COLOR }
+  };
+}
+
+function createDocxTableCell(input: {
+  cell: StoredBlock;
+  columnIndex: number;
+  columnWidths: readonly number[];
+  isHeader: boolean;
+}) {
+  const props = getBlockProps(input.cell);
+  const colSpan = Math.min(
+    getTableCellSpan(input.cell, "colspan"),
+    Math.max(1, input.columnWidths.length - input.columnIndex)
+  );
+  const rowSpan = getTableCellSpan(input.cell, "rowspan");
+  const cellWidth = Math.max(1, sumColumnWidths(input.columnWidths, input.columnIndex, colSpan));
+  const textColor =
+    normalizeDocxHexColor(props.textColor, DOCX_TEXT_COLORS) ||
+    (input.isHeader ? DOCX_TABLE_HEADER_TEXT : undefined);
+  const backgroundColor =
+    normalizeDocxHexColor(props.backgroundColor, DOCX_BACKGROUND_COLORS) ||
+    (input.isHeader ? DOCX_TABLE_HEADER_FILL : undefined);
+  const text = getInlineText(input.cell.content).trim();
+
+  return new TableCell({
+    width: { size: cellWidth, type: WidthType.DXA },
+    columnSpan: colSpan > 1 ? colSpan : undefined,
+    rowSpan: rowSpan > 1 ? rowSpan : undefined,
+    verticalAlign: VerticalAlignTable.CENTER,
+    margins: {
+      top: DOCX_TABLE_CELL_MARGIN_TWIPS,
+      bottom: DOCX_TABLE_CELL_MARGIN_TWIPS,
+      left: DOCX_TABLE_CELL_MARGIN_TWIPS,
+      right: DOCX_TABLE_CELL_MARGIN_TWIPS
+    },
+    shading: backgroundColor
+      ? {
+          type: ShadingType.CLEAR,
+          fill: backgroundColor,
+          color: "auto"
+        }
+      : undefined,
+    children: [
+      new Paragraph({
+        alignment: getDocxAlignment(props.textAlignment),
+        spacing: { before: 0, after: 0 },
+        children: [
+          new TextRun({
+            text: text || " ",
+            bold: input.isHeader,
+            color: textColor
+          })
+        ]
+      })
+    ]
+  });
+}
+
+function createDocxTableFromBlock(block: StoredBlock) {
+  const tableContent = getTableContent(block.content);
+
+  if (!tableContent) {
+    return new Paragraph({
+      spacing: { after: 90 },
+      children: [new TextRun({ text: getInlineText(block.content).trim() || "Table" })]
+    });
+  }
+
+  const columnCount = getTableColumnCount(tableContent);
+  const columnWidths = getDocxTableColumnWidths(tableContent, columnCount);
+  const headerRows = getPositiveInteger(tableContent.headerRows, 0);
+  const headerCols = getPositiveInteger(tableContent.headerCols, 0);
+  const rows = (tableContent.rows ?? []).map((row, rowIndex) => {
+    let columnIndex = 0;
+    const cells = (row.cells ?? []).map((cell, cellIndex) => {
+      const nextCell = createDocxTableCell({
+        cell,
+        columnIndex,
+        columnWidths,
+        isHeader: rowIndex < headerRows || cellIndex < headerCols
+      });
+      columnIndex += getTableCellSpan(cell, "colspan");
+      return nextCell;
+    });
+
+    while (columnIndex < columnCount) {
+      cells.push(
+        createDocxTableCell({
+          cell: { type: "tableCell", content: [], props: {} } as StoredBlock,
+          columnIndex,
+          columnWidths,
+          isHeader: rowIndex < headerRows || columnIndex < headerCols
+        })
+      );
+      columnIndex += 1;
+    }
+
+    return new TableRow({ children: cells });
+  });
+
+  return new Table({
+    width: { size: "100%", type: WidthType.PERCENTAGE },
+    columnWidths,
+    layout: TableLayoutType.FIXED,
+    margins: {
+      top: DOCX_TABLE_CELL_MARGIN_TWIPS,
+      bottom: DOCX_TABLE_CELL_MARGIN_TWIPS,
+      left: DOCX_TABLE_CELL_MARGIN_TWIPS,
+      right: DOCX_TABLE_CELL_MARGIN_TWIPS
+    },
+    borders: createDocxTableBorders(),
+    rows
+  });
 }
 
 function getMediaBlockUrl(block: StoredBlock, props: Record<string, unknown>) {
@@ -376,22 +647,7 @@ async function blockToDocxParagraphs(
 
   if (type === "table") {
     return [
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({
-                children: [
-                  new Paragraph({
-                    text: text || "Table"
-                  })
-                ]
-              })
-            ]
-          })
-        ]
-      }),
+      createDocxTableFromBlock(block),
       ...children
     ];
   }

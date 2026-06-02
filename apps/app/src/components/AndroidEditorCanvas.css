@@ -1,8 +1,8 @@
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-modal-layer.orbital-editor-modal-layer {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-modal-layer.orbital-editor-modal-layer {
   padding: 0;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-modal-window.orbital-editor-modal-window {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-modal-window.orbital-editor-modal-window {
   width: 100vw;
   width: 100dvw;
   max-width: 100vw;
@@ -16,21 +16,21 @@
   box-shadow: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-scroll {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-scroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topbar {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topbar {
   top: max(8px, env(safe-area-inset-top));
   right: max(8px, env(safe-area-inset-right));
   z-index: 80;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topactions,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topactions.is-canvas-mode,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topactions.is-note-mode {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topactions,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topactions.is-canvas-mode,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topactions.is-note-mode {
   min-height: 44px;
   padding: 5px;
   border: 1px solid rgb(var(--line-rgb) / 0.12);
@@ -39,19 +39,19 @@
     rgb(var(--surface-deep-rgb) / 0.78);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topactions .toolbar-action,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topbar.is-canvas-mode .toolbar-action,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-topbar.is-note-mode .toolbar-action {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topactions .toolbar-action,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topbar.is-canvas-mode .toolbar-action,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topbar.is-note-mode .toolbar-action {
   min-width: 42px;
   min-height: 34px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-ai-preview-layer {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-layer {
   padding: 0;
   place-items: stretch;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-ai-preview-modal {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-modal {
   width: 100vw;
   width: 100dvw;
   max-width: 100vw;
@@ -69,23 +69,23 @@
     max(14px, env(safe-area-inset-left));
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-ai-preview-grid {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-grid {
   max-height: none;
   grid-template-columns: minmax(0, 1fr);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-ai-preview-secondary,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-ai-preview-primary {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-secondary,
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-primary {
   min-height: 44px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-modal-window.is-canvas-mode .canvas-pane {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-modal-window.is-canvas-mode .canvas-pane {
   gap: 0;
   padding: 0;
   background: #080a16;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .orbital-editor-modal-window.is-canvas-mode .canvas-pane-toolbar {
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-modal-window.is-canvas-mode .canvas-pane-toolbar {
   position: absolute;
   z-index: 42;
   top: max(52px, calc(env(safe-area-inset-top) + 46px));
@@ -98,51 +98,51 @@
   border-radius: 24px;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane-toolbar-main {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-toolbar-main {
   flex-basis: 100%;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-title-field {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-title-field {
   min-height: 44px;
   flex-basis: 100%;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane-toolbar-meta {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-toolbar-meta {
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane-toolbar-meta::-webkit-scrollbar {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-toolbar-meta::-webkit-scrollbar {
   display: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane-contextmeta {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-contextmeta {
   display: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane-shell,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-pane-shell {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-shell,
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-pane-shell {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-stage-column,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-stage-column {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-stage-column,
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-stage-column {
   display: flex;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-sidepanel,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-sidepanel {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-sidepanel,
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-sidepanel {
   display: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-stage-frame,
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-pane.is-immersive .canvas-stage-frame {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-stage-frame,
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane.is-immersive .canvas-stage-frame {
   height: 100vh;
   height: 100dvh;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-stage-shell {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-stage-shell {
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -150,11 +150,11 @@
   overscroll-behavior: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-stage-shell .excalidraw {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-stage-shell .excalidraw {
   touch-action: none;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-ai-popover {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-popover {
   position: fixed !important;
   inset:
     auto
@@ -167,34 +167,34 @@
   z-index: 1350;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-ai-command-card {
+.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-command-card {
   overflow: auto;
   overscroll-behavior: contain;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .zoom-button,
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .undo-redo-buttons button,
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .main-menu-trigger,
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .help-icon,
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .default-sidebar-trigger,
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .sidebar-trigger {
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .zoom-button,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .undo-redo-buttons button,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .main-menu-trigger,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .help-icon,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .default-sidebar-trigger,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .sidebar-trigger {
   min-width: 44px !important;
   min-height: 44px !important;
 }
 
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .Island button,
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .App-toolbar button,
-.locoris-adaptive-shell[data-runtime-kind="android"] .canvas-stage-shell .excalidraw .ToolIcon__icon {
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .Island button,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .App-toolbar button,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .ToolIcon__icon {
   min-width: 42px;
   min-height: 42px;
 }
 
 @media (max-width: 430px) {
-  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-surface-switcher {
+  .locoris-adaptive-shell[data-mobile-shell="true"] .canvas-surface-switcher {
     flex: 1 1 auto;
   }
 
-  .locoris-adaptive-shell[data-runtime-kind="android"][data-mobile-shell="true"] .canvas-surface-tab {
+  .locoris-adaptive-shell[data-mobile-shell="true"] .canvas-surface-tab {
     flex: 1 1 0;
   }
 }

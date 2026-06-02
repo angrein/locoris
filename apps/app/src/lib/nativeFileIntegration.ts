@@ -56,6 +56,31 @@ function downloadBlobInBrowser(blob: Blob, fileName: string) {
   URL.revokeObjectURL(objectUrl);
 }
 
+async function writeDesktopFileReplacingExisting(
+  path: string,
+  bytes: Uint8Array,
+  fs: Pick<typeof import("@tauri-apps/plugin-fs"), "exists" | "open" | "remove">
+) {
+  const shouldRemoveExisting = await fs.exists(path).catch(() => false);
+
+  if (shouldRemoveExisting) {
+    await fs.remove(path);
+  }
+
+  const file = await fs.open(path, {
+    write: true,
+    create: true,
+    truncate: true,
+    append: false
+  });
+
+  try {
+    await file.write(bytes);
+  } finally {
+    await file.close();
+  }
+}
+
 function openBrowserFilePicker(accept: string) {
   return new Promise<File | null>((resolve) => {
     const input = document.createElement("input");
@@ -170,7 +195,7 @@ export async function saveTextFileWithDialog(options: {
   preferredExtension: string;
 }) {
   if (isDesktopRuntime()) {
-    const [{ save }, { writeTextFile }] = await Promise.all([
+    const [{ save }, fs] = await Promise.all([
       import("@tauri-apps/plugin-dialog"),
       import("@tauri-apps/plugin-fs")
     ]);
@@ -183,9 +208,10 @@ export async function saveTextFileWithDialog(options: {
       return false;
     }
 
-    await writeTextFile(
+    await writeDesktopFileReplacingExisting(
       ensureFileExtension(selectedPath, options.preferredExtension),
-      options.content
+      new TextEncoder().encode(options.content),
+      fs
     );
     return true;
   }
@@ -204,7 +230,7 @@ export async function saveBlobFileWithDialog(options: {
   preferredExtension: string;
 }) {
   if (isDesktopRuntime()) {
-    const [{ save }, { writeFile }] = await Promise.all([
+    const [{ save }, fs] = await Promise.all([
       import("@tauri-apps/plugin-dialog"),
       import("@tauri-apps/plugin-fs")
     ]);
@@ -218,9 +244,10 @@ export async function saveBlobFileWithDialog(options: {
     }
 
     const bytes = new Uint8Array(await options.blob.arrayBuffer());
-    await writeFile(
+    await writeDesktopFileReplacingExisting(
       ensureFileExtension(selectedPath, options.preferredExtension),
-      bytes
+      bytes,
+      fs
     );
     return true;
   }

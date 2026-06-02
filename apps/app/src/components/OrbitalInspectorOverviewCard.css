@@ -387,6 +387,14 @@
   cursor: grab;
 }
 
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .orbital-inspector-overview-project.is-draggable,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .orbital-inspector-overview-project[draggable="true"],
+.orbital-overlay.is-android-mobile-shell .orbital-inspector-overview-project.is-draggable,
+.orbital-overlay.is-android-mobile-shell .orbital-inspector-overview-project[draggable="true"] {
+  touch-action: pan-y;
+  cursor: default;
+}
+
 .orbital-inspector-overview-project.is-draggable:active,
 .orbital-inspector-overview-project[draggable="true"]:active,
 .orbital-inspector-overview-project.is-dragging {

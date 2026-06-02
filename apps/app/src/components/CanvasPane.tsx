@@ -66,6 +66,7 @@ import {
   buildCanvasAiSpecElements,
   getCanvasAiMermaidThemeVariables,
   getCanvasAiVisualPalette,
+  normalizeCanvasAiBinaryFiles,
   styleCanvasAiElements
 } from "../lib/canvasAiRenderer";
 import type {
@@ -1915,7 +1916,7 @@ export default function CanvasPane({
           note.color || DEFAULT_NOTE_COLOR,
           activeCanvasBackground
         );
-        files = (result.files ?? {}) as BinaryFiles;
+        files = await normalizeCanvasAiBinaryFiles((result.files ?? {}) as BinaryFiles, styledElements);
       }
 
       const visibleCount = styledElements.filter((element) => !element.isDeleted).length;

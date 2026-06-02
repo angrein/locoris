@@ -515,7 +515,6 @@ const VIEWBOX = {
 };
 
 const CAMERA_MIN_SCALE = 0.45;
-const MOBILE_PREVIEW_BREAKPOINT = 720;
 const CAMERA_MAX_SCALE = 2.2;
 const ORBITAL_SCENE_BODY_BUDGET = 70;
 const PROJECT_MIN_DISTANCE = 430;
@@ -2256,11 +2255,6 @@ export default function OrbitalMapView({
   const [devicePixelRatio, setDevicePixelRatio] = useState(
     typeof window === "undefined" ? 1 : window.devicePixelRatio || 1
   );
-  const [isMobilePreviewMode, setIsMobilePreviewMode] = useState(
-    typeof window === "undefined"
-      ? false
-      : window.matchMedia(`(max-width: ${MOBILE_PREVIEW_BREAKPOINT}px)`).matches
-  );
   const [isOrbitInteractionActive, setIsOrbitInteractionActive] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
   const [activeColorFilters, setActiveColorFilters] = useState<string[]>([]);
@@ -2349,6 +2343,13 @@ export default function OrbitalMapView({
   const sceneAnimationFrameRef = useRef<number | null>(null);
   const sceneAnimationLastTimeRef = useRef<number | null>(null);
   const sceneWrapRef = useRef<HTMLDivElement | null>(null);
+  const sceneTouchPointersRef = useRef(new Map<number, { clientX: number; clientY: number }>());
+  const scenePinchRef = useRef<{
+    startDistance: number;
+    anchorWorldX: number;
+    anchorWorldY: number;
+    hasPinched: boolean;
+  } | null>(null);
   const animatedNodePositionsRef = useRef(new Map<string, OrbitalScenePosition>());
   const targetNodePositionsRef = useRef(new Map<string, OrbitalScenePosition>());
   const projectPositionDraftsRef = useRef<Record<string, { x: number; y: number }>>({});
@@ -2419,15 +2420,17 @@ export default function OrbitalMapView({
     | null
   >(null);
   const isAndroidLayout = adaptiveLayout.runtimeKind === "android";
-  const isAndroidTouchLayout = isAndroidLayout || adaptiveLayout.pointer === "coarse";
-  const isAndroidMobileShell = isAndroidLayout && adaptiveLayout.isMobileShell;
+  const isAndroidTouchLayout =
+    isAndroidLayout || adaptiveLayout.pointer === "coarse" || adaptiveLayout.isMobileShell;
+  const isAndroidMobileShell = adaptiveLayout.isMobileShell;
+  const isMobilePreviewMode = adaptiveLayout.isMobileShell;
   const isAndroidPhoneShell = isAndroidMobileShell && adaptiveLayout.device === "phone";
   const isAndroidTabletPortraitShell =
     isAndroidMobileShell &&
     adaptiveLayout.device === "tablet" &&
     adaptiveLayout.orientation === "portrait";
   const isAndroidTabletLandscapeShell =
-    isAndroidLayout &&
+    isAndroidTouchLayout &&
     adaptiveLayout.device === "tablet" &&
     adaptiveLayout.orientation === "landscape";
   const canShowHoverPreview = !isAndroidTouchLayout && !isMobilePreviewMode;
@@ -2503,24 +2506,6 @@ export default function OrbitalMapView({
 
     sceneAnimationFrameRef.current = window.requestAnimationFrame(step);
   };
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_PREVIEW_BREAKPOINT}px)`);
-    const syncMobileMode = () => {
-      setIsMobilePreviewMode(mediaQuery.matches);
-    };
-
-    syncMobileMode();
-    mediaQuery.addEventListener("change", syncMobileMode);
-
-    return () => {
-      mediaQuery.removeEventListener("change", syncMobileMode);
-    };
-  }, []);
 
   useEffect(() => {
     if (isAndroidMobileShell) {
@@ -4295,6 +4280,106 @@ export default function OrbitalMapView({
     }, duration);
   };
 
+  const getScenePointFromClient = (
+    svg: SVGSVGElement,
+    clientX: number,
+    clientY: number
+  ) => {
+    const rect = svg.getBoundingClientRect();
+    const width = rect.width || 1;
+    const height = rect.height || 1;
+
+    return {
+      x: VIEWBOX.minX + ((clientX - rect.left) / width) * VIEWBOX.width,
+      y: VIEWBOX.minY + ((clientY - rect.top) / height) * VIEWBOX.height
+    };
+  };
+
+  const getSceneTouchPair = () => {
+    const pointers = Array.from(sceneTouchPointersRef.current.values());
+
+    if (pointers.length < 2) {
+      return null;
+    }
+
+    const [first, second] = pointers;
+    const distance = Math.hypot(
+      second.clientX - first.clientX,
+      second.clientY - first.clientY
+    );
+
+    return {
+      first,
+      second,
+      distance,
+      centerX: (first.clientX + second.clientX) / 2,
+      centerY: (first.clientY + second.clientY) / 2
+    };
+  };
+
+  const beginScenePinch = (svg: SVGSVGElement) => {
+    const pair = getSceneTouchPair();
+
+    if (!pair || pair.distance < 8) {
+      return false;
+    }
+
+    const currentCamera = cameraRef.current;
+    const center = getScenePointFromClient(svg, pair.centerX, pair.centerY);
+    scenePinchRef.current = {
+      startDistance: pair.distance,
+      anchorWorldX: (center.x - currentCamera.x) / currentCamera.scale,
+      anchorWorldY: (center.y - currentCamera.y) / currentCamera.scale,
+      hasPinched: false
+    };
+    dragRef.current = null;
+    suppressSceneBackgroundClickRef.current = true;
+    closeSelectionHoverPreview();
+    stopCameraAnimation();
+    return true;
+  };
+
+  const updateScenePinch = (svg: SVGSVGElement) => {
+    const pair = getSceneTouchPair();
+
+    if (!pair) {
+      scenePinchRef.current = null;
+      return false;
+    }
+
+    if (!scenePinchRef.current && !beginScenePinch(svg)) {
+      return false;
+    }
+
+    const pinch = scenePinchRef.current;
+
+    if (!pinch || pinch.startDistance < 8) {
+      return false;
+    }
+
+    const currentCamera = cameraRef.current;
+    const nextScale = clamp(
+      currentCamera.scale * (pair.distance / pinch.startDistance),
+      CAMERA_MIN_SCALE,
+      CAMERA_MAX_SCALE
+    );
+    const center = getScenePointFromClient(svg, pair.centerX, pair.centerY);
+    const nextCamera = {
+      x: center.x - pinch.anchorWorldX * nextScale,
+      y: center.y - pinch.anchorWorldY * nextScale,
+      scale: nextScale
+    };
+
+    pinch.startDistance = pair.distance;
+    pinch.anchorWorldX = (center.x - nextCamera.x) / nextScale;
+    pinch.anchorWorldY = (center.y - nextCamera.y) / nextScale;
+    pinch.hasPinched = true;
+    suppressSceneBackgroundClickRef.current = true;
+    cameraRef.current = nextCamera;
+    setCamera(nextCamera);
+    return true;
+  };
+
   useEffect(() => {
     const pendingCenterTarget = pendingInspectorCenterRef.current;
 
@@ -4332,8 +4417,30 @@ export default function OrbitalMapView({
 
   const handlePointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
     markOrbitInteraction();
+    const isNodeTarget = Boolean((event.target as HTMLElement).closest("[data-orbital-node='true']"));
 
-    if ((event.target as HTMLElement).closest("[data-orbital-node='true']")) {
+    if (event.pointerType === "touch") {
+      sceneTouchPointersRef.current.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY
+      });
+
+      if (sceneTouchPointersRef.current.size >= 2) {
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        beginScenePinch(event.currentTarget);
+        return;
+      }
+
+      if (isNodeTarget) {
+        return;
+      }
+
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    if (isNodeTarget) {
       return;
     }
 
@@ -4350,11 +4457,26 @@ export default function OrbitalMapView({
       hasMoved: false
     };
 
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
   };
 
   const handlePointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
     markOrbitInteraction();
+
+    if (event.pointerType === "touch" && sceneTouchPointersRef.current.has(event.pointerId)) {
+      sceneTouchPointersRef.current.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY
+      });
+
+      if (sceneTouchPointersRef.current.size >= 2) {
+        event.preventDefault();
+        updateScenePinch(event.currentTarget);
+        return;
+      }
+    }
 
     if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) {
       return;
@@ -4432,6 +4554,26 @@ export default function OrbitalMapView({
     }
 
     dragRef.current = null;
+  };
+
+  const handleScenePointerEnd = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (event.pointerType === "touch") {
+      if (scenePinchRef.current?.hasPinched) {
+        suppressSceneBackgroundClickRef.current = true;
+      }
+
+      sceneTouchPointersRef.current.delete(event.pointerId);
+
+      if (sceneTouchPointersRef.current.size < 2) {
+        scenePinchRef.current = null;
+      }
+
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    releaseDrag(event.pointerId);
   };
 
   const handleSceneClick = (event: ReactMouseEvent<SVGSVGElement>) => {
@@ -7689,6 +7831,34 @@ export default function OrbitalMapView({
     );
   }
 
+  function renderMobileActionGlyph(kind: "select" | "preview" | "more") {
+    if (kind === "select") {
+      return (
+        <svg viewBox="0 0 18 18" focusable="false" aria-hidden="true">
+          <rect x="3.1" y="3.2" width="11.8" height="11.6" rx="3" />
+          <path d="m6 9.1 2 2 4-4.4" className="orbital-mobile-action-glyph-accent" />
+        </svg>
+      );
+    }
+
+    if (kind === "preview") {
+      return (
+        <svg viewBox="0 0 18 18" focusable="false" aria-hidden="true">
+          <path d="M2.6 9s2.1-4.1 6.4-4.1S15.4 9 15.4 9 13.3 13.1 9 13.1 2.6 9 2.6 9Z" />
+          <circle cx="9" cy="9" r="1.9" className="orbital-mobile-action-glyph-accent" />
+        </svg>
+      );
+    }
+
+    return (
+      <svg viewBox="0 0 18 18" focusable="false" aria-hidden="true">
+        <circle cx="4.5" cy="9" r="1.25" />
+        <circle cx="9" cy="9" r="1.25" className="orbital-mobile-action-glyph-accent" />
+        <circle cx="13.5" cy="9" r="1.25" />
+      </svg>
+    );
+  }
+
   function renderMobileNavGlyph(section: OrbitalMobileNavSection) {
     if (section === "vault") {
       return (
@@ -8980,6 +9150,159 @@ export default function OrbitalMapView({
       : mobileMoveDestination?.kind === "folder"
         ? labels.folder
         : null;
+  const shouldShowMobileInspectorActionBar =
+    isAndroidMobileShell &&
+    !editorOpen &&
+    !activeModal &&
+    !contextMenuState &&
+    !mobileMoveConflictState &&
+    !hoverPreviewNote &&
+    !hoverPreviewAsset &&
+    mobileSection !== "map" &&
+    effectiveInspectorMenu !== "overview" &&
+    (mobileMoveItems.length > 0 ||
+      isMobileSelectionMode ||
+      Boolean(selectedNode) ||
+      mobileSelectedCount > 0);
+  const mobileInspectorActionAccent =
+    mobileMoveDestination?.color ?? selectedNode?.color ?? inspectorContextAccent;
+  const mobileInspectorSummaryKicker =
+    mobileSelectedCount > 1
+      ? t("orbit.mobileSelect")
+      : mobileSelectedKindLabel;
+  const mobileInspectorSummaryTitle =
+    mobileSelectedCount > 1
+      ? t("orbit.selectedCount", { count: mobileSelectedCount })
+      : mobileSelectedTitle;
+
+  const renderMobileInspectorActionBar = () => {
+    if (!shouldShowMobileInspectorActionBar) {
+      return null;
+    }
+
+    return (
+      <section
+        className={`orbital-mobile-inspector-actions ${
+          mobileMoveItems.length > 0 ? "is-move-mode" : ""
+        } ${isMobileSelectionMode ? "is-select-mode" : ""}`}
+        style={{ "--mobile-inspector-accent": mobileInspectorActionAccent } as CSSProperties}
+        aria-label={t("orbit.mobileActions")}
+      >
+        {mobileMoveItems.length > 0 ? (
+          <div className="orbital-mobile-move-panel">
+            <div className="orbital-mobile-move-copy">
+              <span className="orbital-mobile-inspector-status">
+                {t("orbit.mobileMoveActive", { count: mobileMoveItems.length })}
+              </span>
+              <strong>{t("orbit.mobileMoveTitle")}</strong>
+              <small>{t("orbit.mobileMovePickDestination")}</small>
+            </div>
+            <div
+              className={`orbital-mobile-move-destination ${
+                mobileMoveDestination?.issue ? "is-invalid" : ""
+              }`}
+              style={
+                mobileMoveDestination
+                  ? ({ "--mobile-move-accent": mobileMoveDestination.color } as CSSProperties)
+                  : undefined
+              }
+            >
+              <span>{t("orbit.mobileMoveDestination")}</span>
+              <strong>
+                {mobileMoveDestination
+                  ? `${mobileMoveDestination.label} · ${mobileMoveDestinationKindLabel ?? ""}`
+                  : t("orbit.mobileMoveNoDestination")}
+              </strong>
+              {mobileMoveDestination?.issue ? <small>{mobileMoveDestination.issue}</small> : null}
+            </div>
+            <div className="orbital-mobile-move-actions">
+              <button type="button" onClick={cancelMobileMoveSelection}>
+                {labels.cancel}
+              </button>
+              <button
+                type="button"
+                className="is-primary"
+                disabled={!mobileMoveDestination || Boolean(mobileMoveDestination.issue)}
+                onClick={() => {
+                  if (!mobileMoveDestination) {
+                    return;
+                  }
+
+                  void performMobileMove(mobileMoveDestination);
+                }}
+              >
+                {t("orbit.mobileMoveConfirm")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="orbital-mobile-inspector-summary">
+              <span>{mobileInspectorSummaryKicker}</span>
+              <strong>{mobileInspectorSummaryTitle}</strong>
+            </div>
+            <div className="orbital-mobile-inspector-actionstrip">
+              <button
+                type="button"
+                className={isMobileSelectionMode ? "is-active" : ""}
+                onClick={() => setIsMobileSelectionMode((current) => !current)}
+                aria-pressed={isMobileSelectionMode}
+                aria-label={isMobileSelectionMode ? t("orbit.mobileDone") : t("orbit.mobileSelect")}
+                title={isMobileSelectionMode ? t("orbit.mobileDone") : t("orbit.mobileSelect")}
+              >
+                <span className="orbital-mobile-inspector-action-icon">
+                  {renderMobileActionGlyph("select")}
+                </span>
+                <small>{isMobileSelectionMode ? t("orbit.mobileDone") : t("orbit.mobileSelect")}</small>
+              </button>
+              {selectedNode?.note ? (
+                <button
+                  type="button"
+                  className="is-primary"
+                  onClick={openSelectedMobileEntry}
+                  aria-label={selectedNode.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
+                  title={selectedNode.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
+                >
+                  <span className="orbital-mobile-inspector-action-icon">
+                    {renderMobileOpenGlyph()}
+                  </span>
+                  <small>
+                    {selectedNode.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
+                  </small>
+                </button>
+              ) : null}
+              {selectedNode?.note ? (
+                <button
+                  type="button"
+                  onClick={() => openMobileNotePreview(selectedNode.note!.id)}
+                  aria-label={t("orbit.mobilePreviewAction")}
+                  title={t("orbit.mobilePreviewAction")}
+                >
+                  <span className="orbital-mobile-inspector-action-icon">
+                    {renderMobileActionGlyph("preview")}
+                  </span>
+                  <small>{t("orbit.mobilePreviewAction")}</small>
+                </button>
+              ) : null}
+              {mobileSelectedContextTarget ? (
+                <button
+                  type="button"
+                  onClick={() => openInspectorContextMenu(mobileSelectedContextTarget, "sheet", null)}
+                  aria-label={t("orbit.mobileActions")}
+                  title={t("orbit.mobileActions")}
+                >
+                  <span className="orbital-mobile-inspector-action-icon">
+                    {renderMobileActionGlyph("more")}
+                  </span>
+                  <small>{t("orbit.mobileActions")}</small>
+                </button>
+              ) : null}
+            </div>
+          </>
+        )}
+      </section>
+    );
+  };
   const inspectorMenuBody =
     effectiveInspectorMenu === "overview" ? null : (
       <>
@@ -9086,90 +9409,6 @@ export default function OrbitalMapView({
               : null
           }
         />
-
-        {isAndroidMobileShell ? (
-          <div className="orbital-mobile-inspector-actions">
-            {mobileMoveItems.length > 0 ? (
-              <div className="orbital-mobile-move-panel">
-                <div className="orbital-mobile-move-copy">
-                  <span className="orbital-mobile-inspector-status">
-                    {t("orbit.mobileMoveActive", { count: mobileMoveItems.length })}
-                  </span>
-                  <strong>{t("orbit.mobileMoveTitle")}</strong>
-                  <small>{t("orbit.mobileMovePickDestination")}</small>
-                </div>
-                <div
-                  className={`orbital-mobile-move-destination ${
-                    mobileMoveDestination?.issue ? "is-invalid" : ""
-                  }`}
-                  style={
-                    mobileMoveDestination
-                      ? ({ "--mobile-move-accent": mobileMoveDestination.color } as CSSProperties)
-                      : undefined
-                  }
-                >
-                  <span>{t("orbit.mobileMoveDestination")}</span>
-                  <strong>
-                    {mobileMoveDestination
-                      ? `${mobileMoveDestination.label} · ${mobileMoveDestinationKindLabel ?? ""}`
-                      : t("orbit.mobileMoveNoDestination")}
-                  </strong>
-                  {mobileMoveDestination?.issue ? <small>{mobileMoveDestination.issue}</small> : null}
-                </div>
-                <div className="orbital-mobile-move-actions">
-                  <button type="button" onClick={cancelMobileMoveSelection}>
-                    {labels.cancel}
-                  </button>
-                  <button
-                    type="button"
-                    className="is-primary"
-                    disabled={!mobileMoveDestination || Boolean(mobileMoveDestination.issue)}
-                    onClick={() => {
-                      if (!mobileMoveDestination) {
-                        return;
-                      }
-
-                      void performMobileMove(mobileMoveDestination);
-                    }}
-                  >
-                    {t("orbit.mobileMoveConfirm")}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className={isMobileSelectionMode ? "is-active" : ""}
-                  onClick={() => setIsMobileSelectionMode((current) => !current)}
-                  aria-pressed={isMobileSelectionMode}
-                >
-                  {isMobileSelectionMode ? t("orbit.mobileDone") : t("orbit.mobileSelect")}
-                </button>
-                {selectedNode?.note ? (
-                  <button type="button" onClick={openSelectedMobileEntry}>
-                    {selectedNode.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
-                  </button>
-                ) : null}
-                {selectedNode?.note ? (
-                  <button type="button" onClick={() => openMobileNotePreview(selectedNode.note!.id)}>
-                    {t("orbit.mobilePreviewAction")}
-                  </button>
-                ) : null}
-                {mobileSelectedContextTarget ? (
-                  <button
-                    type="button"
-                    onClick={() => openInspectorContextMenu(mobileSelectedContextTarget, "sheet", null)}
-                  >
-                    {mobileSelectedCount > 1
-                      ? t("orbit.selectedCount", { count: mobileSelectedCount })
-                      : t("orbit.mobileActions")}
-                  </button>
-                ) : null}
-              </>
-            )}
-          </div>
-        ) : null}
 
         {renderFolderDraftErrorMessage()}
 
@@ -9526,7 +9765,9 @@ export default function OrbitalMapView({
         isMobileMenuOpen ? "is-mobile-menu-open" : ""
       } ${
         mobileMoveItems.length > 0 ? "is-mobile-move-mode" : ""
-      } ${isMobileSelectionMode ? "is-mobile-select-mode" : ""}`}
+      } ${isMobileSelectionMode ? "is-mobile-select-mode" : ""} ${
+        shouldShowMobileInspectorActionBar ? "has-mobile-inspector-actionbar" : ""
+      }`}
       role="dialog"
       aria-modal="true"
       onPointerDown={markOrbitInteraction}
@@ -10180,9 +10421,9 @@ export default function OrbitalMapView({
             className={`orbital-scene ${isLowDensityDisplay ? "is-low-density" : ""}`}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
-            onPointerUp={(event) => releaseDrag(event.pointerId)}
+            onPointerUp={handleScenePointerEnd}
             onClick={handleSceneClick}
-            onPointerCancel={(event) => releaseDrag(event.pointerId)}
+            onPointerCancel={handleScenePointerEnd}
           >
             <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
               {renderedScene.links.map((link) => {
@@ -10295,6 +10536,13 @@ export default function OrbitalMapView({
                     }}
                     onClick={(event) => {
                       event.stopPropagation();
+
+                      if (suppressSceneBackgroundClickRef.current) {
+                        event.preventDefault();
+                        suppressSceneBackgroundClickRef.current = false;
+                        return;
+                      }
+
                       suppressSceneBackgroundClickRef.current = false;
                       setIsInspectorHierarchyAutoExpandSuppressed(false);
                       setSelectedEntityId(node.entityId);
@@ -10623,6 +10871,8 @@ export default function OrbitalMapView({
         </div>
 
       </div>
+
+      {renderMobileInspectorActionBar()}
 
       {isAndroidMobileShell ? (
         <nav className="orbital-mobile-bottom-nav" aria-label={t("orbit.mobileNavigation")}>

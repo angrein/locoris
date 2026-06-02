@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent
 } from "react";
 import { BlockNoteView } from "@blocknote/mantine";
-import { FormattingToolbarExtension } from "@blocknote/core/extensions";
+import { FilePanelExtension, FormattingToolbarExtension } from "@blocknote/core/extensions";
 import { en, ru } from "@blocknote/core/locales";
 import {
   FilePanelController,
@@ -199,9 +199,154 @@ type MobileQuickBlockType =
   | "numberedListItem"
   | "checkListItem"
   | "quote";
+type MobileInsertBlockType =
+  | MobileQuickBlockType
+  | "heading1"
+  | "heading2"
+  | "heading3"
+  | "heading4"
+  | "heading5"
+  | "heading6"
+  | "toggleHeading1"
+  | "toggleHeading2"
+  | "toggleHeading3"
+  | "toggleListItem"
+  | "codeBlock"
+  | "divider"
+  | "table"
+  | "image"
+  | "file"
+  | "audio"
+  | "video";
+type MobileInsertBlockGroup = {
+  key: "text" | "lists" | "structure" | "media";
+  titleKey: string;
+  items: MobileInsertBlockType[];
+};
+
+const MOBILE_INSERT_BLOCK_GROUPS: readonly MobileInsertBlockGroup[] = [
+  {
+    key: "text",
+    titleKey: "note.mobileInsertGroupText",
+    items: [
+      "paragraph",
+      "heading1",
+      "heading2",
+      "heading3",
+      "heading4",
+      "heading5",
+      "heading6",
+      "toggleHeading1",
+      "toggleHeading2",
+      "toggleHeading3",
+      "quote"
+    ]
+  },
+  {
+    key: "lists",
+    titleKey: "note.mobileInsertGroupLists",
+    items: ["bulletListItem", "numberedListItem", "checkListItem", "toggleListItem"]
+  },
+  {
+    key: "structure",
+    titleKey: "note.mobileInsertGroupStructure",
+    items: ["table", "codeBlock", "divider"]
+  },
+  {
+    key: "media",
+    titleKey: "note.mobileInsertGroupMedia",
+    items: ["image", "file", "audio", "video"]
+  }
+];
+
+const MOBILE_INSERT_BLOCK_SLASH_KEYS: Record<MobileInsertBlockType, string> = {
+  paragraph: "paragraph",
+  heading: "heading_2",
+  heading1: "heading",
+  heading2: "heading_2",
+  heading3: "heading_3",
+  heading4: "heading_4",
+  heading5: "heading_5",
+  heading6: "heading_6",
+  toggleHeading1: "toggle_heading",
+  toggleHeading2: "toggle_heading_2",
+  toggleHeading3: "toggle_heading_3",
+  bulletListItem: "bullet_list",
+  numberedListItem: "numbered_list",
+  checkListItem: "check_list",
+  toggleListItem: "toggle_list",
+  quote: "quote",
+  codeBlock: "code_block",
+  divider: "divider",
+  table: "table",
+  image: "image",
+  file: "file",
+  audio: "audio",
+  video: "video"
+};
+
+const MOBILE_INSERT_BLOCK_GLYPHS: Record<MobileInsertBlockType, string> = {
+  paragraph: "T",
+  heading: "H",
+  heading1: "H1",
+  heading2: "H2",
+  heading3: "H3",
+  heading4: "H4",
+  heading5: "H5",
+  heading6: "H6",
+  toggleHeading1: "H1+",
+  toggleHeading2: "H2+",
+  toggleHeading3: "H3+",
+  bulletListItem: "-",
+  numberedListItem: "1",
+  checkListItem: "[]",
+  toggleListItem: ">",
+  quote: "\"",
+  codeBlock: "{}",
+  divider: "--",
+  table: "#",
+  image: "IMG",
+  file: "FILE",
+  audio: "AUD",
+  video: "VID"
+};
+
+const MOBILE_INSERT_MEDIA_BLOCK_TYPES = new Set<MobileInsertBlockType>([
+  "image",
+  "file",
+  "audio",
+  "video"
+]);
+const MOBILE_INSERT_CURSOR_BLOCK_TYPES = new Set<MobileInsertBlockType>([
+  "paragraph",
+  "heading",
+  "heading1",
+  "heading2",
+  "heading3",
+  "heading4",
+  "heading5",
+  "heading6",
+  "toggleHeading1",
+  "toggleHeading2",
+  "toggleHeading3",
+  "bulletListItem",
+  "numberedListItem",
+  "checkListItem",
+  "toggleListItem",
+  "quote",
+  "codeBlock"
+]);
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function countStoredBlocks(blocks: NoteContent): number {
+  return blocks.reduce((total, block) => {
+    const children = Array.isArray(block.children) ? countStoredBlocks(block.children) : 0;
+
+    return total + 1 + children;
+  }, 0);
 }
 
 function AiSparkleGlyph() {
@@ -311,6 +456,150 @@ function AiArrowGlyph() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.9"
+      />
+    </svg>
+  );
+}
+
+function MobileFocusModeGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M12 7.75a4.25 4.25 0 1 0 0 8.5 4.25 4.25 0 0 0 0-8.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M12 3.25v2.4M12 18.35v2.4M20.75 12h-2.4M5.65 12h-2.4M12 10.7v2.6M10.7 12h2.6"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function MobileReadingModeGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M5.25 5.75h4.35c1.02 0 1.82.28 2.4.85.58-.57 1.38-.85 2.4-.85h4.35v12.5H14.4c-1.02 0-1.82.28-2.4.85-.58-.57-1.38-.85-2.4-.85H5.25V5.75Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.75"
+      />
+      <path
+        d="M12 6.6v12.5M7.65 9.25h2M7.65 12h2M14.35 9.25h2M14.35 12h2"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.55"
+      />
+    </svg>
+  );
+}
+
+function MobileFolderGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M4.5 7.25c0-.9.6-1.5 1.5-1.5h4.15l1.35 1.6H18c.9 0 1.5.6 1.5 1.5v7.9c0 .9-.6 1.5-1.5 1.5H6c-.9 0-1.5-.6-1.5-1.5v-9.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.75"
+      />
+    </svg>
+  );
+}
+
+function MobileTagGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M5.25 6.9v5.2c0 .45.18.88.5 1.2l5.45 5.45a1.8 1.8 0 0 0 2.55 0l4-4a1.8 1.8 0 0 0 0-2.55L12.3 6.75a1.7 1.7 0 0 0-1.2-.5H6.9c-.95 0-1.65.7-1.65 1.65Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.75"
+      />
+      <path d="M8.8 9.1h.02" stroke="currentColor" strokeLinecap="round" strokeWidth="2.6" />
+    </svg>
+  );
+}
+
+function MobilePaletteGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M12.1 4.25c-4.15 0-7.35 2.82-7.35 6.75 0 3.7 2.62 6.75 6.08 6.75h1.42c.66 0 1.08-.5.92-1.12-.28-1.06.48-2.13 1.58-2.13h1.33c2.05 0 3.17-1.36 3.17-3.27 0-4.05-3.1-6.98-7.15-6.98Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.75"
+      />
+      <path d="M8 10.1h.02M10.45 7.9h.02M14 8.05h.02M16.2 10.55h.02" stroke="currentColor" strokeLinecap="round" strokeWidth="2.4" />
+    </svg>
+  );
+}
+
+function MobileExportGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M12 4.5v9M8.55 7.95 12 4.5l3.45 3.45M5.75 12.7v4.55c0 .9.6 1.5 1.5 1.5h9.5c.9 0 1.5-.6 1.5-1.5V12.7"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.85"
+      />
+    </svg>
+  );
+}
+
+function MobilePinGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="m14.6 4.8 4.6 4.6-2.45 1.1-2.2 3.9.75 2.25-1.05 1.05-3.4-3.4-4.65 4.65-1.15-1.15 4.65-4.65-3.4-3.4 1.05-1.05 2.25.75 3.9-2.2 1.1-2.45Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
+function MobileRestoreGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M7.25 7.4A7 7 0 1 1 5.1 12.45M7.25 7.4h-3.5V3.9"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.85"
+      />
+    </svg>
+  );
+}
+
+function MobileTrashGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path
+        d="M5.75 7.25h12.5M9.35 7.25V5.8c0-.7.45-1.15 1.15-1.15h3c.7 0 1.15.45 1.15 1.15v1.45M7.25 9.25l.65 8c.08.95.7 1.5 1.65 1.5h4.9c.95 0 1.57-.55 1.65-1.5l.65-8"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.75"
       />
     </svg>
   );
@@ -978,6 +1267,14 @@ export default function EditorPane({
     [folderOptions, note.folderId]
   );
   const normalizedContent = useMemo(() => normalizeNoteContent(note.content), [note.content]);
+  const mobileNoteStats = useMemo(
+    () => ({
+      blocks: countStoredBlocks(normalizedContent),
+      attachments: assets.length,
+      tags: note.tagIds.length
+    }),
+    [assets.length, normalizedContent, note.tagIds.length]
+  );
   const { confirmPrivateVaultAction, privateVaultWarningDialog } =
     usePrivateVaultWarning(privateVaultWarningContext);
 
@@ -2279,33 +2576,123 @@ export default function EditorPane({
     }
   };
 
-  const buildMobileQuickBlock = (type: MobileQuickBlockType, sourceBlock: StoredBlock) => {
+  const getMobileInsertBlockCopy = (type: MobileInsertBlockType) => {
+    const slashKey = MOBILE_INSERT_BLOCK_SLASH_KEYS[type];
+    const slashItem = (
+      editor.dictionary.slash_menu as Record<string, { title?: string; subtext?: string }>
+    )[slashKey];
+
+    return {
+      title: slashItem?.title ?? getMobileQuickBlockLabel(type as MobileQuickBlockType),
+      subtext: slashItem?.subtext ?? ""
+    };
+  };
+
+  const getMobileInsertBlockGlyph = (type: MobileInsertBlockType) =>
+    MOBILE_INSERT_BLOCK_GLYPHS[type] ?? "T";
+
+  const buildMobileInsertBlock = (type: MobileInsertBlockType, sourceBlock: StoredBlock) => {
     const preservedProps = getMobileBlockCarryProps(sourceBlock);
+
+    if (type === "heading") {
+      return {
+        type: "heading",
+        props: { ...preservedProps, level: 2 },
+        content: ""
+      } as StoredBlock;
+    }
+
+    if (type.startsWith("heading")) {
+      const level = Number(type.replace("heading", "")) || 2;
+
+      return {
+        type: "heading",
+        props: { ...preservedProps, level },
+        content: ""
+      } as StoredBlock;
+    }
+
+    if (type.startsWith("toggleHeading")) {
+      const level = Number(type.replace("toggleHeading", "")) || 2;
+
+      return {
+        type: "heading",
+        props: { ...preservedProps, level, isToggleable: true },
+        content: ""
+      } as StoredBlock;
+    }
+
+    if (type === "checkListItem") {
+      return {
+        type,
+        props: { ...preservedProps, checked: false },
+        content: ""
+      } as StoredBlock;
+    }
+
+    if (type === "codeBlock") {
+      return {
+        type,
+        props: { language: "text" },
+        content: ""
+      } as StoredBlock;
+    }
+
+    if (type === "table") {
+      return {
+        type,
+        props: typeof preservedProps.textColor === "string"
+          ? { textColor: preservedProps.textColor }
+          : {},
+        content: {
+          type: "tableContent",
+          rows: [
+            { cells: ["", "", ""] },
+            { cells: ["", "", ""] }
+          ]
+        }
+      } as StoredBlock;
+    }
+
+    if (type === "divider") {
+      return {
+        type,
+        props: {}
+      } as StoredBlock;
+    }
+
+    if (MOBILE_INSERT_MEDIA_BLOCK_TYPES.has(type)) {
+      return {
+        type,
+        props: {}
+      } as StoredBlock;
+    }
 
     return {
       type,
-      props:
-        type === "heading"
-          ? { ...preservedProps, level: 2 }
-          : type === "checkListItem"
-            ? { ...preservedProps, checked: false }
-            : preservedProps,
+      props: preservedProps,
       content: ""
     } as StoredBlock;
   };
 
-  const insertMobileBlockAfterCursor = (type: MobileQuickBlockType) => {
+  const insertMobileBlockAfterCursor = (type: MobileInsertBlockType) => {
     try {
       const activeBlock = editor.getTextCursorPosition().block as unknown as StoredBlock;
       const insertedBlocks = editor.insertBlocks(
-        [buildMobileQuickBlock(type, activeBlock) as any],
+        [buildMobileInsertBlock(type, activeBlock) as any],
         activeBlock as any,
         "after"
       );
       const insertedBlock = insertedBlocks[0] as StoredBlock | undefined;
 
-      if (typeof insertedBlock?.id === "string") {
+      if (typeof insertedBlock?.id === "string" && MOBILE_INSERT_CURSOR_BLOCK_TYPES.has(type)) {
         editor.setTextCursorPosition(insertedBlock.id, "end");
+      }
+
+      if (typeof insertedBlock?.id === "string" && MOBILE_INSERT_MEDIA_BLOCK_TYPES.has(type)) {
+        window.setTimeout(() => {
+          editor.getExtension(FilePanelExtension)?.showMenu(insertedBlock.id as string);
+        }, 0);
       }
 
       setMobileInsertMenuOpen(false);
@@ -2448,18 +2835,22 @@ export default function EditorPane({
           <button
             type="button"
             className={typographyMode === "focus" ? "is-active" : ""}
+            aria-label={t("note.typographyFocus")}
             aria-pressed={typographyMode === "focus"}
+            title={t("note.typographyFocus")}
             onClick={() => setTypographyMode("focus")}
           >
-            {t("note.mobileFocusShort")}
+            <MobileFocusModeGlyph />
           </button>
           <button
             type="button"
             className={typographyMode === "reading" ? "is-active" : ""}
+            aria-label={t("note.typographyReading")}
             aria-pressed={typographyMode === "reading"}
+            title={t("note.typographyReading")}
             onClick={() => setTypographyMode("reading")}
           >
-            {t("note.mobileReadingShort")}
+            <MobileReadingModeGlyph />
           </button>
         </div>
 
@@ -2959,12 +3350,32 @@ export default function EditorPane({
               <span>{t("note.mobileInsertMenuTitle")}</span>
               <p>{t("note.mobileInsertMenuSubtitle")}</p>
             </div>
-            <div className="editor-pane-mobile-insert-grid">
-              {(["paragraph", "heading", "bulletListItem", "numberedListItem", "checkListItem", "quote"] as MobileQuickBlockType[]).map((type) => (
-                <button key={type} type="button" onClick={() => insertMobileBlockAfterCursor(type)}>
-                  <span>{getMobileQuickBlockGlyph(type)}</span>
-                  <strong>{getMobileQuickBlockLabel(type)}</strong>
-                </button>
+            <div className="editor-pane-mobile-insert-scroll">
+              {MOBILE_INSERT_BLOCK_GROUPS.map((group) => (
+                <section key={group.key} className="editor-pane-mobile-insert-group">
+                  <h3>{t(group.titleKey)}</h3>
+                  <div className="editor-pane-mobile-insert-grid">
+                    {group.items.map((type) => {
+                      const copy = getMobileInsertBlockCopy(type);
+
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => insertMobileBlockAfterCursor(type)}
+                        >
+                          <span className="editor-pane-mobile-insert-glyph">
+                            {getMobileInsertBlockGlyph(type)}
+                          </span>
+                          <span className="editor-pane-mobile-insert-copy">
+                            <strong>{copy.title}</strong>
+                            {copy.subtext ? <small>{copy.subtext}</small> : null}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
               ))}
             </div>
           </section>
@@ -3049,11 +3460,17 @@ export default function EditorPane({
           </div>
         </div>
 
-        <aside className="editor-sidepanel">
-          <div className="editor-pane-mobile-sheet-head">
+        <aside className="editor-sidepanel editor-pane-mobile-options-sheet">
+          <div className="editor-pane-mobile-options-handle" aria-hidden="true" />
+          <div className="editor-pane-mobile-sheet-head editor-pane-mobile-options-head">
             <div>
-              <span>{t("note.mobileMenuTitle")}</span>
-              <p>{t("note.mobileMenuSubtitle")}</p>
+              <span className="editor-pane-mobile-options-kicker">{t("note.mobileMenuTitle")}</span>
+              <strong className="editor-pane-mobile-options-title">
+                {titleDraft.trim() || t("note.titlePlaceholder")}
+              </strong>
+              <p>
+                {t("note.updated")}: {formatTimestamp(note.updatedAt, language)}
+              </p>
             </div>
             <button
               type="button"
@@ -3061,12 +3478,40 @@ export default function EditorPane({
               onClick={() => setMobileNoteMenuOpen(false)}
               aria-label={t("dialog.cancel")}
             >
-              <MobileMoreGlyph />
+              <CloseGlyph />
             </button>
           </div>
 
-          <section className="editor-pane-detail-card">
-            <div className="editor-pane-detail-field">
+          <section className="editor-pane-mobile-options-summary" aria-label={t("note.details")}>
+            <span className={`editor-pane-mobile-options-status is-${saveState}`}>
+              {t(`saveState.${saveState}`)}
+            </span>
+            <span>
+              <strong>{mobileNoteStats.blocks}</strong>
+              {t("note.blocks").toLowerCase()}
+            </span>
+            <span>
+              <strong>{mobileNoteStats.attachments}</strong>
+              {t("note.attachments").toLowerCase()}
+            </span>
+            <span>
+              <strong>{mobileNoteStats.tags}</strong>
+              {t("note.tags").toLowerCase()}
+            </span>
+          </section>
+
+          <section className="editor-pane-detail-card editor-pane-mobile-options-card">
+            <div className="editor-pane-mobile-options-section-head">
+              <span className="editor-pane-mobile-option-icon" aria-hidden="true">
+                <MobileFolderGlyph />
+              </span>
+              <div>
+                <strong>{t("note.mobileMenuFolderTags")}</strong>
+                <p>{currentFolder?.name ?? t("orbit.uncategorized")}</p>
+              </div>
+            </div>
+
+            <div className="editor-pane-detail-field editor-pane-mobile-options-field">
               <span className="editor-pane-detail-label">{t("note.folder")}</span>
               <FolderPicker
                 options={folderOptions}
@@ -3077,8 +3522,14 @@ export default function EditorPane({
               />
             </div>
 
-            <div className="editor-pane-detail-field">
+            <div className="editor-pane-detail-field editor-pane-mobile-options-field">
               <span className="editor-pane-detail-label">{t("note.tags")}</span>
+              <div className="editor-pane-mobile-options-field-title">
+                <span className="editor-pane-mobile-option-icon is-small" aria-hidden="true">
+                  <MobileTagGlyph />
+                </span>
+                <span>{t("note.tags")}</span>
+              </div>
               <TagInputField
                 tags={tags}
                 selectedTagIds={note.tagIds}
@@ -3087,8 +3538,20 @@ export default function EditorPane({
                 onCreateTag={onCreateTag}
               />
             </div>
+          </section>
 
-            <div className="editor-pane-detail-field">
+          <section className="editor-pane-detail-card editor-pane-mobile-options-card">
+            <div className="editor-pane-mobile-options-section-head">
+              <span className="editor-pane-mobile-option-icon" aria-hidden="true">
+                <MobilePaletteGlyph />
+              </span>
+              <div>
+                <strong>{t("note.color")}</strong>
+                <p>{(note.color || DEFAULT_NOTE_COLOR).toUpperCase()}</p>
+              </div>
+            </div>
+
+            <div className="editor-pane-detail-field editor-pane-mobile-options-field">
               <span className="editor-pane-detail-label">{t("note.color")}</span>
               <div className="color-swatch-grid compact editor-pane-color-grid">
                 {COLOR_PALETTE.map((colorOption) => (
@@ -3123,32 +3586,64 @@ export default function EditorPane({
             </div>
           </section>
 
-          <section className="editor-pane-detail-card editor-pane-detail-card-actions">
+          <section className="editor-pane-detail-card editor-pane-detail-card-actions editor-pane-mobile-options-card">
+            <div className="editor-pane-mobile-options-section-head">
+              <span className="editor-pane-mobile-option-icon" aria-hidden="true">
+                <MobileExportGlyph />
+              </span>
+              <div>
+                <strong>{t("note.actions")}</strong>
+                <p>{t("note.mobileMenuSubtitle")}</p>
+              </div>
+            </div>
+
             <div className="editor-pane-action-grid">
               <button
                 type="button"
-                className="micro-action editor-pane-mobile-only-action"
+                className="micro-action editor-pane-mobile-only-action editor-pane-mobile-action-row"
                 onClick={() => {
                   setMobileNoteMenuOpen(false);
                   setNoteTransferOpen(true);
                 }}
               >
-                {t("note.transferButton")}
+                <span className="editor-pane-mobile-option-icon" aria-hidden="true">
+                  <MobileExportGlyph />
+                </span>
+                <span>{t("note.transferButton")}</span>
               </button>
               <button
                 type="button"
-                className={`micro-action ${note.pinned || note.favorite ? "is-active" : ""}`}
+                className={`micro-action editor-pane-mobile-action-row ${
+                  note.pinned || note.favorite ? "is-active" : ""
+                }`}
                 onClick={onTogglePin}
               >
-                {note.pinned || note.favorite ? t("note.unpin") : t("note.pin")}
+                <span className="editor-pane-mobile-option-icon" aria-hidden="true">
+                  <MobilePinGlyph />
+                </span>
+                <span>{note.pinned || note.favorite ? t("note.unpin") : t("note.pin")}</span>
               </button>
               {note.trashedAt ? (
-                <button type="button" className="micro-action" onClick={onRestore}>
-                  {t("note.restore")}
+                <button
+                  type="button"
+                  className="micro-action editor-pane-mobile-action-row"
+                  onClick={onRestore}
+                >
+                  <span className="editor-pane-mobile-option-icon" aria-hidden="true">
+                    <MobileRestoreGlyph />
+                  </span>
+                  <span>{t("note.restore")}</span>
                 </button>
               ) : null}
-              <button type="button" className="micro-action danger" onClick={onDelete}>
-                {note.trashedAt ? t("note.deletePermanently") : t("note.moveToTrash")}
+              <button
+                type="button"
+                className="micro-action danger editor-pane-mobile-action-row"
+                onClick={onDelete}
+              >
+                <span className="editor-pane-mobile-option-icon" aria-hidden="true">
+                  <MobileTrashGlyph />
+                </span>
+                <span>{note.trashedAt ? t("note.deletePermanently") : t("note.moveToTrash")}</span>
               </button>
             </div>
           </section>

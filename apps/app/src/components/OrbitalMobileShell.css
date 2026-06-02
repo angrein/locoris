@@ -1,4 +1,5 @@
-.orbital-overlay.is-android-runtime {
+.orbital-overlay.is-android-runtime,
+.orbital-overlay.is-android-mobile-shell {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -6,7 +7,11 @@
 .orbital-overlay.is-android-runtime button,
 .orbital-overlay.is-android-runtime input,
 .orbital-overlay.is-android-runtime textarea,
-.orbital-overlay.is-android-runtime select {
+.orbital-overlay.is-android-runtime select,
+.orbital-overlay.is-android-mobile-shell button,
+.orbital-overlay.is-android-mobile-shell input,
+.orbital-overlay.is-android-mobile-shell textarea,
+.orbital-overlay.is-android-mobile-shell select {
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -18,6 +23,7 @@
 .orbital-overlay.is-android-runtime .orbital-mobile-project-chip,
 .orbital-overlay.is-android-runtime .orbital-mobile-map-controls,
 .orbital-overlay.is-android-runtime .orbital-mobile-selection-sheet,
+.orbital-overlay.is-android-runtime .orbital-mobile-inspector-actions,
 .orbital-overlay.is-android-runtime .orbital-mobile-bottom-nav,
 .orbital-overlay.is-android-runtime .orbital-mobile-menu-backdrop,
 .orbital-overlay.is-android-runtime .orbital-mobile-menu-card {
@@ -71,7 +77,13 @@
 .orbital-overlay.is-android-runtime .orbital-command-button,
 .orbital-overlay.is-android-runtime .orbital-toolbar-action,
 .orbital-overlay.is-android-runtime .toolbar-action,
-.orbital-overlay.is-android-runtime .micro-action {
+.orbital-overlay.is-android-runtime .micro-action,
+.orbital-overlay.is-android-mobile-shell .orbital-tree-item,
+.orbital-overlay.is-android-mobile-shell .orbital-menu-compact-item,
+.orbital-overlay.is-android-mobile-shell .orbital-command-button,
+.orbital-overlay.is-android-mobile-shell .orbital-toolbar-action,
+.orbital-overlay.is-android-mobile-shell .toolbar-action,
+.orbital-overlay.is-android-mobile-shell .micro-action {
   min-height: 44px;
 }
 
@@ -271,6 +283,7 @@
 
 .orbital-overlay.is-android-mobile-shell .orbital-layout,
 .orbital-overlay.is-android-mobile-shell .orbital-layout.has-editor {
+  height: 100%;
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
@@ -289,6 +302,28 @@
   padding-bottom: 88px;
   border-radius: 26px;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.orbital-overlay.is-android-mobile-shell.has-mobile-inspector-actionbar .orbital-inspector.panel {
+  padding-bottom: 206px;
+}
+
+.orbital-overlay.is-android-mobile-shell.has-mobile-inspector-actionbar.is-mobile-move-mode .orbital-inspector.panel {
+  padding-bottom: 292px;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-inspector-subview,
+.orbital-overlay.is-android-mobile-shell .orbital-inspector-section,
+.orbital-overlay.is-android-mobile-shell .orbital-inspector-list,
+.orbital-overlay.is-android-mobile-shell .orbital-tree,
+.orbital-overlay.is-android-mobile-shell .orbital-tree-children,
+.orbital-overlay.is-android-mobile-shell .orbital-menu-compact-list,
+.orbital-overlay.is-android-mobile-shell .orbital-inspector-overview-card,
+.orbital-overlay.is-android-mobile-shell .orbital-inspector-overview-recent,
+.orbital-overlay.is-android-mobile-shell .orbital-inspector-overview-projects {
+  touch-action: pan-y;
 }
 
 .orbital-overlay.is-android-mobile-shell:not(.is-mobile-section-map) .orbital-scene-wrap {
@@ -306,6 +341,12 @@
   border-radius: 26px;
   overflow: hidden;
   contain: layout paint style;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-scene {
+  touch-action: none;
 }
 
 .orbital-overlay.is-android-phone-shell.is-mobile-section-map .orbital-scene-wrap {
@@ -417,24 +458,137 @@
 }
 
 .orbital-mobile-inspector-actions {
-  position: sticky;
-  top: 8px;
-  z-index: 5;
+  position: fixed;
+  z-index: 14;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(82px + max(10px, env(safe-area-inset-bottom)));
+  left: max(10px, env(safe-area-inset-left));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  margin: 8px 0 10px;
-  padding: 8px;
-  border: 1px solid rgb(var(--line-rgb) / 0.1);
-  border-radius: 20px;
+  gap: 10px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--mobile-inspector-accent, var(--accent-theme-primary, var(--gold))) 30%, rgb(var(--line-rgb) / 0.14));
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.72), rgb(var(--surface-deep-rgb) / 0.62)),
-    rgb(var(--surface-deep-rgb) / 0.68);
-  backdrop-filter: blur(16px) saturate(124%);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--mobile-inspector-accent, var(--accent-theme-primary, var(--gold))) 14%, transparent), transparent 48%),
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.82), rgb(var(--surface-deep-rgb) / 0.72)),
+    rgb(var(--surface-deep-rgb) / 0.78);
+  box-shadow:
+    0 18px 54px rgba(2, 5, 15, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(20px) saturate(132%);
+  animation: orbital-mobile-actionbar-enter 210ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.orbital-mobile-inspector-actions.is-move-mode {
+  grid-template-columns: 1fr;
+  bottom: calc(78px + max(10px, env(safe-area-inset-bottom)));
+  padding: 12px;
+}
+
+.orbital-mobile-inspector-summary {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.orbital-mobile-inspector-summary span {
+  color: color-mix(in srgb, var(--mobile-inspector-accent, var(--accent-theme-primary, var(--gold))) 72%, rgba(238, 241, 255, 0.78));
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.orbital-mobile-inspector-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-mobile-inspector-actionstrip {
+  min-width: max-content;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.orbital-mobile-inspector-actionstrip button {
+  position: relative;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.025);
+}
+
+.orbital-mobile-inspector-actionstrip button.is-primary {
+  border-color: color-mix(in srgb, var(--mobile-inspector-accent, var(--accent-theme-primary, var(--gold))) 44%, rgb(var(--line-rgb) / 0.16));
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--mobile-inspector-accent, var(--accent-theme-primary, var(--gold))) 22%, transparent), transparent 70%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.orbital-mobile-inspector-actionstrip button small {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.orbital-mobile-inspector-action-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--mobile-inspector-accent, var(--accent-theme-primary, var(--gold))) 76%, white 8%);
+}
+
+.orbital-mobile-inspector-action-icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.orbital-mobile-inspector-action-icon svg path,
+.orbital-mobile-inspector-action-icon svg rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.orbital-mobile-inspector-action-icon svg circle {
+  fill: currentColor;
+}
+
+.orbital-mobile-inspector-action-icon svg circle.orbital-mobile-action-glyph-accent {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
 }
 
 .orbital-mobile-inspector-actions button.is-active {
-  border-color: color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 34%, rgb(var(--line-rgb) / 0.12));
+  border-color: color-mix(in srgb, var(--mobile-inspector-accent, var(--accent-theme-primary, var(--gold))) 46%, rgb(var(--line-rgb) / 0.12));
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 16%, transparent), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, color-mix(in srgb, var(--mobile-inspector-accent, var(--accent-theme-primary, var(--gold))) 18%, transparent), rgba(255, 255, 255, 0.02)),
     rgba(255, 255, 255, 0.03);
 }
 
@@ -517,6 +671,18 @@
 
 .orbital-mobile-move-actions button:disabled {
   opacity: 0.48;
+}
+
+@keyframes orbital-mobile-actionbar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .orbital-menu-compact-preview-mark {

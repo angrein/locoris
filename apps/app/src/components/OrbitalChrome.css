@@ -799,6 +799,14 @@
   cursor: grab;
 }
 
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .orbital-overlay .orbital-tree-item.is-draggable,
+.locoris-adaptive-shell[data-pointer-mode="coarse"] .orbital-overlay .orbital-tree-item[draggable="true"],
+.orbital-overlay.is-android-mobile-shell .orbital-tree-item.is-draggable,
+.orbital-overlay.is-android-mobile-shell .orbital-tree-item[draggable="true"] {
+  touch-action: pan-y;
+  cursor: default;
+}
+
 .orbital-overlay .orbital-tree-item.is-draggable:active,
 .orbital-overlay .orbital-tree-item[draggable="true"]:active {
   cursor: grabbing;
