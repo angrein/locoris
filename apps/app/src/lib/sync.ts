@@ -55,6 +55,9 @@ import type {
   AppSettings,
   Asset,
   Folder,
+  Goal,
+  Habit,
+  HabitLog,
   HostedAccountSession,
   HostedAccountUser,
   HostedAccountVault,
@@ -80,7 +83,9 @@ import type {
   SyncedAssetRecord,
   SyncedNoteRecord,
   SyncVaultDescriptor,
-  Tag
+  Tag,
+  Task,
+  TimeBlock
 } from "../types";
 
 type SnapshotEntityState<T> = {
@@ -147,6 +152,45 @@ type CreateOutgoingRemoteEnvelopeOptions = {
 
 function getEntityKey(entityType: SyncEntityKind, entityId: string) {
   return `${entityType}:${entityId}`;
+}
+
+function normalizeSyncSnapshotPayload(
+  value: Partial<SyncSnapshot> | null | undefined,
+  fallbackDeviceId = "server"
+): SyncSnapshot {
+  if (!value || typeof value !== "object") {
+    return {
+      deviceId: fallbackDeviceId,
+      exportedAt: Date.now(),
+      projects: [],
+      folders: [],
+      tags: [],
+      notes: [],
+      assets: [],
+      tasks: [],
+      habits: [],
+      habitLogs: [],
+      goals: [],
+      timeBlocks: [],
+      tombstones: []
+    };
+  }
+
+  return {
+    deviceId: typeof value.deviceId === "string" ? value.deviceId : fallbackDeviceId,
+    exportedAt: typeof value.exportedAt === "number" ? value.exportedAt : Date.now(),
+    projects: Array.isArray(value.projects) ? value.projects.filter(Boolean) : [],
+    folders: Array.isArray(value.folders) ? value.folders.filter(Boolean) : [],
+    tags: Array.isArray(value.tags) ? value.tags.filter(Boolean) : [],
+    notes: Array.isArray(value.notes) ? value.notes.filter(Boolean) : [],
+    assets: Array.isArray(value.assets) ? value.assets.filter(Boolean) : [],
+    tasks: Array.isArray(value.tasks) ? value.tasks.filter(Boolean) : [],
+    habits: Array.isArray(value.habits) ? value.habits.filter(Boolean) : [],
+    habitLogs: Array.isArray(value.habitLogs) ? value.habitLogs.filter(Boolean) : [],
+    goals: Array.isArray(value.goals) ? value.goals.filter(Boolean) : [],
+    timeBlocks: Array.isArray(value.timeBlocks) ? value.timeBlocks.filter(Boolean) : [],
+    tombstones: Array.isArray(value.tombstones) ? value.tombstones.filter(Boolean) : []
+  };
 }
 
 function createSyncRevision() {
@@ -290,14 +334,14 @@ async function resolveRemoteEnvelopeRecord(
 
     return {
       revision: envelope.revision ?? null,
-      snapshot,
+      snapshot: normalizeSyncSnapshotPayload(snapshot, remote.vaultId || "server"),
       metadata
     };
   }
 
   return {
     revision: envelope.revision ?? null,
-    snapshot: envelope.snapshot,
+    snapshot: normalizeSyncSnapshotPayload(envelope.snapshot, remote.vaultId || "server"),
     metadata
   };
 }
@@ -311,7 +355,7 @@ async function createOutgoingRemoteEnvelope(
 ): Promise<RemoteEnvelopeRecord> {
   const vaultDescriptor = buildRemoteVaultDescriptor(remote);
   const nextSnapshot = {
-    ...snapshot,
+    ...normalizeSyncSnapshotPayload(snapshot, settings.localDeviceId),
     exportedAt: Date.now()
   };
   const localVaultProfile = remote.localVaultId ? getLocalVaultProfile(remote.localVaultId) : null;
@@ -442,7 +486,7 @@ function createNextSyncEnvelope(snapshot: SyncSnapshot, existing: SyncEnvelope |
   return {
     revision: `rev-${Date.now()}-${crypto.randomUUID()}`,
     snapshot: {
-      ...snapshot,
+      ...normalizeSyncSnapshotPayload(snapshot),
       exportedAt: Date.now()
     },
     metadata
@@ -506,6 +550,11 @@ function createEmptyChangeSet(deviceId = "server"): SyncChangeSet {
     tags: [],
     notes: [],
     assets: [],
+    tasks: [],
+    habits: [],
+    habitLogs: [],
+    goals: [],
+    timeBlocks: [],
     tombstones: []
   };
 }
@@ -517,6 +566,11 @@ function isChangeSetEmpty(changeSet: SyncChangeSet) {
     changeSet.tags.length === 0 &&
     changeSet.notes.length === 0 &&
     changeSet.assets.length === 0 &&
+    changeSet.tasks.length === 0 &&
+    changeSet.habits.length === 0 &&
+    changeSet.habitLogs.length === 0 &&
+    changeSet.goals.length === 0 &&
+    changeSet.timeBlocks.length === 0 &&
     changeSet.tombstones.length === 0
   );
 }
@@ -528,6 +582,11 @@ function countChangeSetEntries(changeSet: SyncChangeSet) {
     changeSet.tags.length +
     changeSet.notes.length +
     changeSet.assets.length +
+    changeSet.tasks.length +
+    changeSet.habits.length +
+    changeSet.habitLogs.length +
+    changeSet.goals.length +
+    changeSet.timeBlocks.length +
     changeSet.tombstones.length
   );
 }
@@ -548,6 +607,11 @@ function normalizeChangeSetPayload(
     tags: Array.isArray(payload.tags) ? payload.tags.filter(Boolean) : [],
     notes: Array.isArray(payload.notes) ? payload.notes.filter(Boolean) : [],
     assets: Array.isArray(payload.assets) ? payload.assets.filter(Boolean) : [],
+    tasks: Array.isArray(payload.tasks) ? payload.tasks.filter(Boolean) : [],
+    habits: Array.isArray(payload.habits) ? payload.habits.filter(Boolean) : [],
+    habitLogs: Array.isArray(payload.habitLogs) ? payload.habitLogs.filter(Boolean) : [],
+    goals: Array.isArray(payload.goals) ? payload.goals.filter(Boolean) : [],
+    timeBlocks: Array.isArray(payload.timeBlocks) ? payload.timeBlocks.filter(Boolean) : [],
     tombstones: Array.isArray(payload.tombstones) ? payload.tombstones.filter(Boolean) : []
   };
 }
@@ -559,6 +623,11 @@ function applyChangeSetIntoMaps(
     tag: Map<string, Tag>;
     note: Map<string, SyncedNoteRecord>;
     asset: Map<string, SyncedAssetRecord>;
+    task: Map<string, Task>;
+    habit: Map<string, Habit>;
+    habitLog: Map<string, HabitLog>;
+    goal: Map<string, Goal>;
+    timeBlock: Map<string, TimeBlock>;
     tombstones: Map<string, SyncTombstone>;
   },
   changeSet: SyncChangeSet
@@ -579,6 +648,11 @@ function applyChangeSetIntoMaps(
   applyRecords("tag", maps.tag, changeSet.tags);
   applyRecords("note", maps.note, changeSet.notes);
   applyRecords("asset", maps.asset, changeSet.assets);
+  applyRecords("task", maps.task, changeSet.tasks);
+  applyRecords("habit", maps.habit, changeSet.habits);
+  applyRecords("habitLog", maps.habitLog, changeSet.habitLogs);
+  applyRecords("goal", maps.goal, changeSet.goals);
+  applyRecords("timeBlock", maps.timeBlock, changeSet.timeBlocks);
 
   changeSet.tombstones.forEach((tombstone) => {
     switch (tombstone.entityType) {
@@ -597,6 +671,21 @@ function applyChangeSetIntoMaps(
       case "asset":
         maps.asset.delete(tombstone.entityId);
         break;
+      case "task":
+        maps.task.delete(tombstone.entityId);
+        break;
+      case "habit":
+        maps.habit.delete(tombstone.entityId);
+        break;
+      case "habitLog":
+        maps.habitLog.delete(tombstone.entityId);
+        break;
+      case "goal":
+        maps.goal.delete(tombstone.entityId);
+        break;
+      case "timeBlock":
+        maps.timeBlock.delete(tombstone.entityId);
+        break;
     }
 
     maps.tombstones.set(tombstone.key, tombstone);
@@ -610,6 +699,11 @@ function collapseChangeSetBatches(changeSets: readonly SyncChangeSet[]) {
     tag: new Map<string, Tag>(),
     note: new Map<string, SyncedNoteRecord>(),
     asset: new Map<string, SyncedAssetRecord>(),
+    task: new Map<string, Task>(),
+    habit: new Map<string, Habit>(),
+    habitLog: new Map<string, HabitLog>(),
+    goal: new Map<string, Goal>(),
+    timeBlock: new Map<string, TimeBlock>(),
     tombstones: new Map<string, SyncTombstone>()
   };
   let deviceId = "server";
@@ -630,17 +724,23 @@ function collapseChangeSetBatches(changeSets: readonly SyncChangeSet[]) {
     tags: sortById([...maps.tag.values()]),
     notes: sortById([...maps.note.values()]),
     assets: sortById([...maps.asset.values()]),
+    tasks: sortById([...maps.task.values()]),
+    habits: sortById([...maps.habit.values()]),
+    habitLogs: sortById([...maps.habitLog.values()]),
+    goals: sortById([...maps.goal.values()]),
+    timeBlocks: sortById([...maps.timeBlock.values()]),
     tombstones: sortTombstones([...maps.tombstones.values()])
   } satisfies SyncChangeSet;
 }
 
 function buildRecordChangeSetFromSnapshot(snapshot: SyncSnapshot, shadows: readonly SyncShadow[]) {
-  const changeSet = createEmptyChangeSet(snapshot.deviceId);
+  const normalizedSnapshot = normalizeSyncSnapshotPayload(snapshot);
+  const changeSet = createEmptyChangeSet(normalizedSnapshot.deviceId);
   const shadowMap = buildShadowMap(shadows);
 
-  changeSet.exportedAt = snapshot.exportedAt;
+  changeSet.exportedAt = normalizedSnapshot.exportedAt;
 
-  snapshot.projects.forEach((project) => {
+  normalizedSnapshot.projects.forEach((project) => {
     const state = createRecordState("project", project, project.updatedAt);
 
     if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
@@ -648,7 +748,7 @@ function buildRecordChangeSetFromSnapshot(snapshot: SyncSnapshot, shadows: reado
     }
   });
 
-  snapshot.folders.forEach((folder) => {
+  normalizedSnapshot.folders.forEach((folder) => {
     const state = createRecordState("folder", folder, folder.updatedAt);
 
     if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
@@ -656,7 +756,7 @@ function buildRecordChangeSetFromSnapshot(snapshot: SyncSnapshot, shadows: reado
     }
   });
 
-  snapshot.tags.forEach((tag) => {
+  normalizedSnapshot.tags.forEach((tag) => {
     const state = createRecordState("tag", tag, tag.updatedAt);
 
     if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
@@ -664,7 +764,7 @@ function buildRecordChangeSetFromSnapshot(snapshot: SyncSnapshot, shadows: reado
     }
   });
 
-  snapshot.notes.forEach((note) => {
+  normalizedSnapshot.notes.forEach((note) => {
     const state = createRecordState("note", note, note.updatedAt);
 
     if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
@@ -672,7 +772,7 @@ function buildRecordChangeSetFromSnapshot(snapshot: SyncSnapshot, shadows: reado
     }
   });
 
-  snapshot.assets.forEach((asset) => {
+  normalizedSnapshot.assets.forEach((asset) => {
     const state = createRecordState("asset", asset, asset.updatedAt);
 
     if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
@@ -680,7 +780,47 @@ function buildRecordChangeSetFromSnapshot(snapshot: SyncSnapshot, shadows: reado
     }
   });
 
-  snapshot.tombstones.forEach((tombstone) => {
+  normalizedSnapshot.tasks.forEach((task) => {
+    const state = createRecordState("task", task, task.updatedAt);
+
+    if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
+      changeSet.tasks.push(task);
+    }
+  });
+
+  normalizedSnapshot.habits.forEach((habit) => {
+    const state = createRecordState("habit", habit, habit.updatedAt);
+
+    if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
+      changeSet.habits.push(habit);
+    }
+  });
+
+  normalizedSnapshot.habitLogs.forEach((habitLog) => {
+    const state = createRecordState("habitLog", habitLog, habitLog.updatedAt);
+
+    if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
+      changeSet.habitLogs.push(habitLog);
+    }
+  });
+
+  normalizedSnapshot.goals.forEach((goal) => {
+    const state = createRecordState("goal", goal, goal.updatedAt);
+
+    if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
+      changeSet.goals.push(goal);
+    }
+  });
+
+  normalizedSnapshot.timeBlocks.forEach((timeBlock) => {
+    const state = createRecordState("timeBlock", timeBlock, timeBlock.updatedAt);
+
+    if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
+      changeSet.timeBlocks.push(timeBlock);
+    }
+  });
+
+  normalizedSnapshot.tombstones.forEach((tombstone) => {
     const state = createTombstoneState(tombstone);
 
     if ((shadowMap.get(state.key)?.hash ?? null) !== state.hash) {
@@ -695,13 +835,20 @@ function buildRecordChangeSetFromSnapshot(snapshot: SyncSnapshot, shadows: reado
     tags: sortById(changeSet.tags),
     notes: sortById(changeSet.notes),
     assets: sortById(changeSet.assets),
+    tasks: sortById(changeSet.tasks),
+    habits: sortById(changeSet.habits),
+    habitLogs: sortById(changeSet.habitLogs),
+    goals: sortById(changeSet.goals),
+    timeBlocks: sortById(changeSet.timeBlocks),
     tombstones: sortTombstones(changeSet.tombstones)
   };
 }
 
 function buildChangeSetBetweenSnapshots(previous: SyncSnapshot, next: SyncSnapshot) {
-  const changeSet = createEmptyChangeSet(next.deviceId);
-  changeSet.exportedAt = next.exportedAt;
+  const previousSnapshot = normalizeSyncSnapshotPayload(previous);
+  const nextSnapshot = normalizeSyncSnapshotPayload(next, previousSnapshot.deviceId);
+  const changeSet = createEmptyChangeSet(nextSnapshot.deviceId);
+  changeSet.exportedAt = nextSnapshot.exportedAt;
 
   const appendEntityChanges = <T extends { id: string }>(
     entityType: SyncEntityKind,
@@ -725,11 +872,16 @@ function buildChangeSetBetweenSnapshots(previous: SyncSnapshot, next: SyncSnapsh
     });
   };
 
-  appendEntityChanges("project", next.projects, previous.projects, (record: Project) => record.updatedAt);
-  appendEntityChanges("folder", next.folders, previous.folders, (record: Folder) => record.updatedAt);
-  appendEntityChanges("tag", next.tags, previous.tags, (record: Tag) => record.updatedAt);
-  appendEntityChanges("note", next.notes, previous.notes, (record: SyncedNoteRecord) => record.updatedAt);
-  appendEntityChanges("asset", next.assets, previous.assets, (record: SyncedAssetRecord) => record.updatedAt);
+  appendEntityChanges("project", nextSnapshot.projects, previousSnapshot.projects, (record: Project) => record.updatedAt);
+  appendEntityChanges("folder", nextSnapshot.folders, previousSnapshot.folders, (record: Folder) => record.updatedAt);
+  appendEntityChanges("tag", nextSnapshot.tags, previousSnapshot.tags, (record: Tag) => record.updatedAt);
+  appendEntityChanges("note", nextSnapshot.notes, previousSnapshot.notes, (record: SyncedNoteRecord) => record.updatedAt);
+  appendEntityChanges("asset", nextSnapshot.assets, previousSnapshot.assets, (record: SyncedAssetRecord) => record.updatedAt);
+  appendEntityChanges("task", nextSnapshot.tasks, previousSnapshot.tasks, (record: Task) => record.updatedAt);
+  appendEntityChanges("habit", nextSnapshot.habits, previousSnapshot.habits, (record: Habit) => record.updatedAt);
+  appendEntityChanges("habitLog", nextSnapshot.habitLogs, previousSnapshot.habitLogs, (record: HabitLog) => record.updatedAt);
+  appendEntityChanges("goal", nextSnapshot.goals, previousSnapshot.goals, (record: Goal) => record.updatedAt);
+  appendEntityChanges("timeBlock", nextSnapshot.timeBlocks, previousSnapshot.timeBlocks, (record: TimeBlock) => record.updatedAt);
 
   return {
     ...changeSet,
@@ -738,6 +890,11 @@ function buildChangeSetBetweenSnapshots(previous: SyncSnapshot, next: SyncSnapsh
     tags: sortById(changeSet.tags),
     notes: sortById(changeSet.notes),
     assets: sortById(changeSet.assets),
+    tasks: sortById(changeSet.tasks),
+    habits: sortById(changeSet.habits),
+    habitLogs: sortById(changeSet.habitLogs),
+    goals: sortById(changeSet.goals),
+    timeBlocks: sortById(changeSet.timeBlocks),
     tombstones: sortTombstones(changeSet.tombstones)
   } satisfies SyncChangeSet;
 }
@@ -772,7 +929,20 @@ function createSyncTombstoneShadow(tombstone: SyncTombstone, syncedAt: number, r
 }
 
 function buildShadowEntries(
-  source: Pick<SyncChangeSet, "projects" | "folders" | "tags" | "notes" | "assets" | "tombstones">,
+  source: Pick<
+    SyncChangeSet,
+    | "projects"
+    | "folders"
+    | "tags"
+    | "notes"
+    | "assets"
+    | "tasks"
+    | "habits"
+    | "habitLogs"
+    | "goals"
+    | "timeBlocks"
+    | "tombstones"
+  >,
   syncedAt: number,
   revision: string | null
 ) {
@@ -798,6 +968,26 @@ function buildShadowEntries(
     shadows.push(createSyncShadowRecord("asset", asset, syncedAt, revision));
   });
 
+  source.tasks.forEach((task) => {
+    shadows.push(createSyncShadowRecord("task", task, syncedAt, revision));
+  });
+
+  source.habits.forEach((habit) => {
+    shadows.push(createSyncShadowRecord("habit", habit, syncedAt, revision));
+  });
+
+  source.habitLogs.forEach((habitLog) => {
+    shadows.push(createSyncShadowRecord("habitLog", habitLog, syncedAt, revision));
+  });
+
+  source.goals.forEach((goal) => {
+    shadows.push(createSyncShadowRecord("goal", goal, syncedAt, revision));
+  });
+
+  source.timeBlocks.forEach((timeBlock) => {
+    shadows.push(createSyncShadowRecord("timeBlock", timeBlock, syncedAt, revision));
+  });
+
   source.tombstones.forEach((tombstone) => {
     shadows.push(createSyncTombstoneShadow(tombstone, syncedAt, revision));
   });
@@ -806,7 +996,20 @@ function buildShadowEntries(
 }
 
 function collectChangeSetKeys(
-  source: Pick<SyncChangeSet, "projects" | "folders" | "tags" | "notes" | "assets" | "tombstones">
+  source: Pick<
+    SyncChangeSet,
+    | "projects"
+    | "folders"
+    | "tags"
+    | "notes"
+    | "assets"
+    | "tasks"
+    | "habits"
+    | "habitLogs"
+    | "goals"
+    | "timeBlocks"
+    | "tombstones"
+  >
 ) {
   return [
     ...source.projects.map((project) => getEntityKey("project", project.id)),
@@ -814,6 +1017,11 @@ function collectChangeSetKeys(
     ...source.tags.map((tag) => getEntityKey("tag", tag.id)),
     ...source.notes.map((note) => getEntityKey("note", note.id)),
     ...source.assets.map((asset) => getEntityKey("asset", asset.id)),
+    ...source.tasks.map((task) => getEntityKey("task", task.id)),
+    ...source.habits.map((habit) => getEntityKey("habit", habit.id)),
+    ...source.habitLogs.map((habitLog) => getEntityKey("habitLog", habitLog.id)),
+    ...source.goals.map((goal) => getEntityKey("goal", goal.id)),
+    ...source.timeBlocks.map((timeBlock) => getEntityKey("timeBlock", timeBlock.id)),
     ...source.tombstones.map((tombstone) => tombstone.key)
   ];
 }
@@ -847,6 +1055,21 @@ function appendResolvedStateToChangeSet<T extends { id: string }>(
       break;
     case "asset":
       changeSet.assets.push(resolved.record as unknown as SyncedAssetRecord);
+      break;
+    case "task":
+      changeSet.tasks.push(resolved.record as unknown as Task);
+      break;
+    case "habit":
+      changeSet.habits.push(resolved.record as unknown as Habit);
+      break;
+    case "habitLog":
+      changeSet.habitLogs.push(resolved.record as unknown as HabitLog);
+      break;
+    case "goal":
+      changeSet.goals.push(resolved.record as unknown as Goal);
+      break;
+    case "timeBlock":
+      changeSet.timeBlocks.push(resolved.record as unknown as TimeBlock);
       break;
   }
 }
@@ -1739,7 +1962,12 @@ export async function importRemoteVaultIntoLocalVault(input: {
       envelope.snapshot.folders.length +
       envelope.snapshot.tags.length +
       envelope.snapshot.notes.length +
-      envelope.snapshot.assets.length
+      envelope.snapshot.assets.length +
+      envelope.snapshot.tasks.length +
+      envelope.snapshot.habits.length +
+      envelope.snapshot.habitLogs.length +
+      envelope.snapshot.goals.length +
+      envelope.snapshot.timeBlocks.length
   };
 }
 
@@ -2155,15 +2383,21 @@ export async function migrateRemoteVaultEncryption(
 }
 
 export async function exportLocalSyncSnapshot(database: ZenNotesDatabase = db): Promise<SyncSnapshot> {
-  const [projects, folders, tags, notes, assets, settings, tombstones] = await Promise.all([
-    database.projects.toArray(),
-    database.folders.toArray(),
-    database.tags.toArray(),
-    database.notes.toArray(),
-    database.assets.toArray(),
-    database.settings.get("app"),
-    database.syncTombstones.toArray()
-  ]);
+  const [projects, folders, tags, notes, assets, tasks, habits, habitLogs, goals, timeBlocks, settings, tombstones] =
+    await Promise.all([
+      database.projects.toArray(),
+      database.folders.toArray(),
+      database.tags.toArray(),
+      database.notes.toArray(),
+      database.assets.toArray(),
+      database.tasks.toArray(),
+      database.habits.toArray(),
+      database.habitLogs.toArray(),
+      database.goals.toArray(),
+      database.timeBlocks.toArray(),
+      database.settings.get("app"),
+      database.syncTombstones.toArray()
+    ]);
 
   if (!settings) {
     throw new Error("SETTINGS_MISSING");
@@ -2179,6 +2413,11 @@ export async function exportLocalSyncSnapshot(database: ZenNotesDatabase = db): 
     tags: sortById(tags),
     notes: sortById(notes).map((note) => serializeNote(note)),
     assets: sortById(syncedAssets),
+    tasks: sortById(tasks),
+    habits: sortById(habits),
+    habitLogs: sortById(habitLogs),
+    goals: sortById(goals),
+    timeBlocks: sortById(timeBlocks),
     tombstones: sortTombstones(tombstones)
   };
 }
@@ -2222,7 +2461,12 @@ function createChangeStateMaps(changeSet: SyncChangeSet) {
     folders: buildStateMap("folder", changeSet.folders, changeSet.tombstones, (record) => record.updatedAt),
     tags: buildStateMap("tag", changeSet.tags, changeSet.tombstones, (record) => record.updatedAt),
     notes: buildStateMap("note", changeSet.notes, changeSet.tombstones, (record) => record.updatedAt),
-    assets: buildStateMap("asset", changeSet.assets, changeSet.tombstones, (record) => record.updatedAt)
+    assets: buildStateMap("asset", changeSet.assets, changeSet.tombstones, (record) => record.updatedAt),
+    tasks: buildStateMap("task", changeSet.tasks, changeSet.tombstones, (record) => record.updatedAt),
+    habits: buildStateMap("habit", changeSet.habits, changeSet.tombstones, (record) => record.updatedAt),
+    habitLogs: buildStateMap("habitLog", changeSet.habitLogs, changeSet.tombstones, (record) => record.updatedAt),
+    goals: buildStateMap("goal", changeSet.goals, changeSet.tombstones, (record) => record.updatedAt),
+    timeBlocks: buildStateMap("timeBlock", changeSet.timeBlocks, changeSet.tombstones, (record) => record.updatedAt)
   };
 }
 
@@ -2232,24 +2476,32 @@ function mergeChangeSetsIntoSnapshot(
   remoteChanges: SyncChangeSet,
   shadows: readonly SyncShadow[]
 ) {
+  const normalizedLocalSnapshot = normalizeSyncSnapshotPayload(localSnapshot);
   const shadowMap = buildShadowMap(shadows);
   const stats: SyncRunStats = {
     pulled: countChangeSetEntries(remoteChanges),
     pushed: 0,
     conflicts: 0
   };
-  const outgoingChanges = createEmptyChangeSet(localSnapshot.deviceId);
+  const outgoingChanges = createEmptyChangeSet(normalizedLocalSnapshot.deviceId);
   outgoingChanges.exportedAt = Date.now();
 
   const localStateMaps = createChangeStateMaps(localChanges);
   const remoteStateMaps = createChangeStateMaps(remoteChanges);
-  const currentProjectsMap = new Map(localSnapshot.projects.map((project) => [project.id, project]));
-  const currentFoldersMap = new Map(localSnapshot.folders.map((folder) => [folder.id, folder]));
-  const currentTagsMap = new Map(localSnapshot.tags.map((tag) => [tag.id, tag]));
-  const currentNotesMap = new Map(localSnapshot.notes.map((note) => [note.id, note]));
-  const currentAssetsMap = new Map(localSnapshot.assets.map((asset) => [asset.id, asset]));
-  const mergedTombstones = new Map(localSnapshot.tombstones.map((tombstone) => [tombstone.key, tombstone]));
-  const localAssetsById = new Map(localSnapshot.assets.map((asset) => [asset.id, asset]));
+  const currentProjectsMap = new Map(normalizedLocalSnapshot.projects.map((project) => [project.id, project]));
+  const currentFoldersMap = new Map(normalizedLocalSnapshot.folders.map((folder) => [folder.id, folder]));
+  const currentTagsMap = new Map(normalizedLocalSnapshot.tags.map((tag) => [tag.id, tag]));
+  const currentNotesMap = new Map(normalizedLocalSnapshot.notes.map((note) => [note.id, note]));
+  const currentAssetsMap = new Map(normalizedLocalSnapshot.assets.map((asset) => [asset.id, asset]));
+  const currentTasksMap = new Map(normalizedLocalSnapshot.tasks.map((task) => [task.id, task]));
+  const currentHabitsMap = new Map(normalizedLocalSnapshot.habits.map((habit) => [habit.id, habit]));
+  const currentHabitLogsMap = new Map(normalizedLocalSnapshot.habitLogs.map((habitLog) => [habitLog.id, habitLog]));
+  const currentGoalsMap = new Map(normalizedLocalSnapshot.goals.map((goal) => [goal.id, goal]));
+  const currentTimeBlocksMap = new Map(
+    normalizedLocalSnapshot.timeBlocks.map((timeBlock) => [timeBlock.id, timeBlock])
+  );
+  const mergedTombstones = new Map(normalizedLocalSnapshot.tombstones.map((tombstone) => [tombstone.key, tombstone]));
+  const localAssetsById = new Map(normalizedLocalSnapshot.assets.map((asset) => [asset.id, asset]));
   let localMutationCount = 0;
 
   const registerResolvedGenericState = <T extends { id: string }>(
@@ -2452,6 +2704,48 @@ function mergeChangeSetsIntoSnapshot(
     mergedTombstones.delete(getEntityKey("asset", asset.id));
   });
 
+  const mergeGenericPlannerEntity = <T extends { id: string }>(
+    entityType: SyncEntityKind,
+    localMap: Map<string, SnapshotEntityState<T>>,
+    remoteMap: Map<string, SnapshotEntityState<T>>,
+    currentMap: Map<string, T>
+  ) => {
+    const keys = new Set([...localMap.keys(), ...remoteMap.keys()]);
+
+    keys.forEach((key) => {
+      const localState = localMap.get(key) ?? null;
+      const remoteState = remoteMap.get(key) ?? null;
+      const resolved = resolveGenericState<T>({
+        local: localState,
+        remote: remoteState,
+        shadowHash: shadowMap.get(key)?.hash ?? null
+      });
+
+      if (!resolved) {
+        return;
+      }
+
+      registerResolvedGenericState(entityType, resolved, localState, remoteState);
+
+      if (resolved.deleted && resolved.tombstone) {
+        currentMap.delete(resolved.tombstone.entityId);
+        mergedTombstones.set(resolved.tombstone.key, resolved.tombstone);
+        return;
+      }
+
+      if (resolved.record) {
+        currentMap.set(resolved.record.id, resolved.record);
+        mergedTombstones.delete(key);
+      }
+    });
+  };
+
+  mergeGenericPlannerEntity("task", localStateMaps.tasks, remoteStateMaps.tasks, currentTasksMap);
+  mergeGenericPlannerEntity("habit", localStateMaps.habits, remoteStateMaps.habits, currentHabitsMap);
+  mergeGenericPlannerEntity("habitLog", localStateMaps.habitLogs, remoteStateMaps.habitLogs, currentHabitLogsMap);
+  mergeGenericPlannerEntity("goal", localStateMaps.goals, remoteStateMaps.goals, currentGoalsMap);
+  mergeGenericPlannerEntity("timeBlock", localStateMaps.timeBlocks, remoteStateMaps.timeBlocks, currentTimeBlocksMap);
+
   const notes = sortById([...currentNotesMap.values()]);
   const assets = sortById(pruneUnreferencedAssets([...currentAssetsMap.values()], notes));
   const liveAssetIds = new Set(assets.map((asset) => asset.id));
@@ -2471,18 +2765,28 @@ function mergeChangeSetsIntoSnapshot(
   outgoingChanges.tags = sortById(outgoingChanges.tags);
   outgoingChanges.notes = sortById(outgoingChanges.notes);
   outgoingChanges.assets = sortById(outgoingChanges.assets);
+  outgoingChanges.tasks = sortById(outgoingChanges.tasks);
+  outgoingChanges.habits = sortById(outgoingChanges.habits);
+  outgoingChanges.habitLogs = sortById(outgoingChanges.habitLogs);
+  outgoingChanges.goals = sortById(outgoingChanges.goals);
+  outgoingChanges.timeBlocks = sortById(outgoingChanges.timeBlocks);
   outgoingChanges.tombstones = sortTombstones(outgoingChanges.tombstones);
   stats.pushed = countChangeSetEntries(outgoingChanges);
 
   return {
     snapshot: {
-      deviceId: localSnapshot.deviceId,
+      deviceId: normalizedLocalSnapshot.deviceId,
       exportedAt: Date.now(),
       projects: sortById([...currentProjectsMap.values()]),
       folders: sortById([...currentFoldersMap.values()]),
       tags: sortById([...currentTagsMap.values()]),
       notes,
       assets,
+      tasks: sortById([...currentTasksMap.values()]),
+      habits: sortById([...currentHabitsMap.values()]),
+      habitLogs: sortById([...currentHabitLogsMap.values()]),
+      goals: sortById([...currentGoalsMap.values()]),
+      timeBlocks: sortById([...currentTimeBlocksMap.values()]),
       tombstones: sortTombstones([...mergedTombstones.values()])
     } satisfies SyncSnapshot,
     outgoingChanges,
@@ -2496,6 +2800,8 @@ function mergeSnapshots(
   remote: SyncSnapshot,
   shadows: readonly SyncShadow[]
 ) {
+  const localSnapshot = normalizeSyncSnapshotPayload(local);
+  const remoteSnapshot = normalizeSyncSnapshotPayload(remote, localSnapshot.deviceId);
   const shadowMap = buildShadowMap(shadows);
   const stats: SyncRunStats = {
     pulled: 0,
@@ -2503,22 +2809,37 @@ function mergeSnapshots(
     conflicts: 0
   };
 
-  const localProjects = buildStateMap("project", local.projects, local.tombstones, (record) => record.updatedAt);
-  const remoteProjects = buildStateMap("project", remote.projects, remote.tombstones, (record) => record.updatedAt);
-  const localFolders = buildStateMap("folder", local.folders, local.tombstones, (record) => record.updatedAt);
-  const remoteFolders = buildStateMap("folder", remote.folders, remote.tombstones, (record) => record.updatedAt);
-  const localTags = buildStateMap("tag", local.tags, local.tombstones, (record) => record.updatedAt);
-  const remoteTags = buildStateMap("tag", remote.tags, remote.tombstones, (record) => record.updatedAt);
-  const localNotes = buildStateMap("note", local.notes, local.tombstones, (record) => record.updatedAt);
-  const remoteNotes = buildStateMap("note", remote.notes, remote.tombstones, (record) => record.updatedAt);
-  const localAssets = buildStateMap("asset", local.assets, local.tombstones, (record) => record.updatedAt);
-  const remoteAssets = buildStateMap("asset", remote.assets, remote.tombstones, (record) => record.updatedAt);
+  const localProjects = buildStateMap("project", localSnapshot.projects, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteProjects = buildStateMap("project", remoteSnapshot.projects, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localFolders = buildStateMap("folder", localSnapshot.folders, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteFolders = buildStateMap("folder", remoteSnapshot.folders, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localTags = buildStateMap("tag", localSnapshot.tags, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteTags = buildStateMap("tag", remoteSnapshot.tags, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localNotes = buildStateMap("note", localSnapshot.notes, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteNotes = buildStateMap("note", remoteSnapshot.notes, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localAssets = buildStateMap("asset", localSnapshot.assets, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteAssets = buildStateMap("asset", remoteSnapshot.assets, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localTasks = buildStateMap("task", localSnapshot.tasks, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteTasks = buildStateMap("task", remoteSnapshot.tasks, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localHabits = buildStateMap("habit", localSnapshot.habits, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteHabits = buildStateMap("habit", remoteSnapshot.habits, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localHabitLogs = buildStateMap("habitLog", localSnapshot.habitLogs, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteHabitLogs = buildStateMap("habitLog", remoteSnapshot.habitLogs, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localGoals = buildStateMap("goal", localSnapshot.goals, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteGoals = buildStateMap("goal", remoteSnapshot.goals, remoteSnapshot.tombstones, (record) => record.updatedAt);
+  const localTimeBlocks = buildStateMap("timeBlock", localSnapshot.timeBlocks, localSnapshot.tombstones, (record) => record.updatedAt);
+  const remoteTimeBlocks = buildStateMap("timeBlock", remoteSnapshot.timeBlocks, remoteSnapshot.tombstones, (record) => record.updatedAt);
   const changeCounts = [
     countChangedKeys(localProjects, remoteProjects, shadowMap),
     countChangedKeys(localFolders, remoteFolders, shadowMap),
     countChangedKeys(localTags, remoteTags, shadowMap),
     countChangedKeys(localNotes, remoteNotes, shadowMap),
-    countChangedKeys(localAssets, remoteAssets, shadowMap)
+    countChangedKeys(localAssets, remoteAssets, shadowMap),
+    countChangedKeys(localTasks, remoteTasks, shadowMap),
+    countChangedKeys(localHabits, remoteHabits, shadowMap),
+    countChangedKeys(localHabitLogs, remoteHabitLogs, shadowMap),
+    countChangedKeys(localGoals, remoteGoals, shadowMap),
+    countChangedKeys(localTimeBlocks, remoteTimeBlocks, shadowMap)
   ];
 
   stats.pulled = changeCounts.reduce((sum, entry) => sum + entry.pulled, 0);
@@ -2527,6 +2848,11 @@ function mergeSnapshots(
   const mergedProjectsMap = new Map<string, Project>();
   const mergedFoldersMap = new Map<string, Folder>();
   const mergedTagsMap = new Map<string, Tag>();
+  const mergedTasksMap = new Map<string, Task>();
+  const mergedHabitsMap = new Map<string, Habit>();
+  const mergedHabitLogsMap = new Map<string, HabitLog>();
+  const mergedGoalsMap = new Map<string, Goal>();
+  const mergedTimeBlocksMap = new Map<string, TimeBlock>();
   const mergedTombstones = new Map<string, SyncTombstone>();
   const mergedProjectKeys = new Set([...localProjects.keys(), ...remoteProjects.keys()]);
   const mergedFolderKeys = new Set([...localFolders.keys(), ...remoteFolders.keys()]);
@@ -2595,7 +2921,7 @@ function mergeSnapshots(
     }
   });
 
-  const localAssetsById = new Map(local.assets.map((asset) => [asset.id, asset]));
+  const localAssetsById = new Map(localSnapshot.assets.map((asset) => [asset.id, asset]));
   const mergedNotesMap = new Map<string, SyncedNoteRecord>();
   const conflictAssets: SyncedAssetRecord[] = [];
   const mergedNoteKeys = new Set([...localNotes.keys(), ...remoteNotes.keys()]);
@@ -2667,6 +2993,42 @@ function mergeSnapshots(
     mergedTombstones.delete(getEntityKey("asset", asset.id));
   });
 
+  const mergeGenericEntity = <T extends { id: string }>(
+    localMap: Map<string, SnapshotEntityState<T>>,
+    remoteMap: Map<string, SnapshotEntityState<T>>,
+    outputMap: Map<string, T>
+  ) => {
+    const keys = new Set([...localMap.keys(), ...remoteMap.keys()]);
+
+    keys.forEach((key) => {
+      const resolved = resolveGenericState<T>({
+        local: localMap.get(key) ?? null,
+        remote: remoteMap.get(key) ?? null,
+        shadowHash: shadowMap.get(key)?.hash ?? null
+      });
+
+      if (!resolved) {
+        return;
+      }
+
+      if (resolved.deleted && resolved.tombstone) {
+        mergedTombstones.set(key, resolved.tombstone);
+        return;
+      }
+
+      if (resolved.record) {
+        outputMap.set(resolved.record.id, resolved.record);
+        mergedTombstones.delete(key);
+      }
+    });
+  };
+
+  mergeGenericEntity(localTasks, remoteTasks, mergedTasksMap);
+  mergeGenericEntity(localHabits, remoteHabits, mergedHabitsMap);
+  mergeGenericEntity(localHabitLogs, remoteHabitLogs, mergedHabitLogsMap);
+  mergeGenericEntity(localGoals, remoteGoals, mergedGoalsMap);
+  mergeGenericEntity(localTimeBlocks, remoteTimeBlocks, mergedTimeBlocksMap);
+
   const notes = sortById([...mergedNotesMap.values()]);
   const assets = sortById(pruneUnreferencedAssets([...mergedAssetsMap.values()], notes));
   const liveAssetIds = new Set(assets.map((asset) => asset.id));
@@ -2683,13 +3045,18 @@ function mergeSnapshots(
 
   return {
     snapshot: {
-      deviceId: local.deviceId,
+      deviceId: localSnapshot.deviceId,
       exportedAt: Date.now(),
       projects: sortById([...mergedProjectsMap.values()]),
       folders: sortById([...mergedFoldersMap.values()]),
       tags: sortById([...mergedTagsMap.values()]),
       notes,
       assets,
+      tasks: sortById([...mergedTasksMap.values()]),
+      habits: sortById([...mergedHabitsMap.values()]),
+      habitLogs: sortById([...mergedHabitLogsMap.values()]),
+      goals: sortById([...mergedGoalsMap.values()]),
+      timeBlocks: sortById([...mergedTimeBlocksMap.values()]),
       tombstones: sortTombstones([...mergedTombstones.values()])
     } satisfies SyncSnapshot,
     stats
@@ -2701,8 +3068,9 @@ async function replaceLocalDataFromSnapshot(
   settings: AppSettings,
   database: ZenNotesDatabase = db
 ) {
-  const notes = sortById(snapshot.notes).map((note) => hydrateNote(note));
-  const assets = sortById(snapshot.assets).map((asset) => hydrateAsset(asset));
+  const normalizedSnapshot = normalizeSyncSnapshotPayload(snapshot, settings.localDeviceId);
+  const notes = sortById(normalizedSnapshot.notes).map((note) => hydrateNote(note));
+  const assets = sortById(normalizedSnapshot.assets).map((asset) => hydrateAsset(asset));
   const nextOpenedNoteId =
     settings.lastOpenedNoteId && notes.some((note) => note.id === settings.lastOpenedNoteId)
       ? settings.lastOpenedNoteId
@@ -2718,6 +3086,11 @@ async function replaceLocalDataFromSnapshot(
       database.tags,
       database.notes,
       database.assets,
+      database.tasks,
+      database.habits,
+      database.habitLogs,
+      database.goals,
+      database.timeBlocks,
       database.syncTombstones,
       database.settings
     ],
@@ -2727,18 +3100,23 @@ async function replaceLocalDataFromSnapshot(
       await database.tags.clear();
       await database.notes.clear();
       await database.assets.clear();
+      await database.tasks.clear();
+      await database.habits.clear();
+      await database.habitLogs.clear();
+      await database.goals.clear();
+      await database.timeBlocks.clear();
       await database.syncTombstones.clear();
 
-      if (snapshot.projects.length > 0) {
-        await database.projects.bulkAdd(sortById(snapshot.projects));
+      if (normalizedSnapshot.projects.length > 0) {
+        await database.projects.bulkAdd(sortById(normalizedSnapshot.projects));
       }
 
-      if (snapshot.folders.length > 0) {
-        await database.folders.bulkAdd(sortById(snapshot.folders));
+      if (normalizedSnapshot.folders.length > 0) {
+        await database.folders.bulkAdd(sortById(normalizedSnapshot.folders));
       }
 
-      if (snapshot.tags.length > 0) {
-        await database.tags.bulkAdd(sortById(snapshot.tags));
+      if (normalizedSnapshot.tags.length > 0) {
+        await database.tags.bulkAdd(sortById(normalizedSnapshot.tags));
       }
 
       if (notes.length > 0) {
@@ -2749,8 +3127,28 @@ async function replaceLocalDataFromSnapshot(
         await database.assets.bulkAdd(assets);
       }
 
-      if (snapshot.tombstones.length > 0) {
-        await database.syncTombstones.bulkAdd(sortTombstones(snapshot.tombstones));
+      if (normalizedSnapshot.tasks.length > 0) {
+        await database.tasks.bulkAdd(sortById(normalizedSnapshot.tasks));
+      }
+
+      if (normalizedSnapshot.habits.length > 0) {
+        await database.habits.bulkAdd(sortById(normalizedSnapshot.habits));
+      }
+
+      if (normalizedSnapshot.habitLogs.length > 0) {
+        await database.habitLogs.bulkAdd(sortById(normalizedSnapshot.habitLogs));
+      }
+
+      if (normalizedSnapshot.goals.length > 0) {
+        await database.goals.bulkAdd(sortById(normalizedSnapshot.goals));
+      }
+
+      if (normalizedSnapshot.timeBlocks.length > 0) {
+        await database.timeBlocks.bulkAdd(sortById(normalizedSnapshot.timeBlocks));
+      }
+
+      if (normalizedSnapshot.tombstones.length > 0) {
+        await database.syncTombstones.bulkAdd(sortTombstones(normalizedSnapshot.tombstones));
       }
 
       await database.settings.update("app", {
@@ -2783,12 +3181,32 @@ async function applySyncChangeSetToLocalData(
   const assetIdsToDelete = changeSet.tombstones
     .filter((tombstone) => tombstone.entityType === "asset")
     .map((tombstone) => tombstone.entityId);
+  const taskIdsToDelete = changeSet.tombstones
+    .filter((tombstone) => tombstone.entityType === "task")
+    .map((tombstone) => tombstone.entityId);
+  const habitIdsToDelete = changeSet.tombstones
+    .filter((tombstone) => tombstone.entityType === "habit")
+    .map((tombstone) => tombstone.entityId);
+  const habitLogIdsToDelete = changeSet.tombstones
+    .filter((tombstone) => tombstone.entityType === "habitLog")
+    .map((tombstone) => tombstone.entityId);
+  const goalIdsToDelete = changeSet.tombstones
+    .filter((tombstone) => tombstone.entityType === "goal")
+    .map((tombstone) => tombstone.entityId);
+  const timeBlockIdsToDelete = changeSet.tombstones
+    .filter((tombstone) => tombstone.entityType === "timeBlock")
+    .map((tombstone) => tombstone.entityId);
   const restoredTombstoneKeys = [
     ...changeSet.projects.map((project) => getEntityKey("project", project.id)),
     ...changeSet.folders.map((folder) => getEntityKey("folder", folder.id)),
     ...changeSet.tags.map((tag) => getEntityKey("tag", tag.id)),
     ...changeSet.notes.map((note) => getEntityKey("note", note.id)),
-    ...changeSet.assets.map((asset) => getEntityKey("asset", asset.id))
+    ...changeSet.assets.map((asset) => getEntityKey("asset", asset.id)),
+    ...changeSet.tasks.map((task) => getEntityKey("task", task.id)),
+    ...changeSet.habits.map((habit) => getEntityKey("habit", habit.id)),
+    ...changeSet.habitLogs.map((habitLog) => getEntityKey("habitLog", habitLog.id)),
+    ...changeSet.goals.map((goal) => getEntityKey("goal", goal.id)),
+    ...changeSet.timeBlocks.map((timeBlock) => getEntityKey("timeBlock", timeBlock.id))
   ];
   const hydratedNotes = sortById(changeSet.notes).map((note) => hydrateNote(note));
   const hydratedAssets = sortById(changeSet.assets).map((asset) => hydrateAsset(asset));
@@ -2802,6 +3220,11 @@ async function applySyncChangeSetToLocalData(
       database.tags,
       database.notes,
       database.assets,
+      database.tasks,
+      database.habits,
+      database.habitLogs,
+      database.goals,
+      database.timeBlocks,
       database.syncTombstones,
       database.settings
     ],
@@ -2826,6 +3249,26 @@ async function applySyncChangeSetToLocalData(
         await database.assets.bulkDelete(assetIdsToDelete);
       }
 
+      if (taskIdsToDelete.length > 0) {
+        await database.tasks.bulkDelete(taskIdsToDelete);
+      }
+
+      if (habitIdsToDelete.length > 0) {
+        await database.habits.bulkDelete(habitIdsToDelete);
+      }
+
+      if (habitLogIdsToDelete.length > 0) {
+        await database.habitLogs.bulkDelete(habitLogIdsToDelete);
+      }
+
+      if (goalIdsToDelete.length > 0) {
+        await database.goals.bulkDelete(goalIdsToDelete);
+      }
+
+      if (timeBlockIdsToDelete.length > 0) {
+        await database.timeBlocks.bulkDelete(timeBlockIdsToDelete);
+      }
+
       if (changeSet.projects.length > 0) {
         await database.projects.bulkPut(sortById(changeSet.projects));
       }
@@ -2844,6 +3287,26 @@ async function applySyncChangeSetToLocalData(
 
       if (hydratedAssets.length > 0) {
         await database.assets.bulkPut(hydratedAssets);
+      }
+
+      if (changeSet.tasks.length > 0) {
+        await database.tasks.bulkPut(sortById(changeSet.tasks));
+      }
+
+      if (changeSet.habits.length > 0) {
+        await database.habits.bulkPut(sortById(changeSet.habits));
+      }
+
+      if (changeSet.habitLogs.length > 0) {
+        await database.habitLogs.bulkPut(sortById(changeSet.habitLogs));
+      }
+
+      if (changeSet.goals.length > 0) {
+        await database.goals.bulkPut(sortById(changeSet.goals));
+      }
+
+      if (changeSet.timeBlocks.length > 0) {
+        await database.timeBlocks.bulkPut(sortById(changeSet.timeBlocks));
       }
 
       if (restoredTombstoneKeys.length > 0) {

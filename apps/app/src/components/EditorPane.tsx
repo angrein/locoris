@@ -59,6 +59,11 @@ import {
   type GeminiEditorFormat
 } from "../lib/aiIntegration";
 import {
+  EDITOR_CREATE_TASK_EVENT,
+  normalizePlannerContextTaskTitle,
+  type PlannerContextTaskInput
+} from "../lib/plannerLinks";
+import {
   collectAiContentStats,
   sanitizeAiStructuredEditPayload,
   type AiContentStats
@@ -81,6 +86,10 @@ import type { AppLanguage, Asset, Folder, Note, NoteContent, SaveState, StoredBl
 type MarkdownStatus = "copied" | "exported" | "imported" | "error" | null;
 type NoteTransferStatus = {
   tone: "success" | "error" | "info";
+  text: string;
+} | null;
+type TaskCreationStatus = {
+  tone: "success" | "error";
   text: string;
 } | null;
 type EditorTypographyMode = "focus" | "reading";
@@ -1197,6 +1206,7 @@ interface EditorPaneProps {
   onContentChange: (content: NoteContent, state: SaveState) => void;
   onUploadFile: (file: File) => Promise<string>;
   onResolveFileUrl: (url: string) => Promise<string>;
+  onCreateTaskFromContext?: (input: PlannerContextTaskInput) => Promise<unknown> | void;
   privateVaultWarningContext?: PrivateVaultWarningContext | null;
   immersive?: boolean;
   onClose?: () => void;
@@ -1220,6 +1230,7 @@ export default function EditorPane({
   onContentChange,
   onUploadFile,
   onResolveFileUrl,
+  onCreateTaskFromContext,
   privateVaultWarningContext = null,
   immersive = false,
   onClose
@@ -1240,12 +1251,14 @@ export default function EditorPane({
     useState<PendingMarkdownImport | null>(null);
   const [mobileNoteMenuOpen, setMobileNoteMenuOpen] = useState(false);
   const [mobileInsertMenuOpen, setMobileInsertMenuOpen] = useState(false);
+  const [taskCreationStatus, setTaskCreationStatus] = useState<TaskCreationStatus>(null);
   const [aiPanel, setAiPanel] = useState<AiPanelState | null>(null);
   const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
   const aiPanelRef = useRef<HTMLDivElement | null>(null);
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
   const markdownStatusTimeoutRef = useRef<number | null>(null);
+  const taskStatusTimeoutRef = useRef<number | null>(null);
   const isTitleFieldFocusedRef = useRef(false);
   const isApplyingChecklistTransformRef = useRef(false);
   const pendingEmptyInlinePasteRestoreRef =
@@ -1576,7 +1589,7 @@ export default function EditorPane({
       .map((block) => block.id)
       .filter((id): id is string => typeof id === "string" && id.length > 0);
 
-  const getAiSourceSnapshot = (scope: GeminiAiScope) => {
+	  const getAiSourceSnapshot = (scope: GeminiAiScope) => {
     if (scope === "note") {
       const documentBlocks = readEditorDocumentBlocks();
 
@@ -1637,10 +1650,110 @@ export default function EditorPane({
       sourceBlocks,
       targetBlocks: selectedBlocks,
       inlineRange
-    };
-  };
+	    };
+	  };
 
-  const openAiPanel = (scope: GeminiAiScope, triggerRect?: DOMRect | null) => {
+	  const getCurrentEditorBlockForTask = () => {
+	    try {
+	      return editor.getTextCursorPosition().block as unknown as StoredBlock;
+	    } catch {
+	      return null;
+	    }
+	  };
+
+	  const getPlannerTaskSnapshot = (scope: "note" | "selection") => {
+	    if (scope === "note") {
+	      const blocks = readEditorDocumentBlocks();
+	      const noteText = extractPlainText(blocks);
+	      const fallbackTitle = language === "ru" ? "Задача из заметки" : "Task from note";
+
+	      return {
+	        title: normalizePlannerContextTaskTitle(titleDraft || note.title || noteText, fallbackTitle),
+	        description: noteText.slice(0, 1800),
+	        sourceBlockId: null,
+	        sourceLabel: language === "ru" ? "Вся заметка" : "Whole note"
+	      };
+	    }
+
+	    const selection = editor.getSelection();
+	    const selectedText = editor.getSelectedText().trim();
+	    const selectedBlocks = cloneNoteContent((selection?.blocks ?? []) as unknown as NoteContent);
+	    const currentBlock = selectedBlocks[0] ?? getCurrentEditorBlockForTask();
+	    const currentBlockText = currentBlock ? extractPlainText([currentBlock]).trim() : "";
+	    const sourceText = selectedText || currentBlockText;
+	    const isChecklistItem = currentBlock?.type === "checkListItem";
+	    const fallbackTitle = isChecklistItem
+	      ? language === "ru"
+	        ? "Пункт чеклиста"
+	        : "Checklist item"
+	      : language === "ru"
+	        ? "Задача из блока"
+	        : "Task from block";
+
+	    return {
+	      title: normalizePlannerContextTaskTitle(sourceText, fallbackTitle),
+	      description: sourceText.slice(0, 1800),
+	      sourceBlockId:
+	        typeof currentBlock?.id === "string" && currentBlock.id.length > 0 ? currentBlock.id : null,
+	      sourceLabel: isChecklistItem
+	        ? language === "ru"
+	          ? "Пункт чеклиста"
+	          : "Checklist item"
+	        : selectedText
+	          ? language === "ru"
+	            ? "Выделенный текст"
+	            : "Selected text"
+	          : language === "ru"
+	            ? "Текущий блок"
+	            : "Current block"
+	    };
+	  };
+
+	  const showTaskCreationStatus = (status: Exclude<TaskCreationStatus, null>) => {
+	    setTaskCreationStatus(status);
+
+	    if (taskStatusTimeoutRef.current) {
+	      window.clearTimeout(taskStatusTimeoutRef.current);
+	    }
+
+	    taskStatusTimeoutRef.current = window.setTimeout(() => {
+	      setTaskCreationStatus(null);
+	      taskStatusTimeoutRef.current = null;
+	    }, 2200);
+	  };
+
+	  const handleCreateTaskFromEditor = async (scope: "note" | "selection") => {
+	    if (!onCreateTaskFromContext) {
+	      return;
+	    }
+
+	    const snapshot = getPlannerTaskSnapshot(scope);
+
+	    try {
+	      await onCreateTaskFromContext({
+	        title: snapshot.title,
+	        description: snapshot.description,
+	        projectId: note.projectId,
+	        folderId: note.folderId,
+	        noteId: note.id,
+	        sourceBlockId: snapshot.sourceBlockId,
+	        sourceLabel: snapshot.sourceLabel
+	      });
+	      setMobileNoteMenuOpen(false);
+	      showTaskCreationStatus({
+	        tone: "success",
+	        text: t("note.createTaskCreated")
+	      });
+	    } catch (error) {
+	      console.warn("Could not create planner task from note context.", error);
+	      showTaskCreationStatus({
+	        tone: "error",
+	        text: t("note.createTaskFailed")
+	      });
+	    }
+	  };
+
+	  const openAiPanel = (scope: GeminiAiScope, triggerRect?: DOMRect | null) => {
     const snapshot = getAiSourceSnapshot(scope);
 
     setAiPanel({
@@ -1659,15 +1772,25 @@ export default function EditorPane({
     });
   };
 
-  useEffect(() => {
-    const handleOpenAi = (event: Event) => {
-      const detail = (event as CustomEvent<{ scope?: GeminiAiScope }>).detail;
-      openAiPanel(detail?.scope === "selection" ? "selection" : "note");
-    };
+	  useEffect(() => {
+	    const handleOpenAi = (event: Event) => {
+	      const detail = (event as CustomEvent<{ scope?: GeminiAiScope }>).detail;
+	      openAiPanel(detail?.scope === "selection" ? "selection" : "note");
+	    };
 
-    window.addEventListener(EDITOR_AI_OPEN_EVENT, handleOpenAi);
-    return () => window.removeEventListener(EDITOR_AI_OPEN_EVENT, handleOpenAi);
-  });
+	    window.addEventListener(EDITOR_AI_OPEN_EVENT, handleOpenAi);
+	    return () => window.removeEventListener(EDITOR_AI_OPEN_EVENT, handleOpenAi);
+	  });
+
+	  useEffect(() => {
+	    const handleCreateTask = (event: Event) => {
+	      const detail = (event as CustomEvent<{ scope?: "note" | "selection" }>).detail;
+	      void handleCreateTaskFromEditor(detail?.scope === "note" ? "note" : "selection");
+	    };
+
+	    window.addEventListener(EDITOR_CREATE_TASK_EVENT, handleCreateTask);
+	    return () => window.removeEventListener(EDITOR_CREATE_TASK_EVENT, handleCreateTask);
+	  });
 
   useEffect(() => {
     if (!aiPanel) {
@@ -2726,11 +2849,15 @@ export default function EditorPane({
         }
       }
 
-      if (markdownStatusTimeoutRef.current) {
-        window.clearTimeout(markdownStatusTimeoutRef.current);
-      }
+	      if (markdownStatusTimeoutRef.current) {
+	        window.clearTimeout(markdownStatusTimeoutRef.current);
+	      }
 
-      if (latestTitleDraftRef.current !== latestStoredTitleRef.current) {
+	      if (taskStatusTimeoutRef.current) {
+	        window.clearTimeout(taskStatusTimeoutRef.current);
+	      }
+
+	      if (latestTitleDraftRef.current !== latestStoredTitleRef.current) {
         latestOnTitleChangeRef.current(latestTitleDraftRef.current.trim());
       }
     };
@@ -2792,7 +2919,7 @@ export default function EditorPane({
       } ${mobileNoteMenuOpen ? "is-mobile-note-menu-open" : ""}`}
       style={{ "--note-accent": note.color || DEFAULT_NOTE_COLOR } as CSSProperties}
     >
-      <div className="editor-pane-mobile-header">
+	      <div className="editor-pane-mobile-header">
         <button
           type="button"
           className="editor-pane-mobile-icon-action"
@@ -2862,10 +2989,16 @@ export default function EditorPane({
           title={t("note.mobileMore")}
         >
           <MobileMoreGlyph />
-        </button>
-      </div>
+	        </button>
+	      </div>
 
-      <div className="editor-pane-toolbar">
+	      {taskCreationStatus ? (
+	        <div className={`editor-pane-mobile-task-toast is-${taskCreationStatus.tone}`} role="status">
+	          {taskCreationStatus.text}
+	        </div>
+	      ) : null}
+
+	      <div className="editor-pane-toolbar">
         <div className="editor-pane-toolbar-main">
           <div className="editor-pane-title-stack">
             <input
@@ -2926,9 +3059,9 @@ export default function EditorPane({
               <span className="editor-pane-contextmeta">
                 {t("note.updated")}: {formatTimestamp(note.updatedAt, language)}
               </span>
-              <button
-                type="button"
-                className="editor-pane-ai-trigger"
+	              <button
+	                type="button"
+	                className="editor-pane-ai-trigger"
                 onClick={(event) =>
                   openAiPanel("note", event.currentTarget.getBoundingClientRect())
                 }
@@ -2938,9 +3071,26 @@ export default function EditorPane({
                 <span className="editor-pane-ai-trigger-glyph" aria-hidden="true">
                   <AiSparkleGlyph />
                 </span>
-                <span>{t("note.aiShort")}</span>
-              </button>
-            </div>
+	                <span>{t("note.aiShort")}</span>
+	              </button>
+	              {onCreateTaskFromContext ? (
+	                <button
+	                  type="button"
+	                  className="editor-pane-task-trigger"
+	                  onClick={() => void handleCreateTaskFromEditor("note")}
+	                  aria-label={t("note.createTaskFromNote")}
+	                  title={t("note.createTaskFromNote")}
+	                >
+	                  <span className="editor-pane-task-trigger-glyph" aria-hidden="true" />
+	                  <span>{t("note.createTaskShort")}</span>
+	                </button>
+	              ) : null}
+	              {taskCreationStatus ? (
+	                <span className={`editor-pane-chip editor-pane-task-status is-${taskCreationStatus.tone}`}>
+	                  {taskCreationStatus.text}
+	                </span>
+	              ) : null}
+	            </div>
           </div>
 
           <div className="editor-pane-markdown-actions" aria-label={t("note.markdownActions")}>
@@ -3597,8 +3747,18 @@ export default function EditorPane({
               </div>
             </div>
 
-            <div className="editor-pane-action-grid">
-              <button
+	            <div className="editor-pane-action-grid">
+	              {onCreateTaskFromContext ? (
+	                <button
+	                  type="button"
+	                  className="micro-action editor-pane-mobile-action-row"
+	                  onClick={() => void handleCreateTaskFromEditor("note")}
+	                >
+	                  <span className="editor-pane-mobile-option-icon editor-pane-mobile-task-icon" aria-hidden="true" />
+	                  <span>{t("note.createTaskFromNote")}</span>
+	                </button>
+	              ) : null}
+	              <button
                 type="button"
                 className="micro-action editor-pane-mobile-only-action editor-pane-mobile-action-row"
                 onClick={() => {

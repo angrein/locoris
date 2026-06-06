@@ -34,7 +34,8 @@
   white-space: nowrap;
 }
 
-.editor-formatting-toolbar-shell .editor-formatting-ai-button {
+.editor-formatting-toolbar-shell .editor-formatting-ai-button,
+.editor-formatting-toolbar-shell .editor-formatting-task-button {
   border-color: color-mix(in srgb, var(--editor-accent) 34%, rgb(var(--line-rgb) / 0.12));
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 16%, transparent), transparent 64%),
@@ -43,7 +44,8 @@
   font-weight: 700;
 }
 
-.editor-formatting-ai-icon {
+.editor-formatting-ai-icon,
+.editor-formatting-task-icon {
   width: 18px;
   height: 18px;
   display: inline-grid;
@@ -51,13 +53,15 @@
   color: color-mix(in srgb, var(--text) 82%, var(--editor-accent) 18%);
 }
 
-.editor-formatting-ai-icon svg {
+.editor-formatting-ai-icon svg,
+.editor-formatting-task-icon svg {
   width: 16px;
   height: 16px;
   display: block;
 }
 
-.editor-formatting-toolbar-shell .editor-formatting-ai-button:hover {
+.editor-formatting-toolbar-shell .editor-formatting-ai-button:hover,
+.editor-formatting-toolbar-shell .editor-formatting-task-button:hover {
   border-color: color-mix(in srgb, var(--editor-accent) 48%, rgb(var(--cyan-rgb) / 0.18));
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 23%, transparent), transparent 64%),

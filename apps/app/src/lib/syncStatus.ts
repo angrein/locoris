@@ -1,13 +1,18 @@
 import type {
   Asset,
   Folder,
+  Goal,
+  Habit,
+  HabitLog,
   Note,
   Project,
   SyncDirtyEntry,
   SyncEntityKind,
   SyncShadow,
   SyncTombstone,
-  Tag
+  Tag,
+  Task,
+  TimeBlock
 } from "../types";
 
 interface SyncPendingEntity {
@@ -23,6 +28,11 @@ export interface SyncPendingSummary {
   tags: number;
   notes: number;
   assets: number;
+  tasks: number;
+  habits: number;
+  habitLogs: number;
+  goals: number;
+  timeBlocks: number;
   deletions: number;
   lastPendingAt: number | null;
 }
@@ -72,6 +82,21 @@ function addPendingEntity(
     case "asset":
       summary.assets += 1;
       break;
+    case "task":
+      summary.tasks += 1;
+      break;
+    case "habit":
+      summary.habits += 1;
+      break;
+    case "habitLog":
+      summary.habitLogs += 1;
+      break;
+    case "goal":
+      summary.goals += 1;
+      break;
+    case "timeBlock":
+      summary.timeBlocks += 1;
+      break;
   }
 }
 
@@ -81,6 +106,11 @@ function createEntityList(input: {
   tags: Tag[];
   notes: Note[];
   assets: Asset[];
+  tasks?: Task[];
+  habits?: Habit[];
+  habitLogs?: HabitLog[];
+  goals?: Goal[];
+  timeBlocks?: TimeBlock[];
 }) {
   const entities: SyncPendingEntity[] = [];
 
@@ -124,6 +154,46 @@ function createEntityList(input: {
     });
   });
 
+  (input.tasks ?? []).forEach((task) => {
+    entities.push({
+      entityType: "task",
+      entityId: task.id,
+      updatedAt: task.updatedAt
+    });
+  });
+
+  (input.habits ?? []).forEach((habit) => {
+    entities.push({
+      entityType: "habit",
+      entityId: habit.id,
+      updatedAt: habit.updatedAt
+    });
+  });
+
+  (input.habitLogs ?? []).forEach((habitLog) => {
+    entities.push({
+      entityType: "habitLog",
+      entityId: habitLog.id,
+      updatedAt: habitLog.updatedAt
+    });
+  });
+
+  (input.goals ?? []).forEach((goal) => {
+    entities.push({
+      entityType: "goal",
+      entityId: goal.id,
+      updatedAt: goal.updatedAt
+    });
+  });
+
+  (input.timeBlocks ?? []).forEach((timeBlock) => {
+    entities.push({
+      entityType: "timeBlock",
+      entityId: timeBlock.id,
+      updatedAt: timeBlock.updatedAt
+    });
+  });
+
   return entities;
 }
 
@@ -133,6 +203,11 @@ export function computePendingSyncSummary(input: {
   tags: Tag[];
   notes: Note[];
   assets: Asset[];
+  tasks?: Task[];
+  habits?: Habit[];
+  habitLogs?: HabitLog[];
+  goals?: Goal[];
+  timeBlocks?: TimeBlock[];
   shadows: SyncShadow[];
   tombstones: SyncTombstone[];
 }): SyncPendingSummary {
@@ -143,6 +218,11 @@ export function computePendingSyncSummary(input: {
     tags: 0,
     notes: 0,
     assets: 0,
+    tasks: 0,
+    habits: 0,
+    habitLogs: 0,
+    goals: 0,
+    timeBlocks: 0,
     deletions: 0,
     lastPendingAt: null
   };
@@ -179,6 +259,11 @@ export function computePendingSyncSummaryFromDirtyEntries(
     tags: 0,
     notes: 0,
     assets: 0,
+    tasks: 0,
+    habits: 0,
+    habitLogs: 0,
+    goals: 0,
+    timeBlocks: 0,
     deletions: 0,
     lastPendingAt: null
   };

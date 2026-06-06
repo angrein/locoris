@@ -9,12 +9,46 @@ export type NoteListView = "all" | "favorites" | "archived" | "trash";
 export type SyncState = "local" | "dirty" | "synced" | "conflict";
 export type SyncStatus = "disabled" | "idle" | "syncing" | "error";
 export type ConflictStrategy = "duplicate";
-export type SyncEntityKind = "project" | "folder" | "tag" | "note" | "asset";
+export type SyncEntityKind =
+  | "project"
+  | "folder"
+  | "tag"
+  | "note"
+  | "asset"
+  | "task"
+  | "habit"
+  | "habitLog"
+  | "goal"
+  | "timeBlock";
 export type SyncPayloadMode = "plain" | "encrypted";
 export type SyncVaultKind = "regular" | "private";
 export type SyncEncryptionState = "disabled" | "ready" | "locked";
 export type SyncEncryptionKdf = "pbkdf2-sha256";
 export type SyncEncryptionCipher = "aes-gcm-256";
+
+export type PlannerTaskKind = "task" | "milestone";
+export type PlannerTaskStatus =
+  | "inbox"
+  | "todo"
+  | "scheduled"
+  | "inProgress"
+  | "waiting"
+  | "done"
+  | "canceled";
+export type PlannerTaskPriority = "none" | "low" | "medium" | "high" | "urgent";
+export type PlannerReminderChannel = "inApp" | "system";
+export type PlannerLinkKind =
+  | "project"
+  | "folder"
+  | "note"
+  | "canvas"
+  | "block"
+  | "canvasElement"
+  | "url";
+export type HabitStatus = "active" | "paused" | "archived";
+export type HabitTargetPeriod = "day" | "week" | "month";
+export type GoalStatus = "active" | "paused" | "completed" | "archived";
+export type TimeBlockStatus = "planned" | "active" | "completed" | "canceled";
 
 export interface StoredBlock {
   id?: string;
@@ -115,6 +149,158 @@ export interface Asset {
   kind: AssetKind;
   blob: Blob;
   version?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Reminder {
+  id: string;
+  title: string;
+  remindAt: number | null;
+  offsetMinutes: number | null;
+  channel: PlannerReminderChannel;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PlannerRecurrenceOverride {
+  id: string;
+  originalStartAt: number;
+  startAt: number | null;
+  dueAt: number | null;
+  scheduledStartAt: number | null;
+  scheduledEndAt: number | null;
+  skipped: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TaskLink {
+  id: string;
+  kind: PlannerLinkKind;
+  label: string;
+  projectId: string | null;
+  folderId: string | null;
+  noteId: string | null;
+  canvasId: string | null;
+  sourceBlockId: string | null;
+  canvasElementId: string | null;
+  url: string | null;
+  createdAt: number;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  kind: PlannerTaskKind;
+  status: PlannerTaskStatus;
+  priority: PlannerTaskPriority;
+  projectId: string | null;
+  folderId: string | null;
+  noteId: string | null;
+  canvasId: string | null;
+  sourceBlockId: string | null;
+  canvasElementId: string | null;
+  tagIds: string[];
+  links: TaskLink[];
+  reminders: Reminder[];
+  startAt: number | null;
+  dueAt: number | null;
+  scheduledStartAt: number | null;
+  scheduledEndAt: number | null;
+  completedAt: number | null;
+  canceledAt: number | null;
+  recurrenceRule: string | null;
+  recurrenceTimezone: string | null;
+  recurrenceAnchorAt: number | null;
+  recurrenceUntilAt: number | null;
+  recurrenceExceptionDates: number[];
+  recurrenceCompletedDates: number[];
+  recurrenceOverrides: PlannerRecurrenceOverride[];
+  estimateMinutes: number | null;
+  spentMinutes: number;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Habit {
+  id: string;
+  title: string;
+  description: string;
+  status: HabitStatus;
+  projectId: string | null;
+  noteId: string | null;
+  color: string;
+  icon: string;
+  frequencyRule: string;
+  frequencyTimezone: string | null;
+  targetCount: number;
+  targetUnit: string;
+  targetPeriod: HabitTargetPeriod;
+  reminders: Reminder[];
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+  pausedAt: number | null;
+  archivedAt: number | null;
+  pauseRanges: HabitPauseRange[];
+}
+
+export interface HabitPauseRange {
+  id: string;
+  startAt: number;
+  endAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface HabitLog {
+  id: string;
+  habitId: string;
+  occurredAt: number;
+  value: number;
+  unit: string;
+  note: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Goal {
+  id: string;
+  title: string;
+  description: string;
+  status: GoalStatus;
+  projectId: string | null;
+  parentGoalId: string | null;
+  color: string;
+  metricLabel: string;
+  targetValue: number | null;
+  currentValue: number | null;
+  startAt: number | null;
+  dueAt: number | null;
+  completedAt: number | null;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TimeBlock {
+  id: string;
+  title: string;
+  description: string;
+  status: TimeBlockStatus;
+  taskId: string | null;
+  projectId: string | null;
+  noteId: string | null;
+  canvasId: string | null;
+  startAt: number;
+  endAt: number;
+  actualStartAt: number | null;
+  actualEndAt: number | null;
+  color: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -283,6 +469,11 @@ export interface DesktopLocalVaultBackup {
   tags: Tag[];
   notes: Note[];
   assets: DesktopLocalVaultBackupAsset[];
+  tasks: Task[];
+  habits: Habit[];
+  habitLogs: HabitLog[];
+  goals: Goal[];
+  timeBlocks: TimeBlock[];
   settings: AppSettings | null;
   syncDirtyEntries: SyncDirtyEntry[];
   syncShadows: SyncShadow[];
@@ -362,6 +553,11 @@ export interface SyncSnapshot {
   tags: Tag[];
   notes: SyncedNoteRecord[];
   assets: SyncedAssetRecord[];
+  tasks: Task[];
+  habits: Habit[];
+  habitLogs: HabitLog[];
+  goals: Goal[];
+  timeBlocks: TimeBlock[];
   tombstones: SyncTombstone[];
 }
 
@@ -373,6 +569,11 @@ export interface SyncChangeSet {
   tags: Tag[];
   notes: SyncedNoteRecord[];
   assets: SyncedAssetRecord[];
+  tasks: Task[];
+  habits: Habit[];
+  habitLogs: HabitLog[];
+  goals: Goal[];
+  timeBlocks: TimeBlock[];
   tombstones: SyncTombstone[];
 }
 

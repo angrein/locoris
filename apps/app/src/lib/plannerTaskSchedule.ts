@@ -1,0 +1,275 @@
+import type { AppLanguage, Task } from "../types";
+import {
+  formatPlannerDate,
+  formatPlannerDateTime,
+  formatPlannerTime,
+  getEndOfLocalDay,
+  getStartOfLocalDay
+} from "./planner";
+import { buildPlannerRRule, summarizePlannerRecurrence, type PlannerRecurrenceFrequency } from "./plannerRecurrence";
+
+export type PlannerTaskDateRepeat = "none" | PlannerRecurrenceFrequency | "customDaily";
+
+export interface PlannerTaskDateDraft {
+  startDateAt: number | null;
+  endDateAt: number | null;
+  hasTime: boolean;
+  startTimeMinutes: number;
+  endTimeMinutes: number;
+  repeat: PlannerTaskDateRepeat;
+  repeatIntervalDays: number;
+  repeatUntilAt: number | null;
+}
+
+export const DEFAULT_PLANNER_START_TIME_MINUTES = 9 * 60;
+export const DEFAULT_PLANNER_END_TIME_MINUTES = 10 * 60;
+
+function clampTimeMinutes(value: number) {
+  return Math.max(0, Math.min(23 * 60 + 45, Math.round(value / 15) * 15));
+}
+
+function getMinutesOfDay(value: number | null | undefined, fallback: number) {
+  if (!value) {
+    return fallback;
+  }
+
+  const date = new Date(value);
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+export function addPlannerMinutesToDay(dayAt: number, minutes: number) {
+  const date = new Date(getStartOfLocalDay(dayAt));
+  date.setMinutes(clampTimeMinutes(minutes));
+  return date.getTime();
+}
+
+export function createPlannerTaskDateDraft(startDateAt: number | null = null): PlannerTaskDateDraft {
+  return {
+    startDateAt: startDateAt ? getStartOfLocalDay(startDateAt) : null,
+    endDateAt: null,
+    hasTime: false,
+    startTimeMinutes: DEFAULT_PLANNER_START_TIME_MINUTES,
+    endTimeMinutes: DEFAULT_PLANNER_END_TIME_MINUTES,
+    repeat: "none",
+    repeatIntervalDays: 2,
+    repeatUntilAt: null
+  };
+}
+
+export function getPlannerTaskDateDraft(task: Task | null | undefined): PlannerTaskDateDraft {
+  const repeat = getPlannerRepeatFromRule(task?.recurrenceRule);
+  const startSource = task?.scheduledStartAt ?? task?.dueAt ?? task?.recurrenceAnchorAt ?? null;
+  const endSource = task?.scheduledEndAt ?? task?.recurrenceUntilAt ?? null;
+  const startDateAt = startSource ? getStartOfLocalDay(startSource) : null;
+  const endDateAt =
+    endSource && startDateAt && getStartOfLocalDay(endSource) !== startDateAt
+      ? getStartOfLocalDay(endSource)
+      : null;
+  const startTimeMinutes = getMinutesOfDay(task?.scheduledStartAt, DEFAULT_PLANNER_START_TIME_MINUTES);
+  const fallbackEndMinutes = Math.max(startTimeMinutes + 45, DEFAULT_PLANNER_END_TIME_MINUTES);
+  const endTimeMinutes = Math.max(
+    startTimeMinutes + 15,
+    getMinutesOfDay(task?.scheduledEndAt, fallbackEndMinutes)
+  );
+
+  return {
+    startDateAt,
+    endDateAt,
+    hasTime: Boolean(task?.scheduledStartAt),
+    startTimeMinutes,
+    endTimeMinutes: clampTimeMinutes(endTimeMinutes),
+    repeat,
+    repeatIntervalDays: getPlannerRepeatIntervalDays(task?.recurrenceRule),
+    repeatUntilAt: task?.recurrenceUntilAt ?? endDateAt ?? null
+  };
+}
+
+export function getPlannerRepeatFromRule(rule: string | null | undefined): PlannerTaskDateRepeat {
+  const normalized = rule?.trim().toUpperCase() ?? "";
+
+  if (!normalized) {
+    return "none";
+  }
+
+  const frequency = normalized.match(/FREQ=([A-Z]+)/)?.[1]?.toLowerCase();
+  const interval = Number(normalized.match(/INTERVAL=(\d+)/)?.[1] ?? "1");
+
+  if (frequency === "daily" && interval > 1) {
+    return "customDaily";
+  }
+
+  if (frequency === "daily" || frequency === "weekly" || frequency === "monthly" || frequency === "yearly") {
+    return frequency;
+  }
+
+  return "none";
+}
+
+export function getPlannerRepeatIntervalDays(rule: string | null | undefined) {
+  const normalized = rule?.trim().toUpperCase() ?? "";
+  const frequency = normalized.match(/FREQ=([A-Z]+)/)?.[1]?.toLowerCase();
+  const interval = Number(normalized.match(/INTERVAL=(\d+)/)?.[1] ?? "2");
+
+  if (frequency !== "daily") {
+    return 2;
+  }
+
+  return Number.isFinite(interval) ? Math.max(2, Math.min(365, Math.round(interval))) : 2;
+}
+
+export function normalizePlannerTaskDateDraft(draft: PlannerTaskDateDraft): PlannerTaskDateDraft {
+  const startDateAt = draft.startDateAt ? getStartOfLocalDay(draft.startDateAt) : null;
+  const rawEndDateAt = draft.endDateAt ? getStartOfLocalDay(draft.endDateAt) : null;
+  const endDateAt = startDateAt && rawEndDateAt && rawEndDateAt > startDateAt ? rawEndDateAt : null;
+  const startTimeMinutes = clampTimeMinutes(draft.startTimeMinutes);
+  const endTimeMinutes = Math.max(startTimeMinutes + 15, clampTimeMinutes(draft.endTimeMinutes));
+  const repeatIntervalDays = Math.max(2, Math.min(365, Math.round(draft.repeatIntervalDays || 2)));
+
+  return {
+    ...draft,
+    startDateAt,
+    endDateAt,
+    startTimeMinutes,
+    endTimeMinutes,
+    repeatIntervalDays,
+    repeatUntilAt: draft.repeatUntilAt ? getEndOfLocalDay(draft.repeatUntilAt) : endDateAt ? getEndOfLocalDay(endDateAt) : null
+  };
+}
+
+export function buildPlannerTaskSchedulePatch(task: Task, inputDraft: PlannerTaskDateDraft): Partial<Task> {
+  const scheduleFields = buildPlannerTaskScheduleFields(inputDraft, task.status);
+
+  return {
+    ...scheduleFields,
+    recurrenceExceptionDates: scheduleFields.recurrenceRule ? task.recurrenceExceptionDates ?? [] : [],
+    recurrenceCompletedDates: scheduleFields.recurrenceRule ? task.recurrenceCompletedDates ?? [] : [],
+    recurrenceOverrides: scheduleFields.recurrenceRule ? task.recurrenceOverrides ?? [] : []
+  };
+}
+
+export function buildPlannerTaskScheduleFields(
+  inputDraft: PlannerTaskDateDraft,
+  baseStatus: Task["status"] = "todo"
+): Partial<
+  Pick<
+    Task,
+    | "dueAt"
+    | "scheduledStartAt"
+    | "scheduledEndAt"
+    | "recurrenceRule"
+    | "recurrenceTimezone"
+    | "recurrenceAnchorAt"
+    | "recurrenceUntilAt"
+    | "recurrenceExceptionDates"
+    | "recurrenceCompletedDates"
+    | "recurrenceOverrides"
+    | "estimateMinutes"
+    | "status"
+  >
+> {
+  const draft = normalizePlannerTaskDateDraft(inputDraft);
+
+  if (!draft.startDateAt) {
+    return {
+      dueAt: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      recurrenceRule: null,
+      recurrenceTimezone: null,
+      recurrenceAnchorAt: null,
+      recurrenceUntilAt: null,
+      recurrenceExceptionDates: [],
+      recurrenceCompletedDates: [],
+      recurrenceOverrides: [],
+      estimateMinutes: null,
+      status: baseStatus === "scheduled" ? "todo" : baseStatus
+    };
+  }
+
+  const hasRange = Boolean(draft.endDateAt);
+  const scheduledStartAt = draft.hasTime || hasRange ? addPlannerMinutesToDay(draft.startDateAt, draft.startTimeMinutes) : null;
+  const scheduledEndAt = scheduledStartAt
+    ? addPlannerMinutesToDay(draft.endDateAt ?? draft.startDateAt, draft.hasTime ? draft.endTimeMinutes : 23 * 60 + 45)
+    : null;
+  const dueAt = scheduledStartAt ? null : addPlannerMinutesToDay(draft.startDateAt, 12 * 60);
+  const recurrenceUntilSource = draft.repeatUntilAt ?? draft.endDateAt;
+  const recurrenceRule =
+    draft.repeat === "none"
+      ? null
+      : buildPlannerRRule({
+          frequency: draft.repeat === "customDaily" ? "daily" : draft.repeat,
+          interval: draft.repeat === "customDaily" ? draft.repeatIntervalDays : 1,
+          untilAt: recurrenceUntilSource ? getEndOfLocalDay(recurrenceUntilSource) : null
+        });
+  const recurrenceAnchorAt = recurrenceRule ? scheduledStartAt ?? dueAt ?? draft.startDateAt : null;
+
+  return {
+    dueAt,
+    scheduledStartAt,
+    scheduledEndAt,
+    recurrenceRule,
+    recurrenceTimezone: recurrenceRule ? Intl.DateTimeFormat().resolvedOptions().timeZone : null,
+    recurrenceAnchorAt,
+    recurrenceUntilAt: recurrenceRule ? draft.repeatUntilAt ?? (draft.endDateAt ? getEndOfLocalDay(draft.endDateAt) : null) : null,
+    recurrenceExceptionDates: [],
+    recurrenceCompletedDates: [],
+    recurrenceOverrides: [],
+    estimateMinutes:
+      scheduledStartAt && scheduledEndAt
+        ? Math.max(15, Math.round((scheduledEndAt - scheduledStartAt) / 60_000))
+        : null,
+    status: scheduledStartAt && (baseStatus === "inbox" || baseStatus === "todo") ? "scheduled" : baseStatus
+  };
+}
+
+export function formatPlannerTimeMinutes(minutes: number) {
+  const hours = Math.floor(clampTimeMinutes(minutes) / 60);
+  const mins = clampTimeMinutes(minutes) % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+export function getPlannerTaskScheduleSummary(task: Task, language: AppLanguage) {
+  if (task.recurrenceRule) {
+    const anchor = task.scheduledStartAt ?? task.dueAt ?? task.recurrenceAnchorAt;
+    const recurrence = summarizePlannerRecurrence(task.recurrenceRule, language);
+
+    if (anchor) {
+      return `${recurrence} · ${formatPlannerDateTime(anchor, language)}`;
+    }
+
+    return recurrence;
+  }
+
+  if (task.scheduledStartAt) {
+    if (task.scheduledEndAt && getStartOfLocalDay(task.scheduledEndAt) !== getStartOfLocalDay(task.scheduledStartAt)) {
+      return `${formatPlannerDateTime(task.scheduledStartAt, language)} - ${formatPlannerDateTime(task.scheduledEndAt, language)}`;
+    }
+
+    if (task.scheduledEndAt) {
+      return `${formatPlannerDate(task.scheduledStartAt, language)} · ${formatPlannerTime(task.scheduledStartAt, language)}-${formatPlannerTime(task.scheduledEndAt, language)}`;
+    }
+
+    return formatPlannerDateTime(task.scheduledStartAt, language);
+  }
+
+  if (task.dueAt) {
+    return formatPlannerDate(task.dueAt, language);
+  }
+
+  return language === "ru" ? "Без даты" : "No date";
+}
+
+export function getPlannerTaskDateDraftSummary(draft: PlannerTaskDateDraft, language: AppLanguage) {
+  const scheduleFields = buildPlannerTaskScheduleFields(draft);
+
+  return getPlannerTaskScheduleSummary(
+    {
+      recurrenceRule: scheduleFields.recurrenceRule ?? null,
+      recurrenceAnchorAt: scheduleFields.recurrenceAnchorAt ?? null,
+      scheduledStartAt: scheduleFields.scheduledStartAt ?? null,
+      scheduledEndAt: scheduleFields.scheduledEndAt ?? null,
+      dueAt: scheduleFields.dueAt ?? null
+    } as Task,
+    language
+  );
+}

@@ -325,6 +325,103 @@ function buildCanvasFiles(assets: DesktopLocalVaultBackupAsset[]): BinaryFiles {
   return files;
 }
 
+function formatPlannerDate(value: number | null | undefined) {
+  return typeof value === "number" ? new Date(value).toISOString() : "";
+}
+
+function addReadablePlannerFiles(zip: JSZip, backup: DesktopLocalVaultBackup) {
+  const planner = {
+    tasks: backup.tasks ?? [],
+    habits: backup.habits ?? [],
+    habitLogs: backup.habitLogs ?? [],
+    goals: backup.goals ?? [],
+    timeBlocks: backup.timeBlocks ?? []
+  };
+
+  zip.folder("Planner");
+  zip.file("Planner/planner.json", JSON.stringify(planner, null, 2));
+
+  const tasksMarkdown = [...planner.tasks]
+    .sort(compareReadableRecords)
+    .map((task) =>
+      [
+        `- [${task.status === "done" ? "x" : " "}] ${task.title || "Untitled task"}`,
+        `  - status: ${task.status}`,
+        `  - kind: ${task.kind}`,
+        `  - priority: ${task.priority}`,
+        task.projectId ? `  - projectId: ${task.projectId}` : "",
+        task.noteId ? `  - noteId: ${task.noteId}` : "",
+        task.canvasId ? `  - canvasId: ${task.canvasId}` : "",
+        task.sourceBlockId ? `  - sourceBlockId: ${task.sourceBlockId}` : "",
+        task.dueAt ? `  - due: ${formatPlannerDate(task.dueAt)}` : "",
+        task.scheduledStartAt ? `  - scheduled: ${formatPlannerDate(task.scheduledStartAt)}` : "",
+        task.recurrenceRule ? `  - recurrence: ${task.recurrenceRule}` : "",
+        task.description ? `  - description: ${task.description.replace(/\n/g, " ")}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n")
+    )
+    .join("\n\n");
+
+  const habitsMarkdown = [...planner.habits]
+    .sort(compareReadableRecords)
+    .map((habit) =>
+      [
+        `- ${habit.title || "Untitled habit"}`,
+        `  - status: ${habit.status}`,
+        `  - frequency: ${habit.frequencyRule}`,
+        `  - target: ${habit.targetCount} ${habit.targetUnit} / ${habit.targetPeriod}`,
+        habit.projectId ? `  - projectId: ${habit.projectId}` : "",
+        habit.description ? `  - description: ${habit.description.replace(/\n/g, " ")}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n")
+    )
+    .join("\n\n");
+
+  const goalsMarkdown = [...planner.goals]
+    .sort(compareReadableRecords)
+    .map((goal) =>
+      [
+        `- ${goal.title || "Untitled goal"}`,
+        `  - status: ${goal.status}`,
+        goal.projectId ? `  - projectId: ${goal.projectId}` : "",
+        goal.dueAt ? `  - due: ${formatPlannerDate(goal.dueAt)}` : "",
+        goal.metricLabel ? `  - metric: ${goal.metricLabel}` : "",
+        goal.targetValue !== null ? `  - targetValue: ${goal.targetValue}` : "",
+        goal.currentValue !== null ? `  - currentValue: ${goal.currentValue}` : "",
+        goal.description ? `  - description: ${goal.description.replace(/\n/g, " ")}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n")
+    )
+    .join("\n\n");
+
+  const timeBlocksMarkdown = [...planner.timeBlocks]
+    .sort((left, right) => left.startAt - right.startAt || left.id.localeCompare(right.id))
+    .map((timeBlock) =>
+      [
+        `- ${timeBlock.title || "Untitled time block"}`,
+        `  - status: ${timeBlock.status}`,
+        `  - start: ${formatPlannerDate(timeBlock.startAt)}`,
+        `  - end: ${formatPlannerDate(timeBlock.endAt)}`,
+        timeBlock.taskId ? `  - taskId: ${timeBlock.taskId}` : "",
+        timeBlock.projectId ? `  - projectId: ${timeBlock.projectId}` : "",
+        timeBlock.noteId ? `  - noteId: ${timeBlock.noteId}` : "",
+        timeBlock.canvasId ? `  - canvasId: ${timeBlock.canvasId}` : "",
+        timeBlock.description ? `  - description: ${timeBlock.description.replace(/\n/g, " ")}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n")
+    )
+    .join("\n\n");
+
+  zip.file("Planner/tasks.md", tasksMarkdown || "No tasks.");
+  zip.file("Planner/habits.md", habitsMarkdown || "No habits.");
+  zip.file("Planner/goals.md", goalsMarkdown || "No goals.");
+  zip.file("Planner/time-blocks.md", timeBlocksMarkdown || "No time blocks.");
+}
+
 async function addCanvasReadableFiles(input: {
   zip: JSZip;
   basePath: string;
@@ -389,6 +486,7 @@ export async function createReadableVaultZipBlob(input: {
   );
 
   zip.file("manifest.json", JSON.stringify(createBackupManifest({ backup, vaultName: input.vaultName }), null, 2));
+  addReadablePlannerFiles(zip, backup);
 
   [...projectPaths.values()].forEach((projectPath) => zip.folder(projectPath));
   [...folderPaths.values()].forEach((folderPath) => zip.folder(folderPath));

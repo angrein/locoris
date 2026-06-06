@@ -162,6 +162,11 @@
   gap: 6px;
 }
 
+.orbital-inspector-overview-quickrow {
+  flex-wrap: nowrap;
+  gap: 5px;
+}
+
 .orbital-inspector-overview-card-actions {
   flex: none;
 }
@@ -278,11 +283,13 @@
   border-radius: 10px;
 }
 
-.orbital-inspector-overview-tool.is-color {
+.orbital-inspector-overview-tool.is-color,
+.orbital-inspector-overview-icon-action.is-color {
   position: relative;
 }
 
-.orbital-inspector-overview-tool.is-color.is-active {
+.orbital-inspector-overview-tool.is-color.is-active,
+.orbital-inspector-overview-icon-action.is-color.is-active {
   border-color: color-mix(in srgb, var(--overview-card-accent) 42%, rgba(255, 255, 255, 0.18));
 }
 
@@ -304,6 +311,19 @@
 .orbital-inspector-overview-tool.is-danger:hover:not(:disabled) {
   border-color: rgba(255, 130, 158, 0.3);
   background: rgba(255, 103, 140, 0.07);
+}
+
+.orbital-inspector-overview-quickrow .orbital-inspector-overview-tool {
+  width: 27px;
+  min-width: 27px;
+  height: 27px;
+  min-height: 27px;
+  border-radius: 11px;
+}
+
+.orbital-inspector-overview-quickrow .orbital-inspector-overview-tool svg {
+  width: 15.5px;
+  height: 15.5px;
 }
 
 .orbital-inspector-overview-project-panel {
@@ -800,6 +820,14 @@
 
   .orbital-inspector-overview-quickrow {
     justify-content: space-between;
+    gap: 4px;
+  }
+
+  .orbital-inspector-overview-quickrow .orbital-inspector-overview-tool {
+    width: 26px;
+    min-width: 26px;
+    height: 26px;
+    min-height: 26px;
   }
 
   .orbital-inspector-overview-projects {

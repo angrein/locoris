@@ -18,6 +18,11 @@ export function createEmptySnapshot() {
     tags: [],
     notes: [],
     assets: [],
+    tasks: [],
+    habits: [],
+    habitLogs: [],
+    goals: [],
+    timeBlocks: [],
     tombstones: []
   };
 }
@@ -72,6 +77,11 @@ export function createEmptyChangeSet(deviceId = "server") {
     tags: [],
     notes: [],
     assets: [],
+    tasks: [],
+    habits: [],
+    habitLogs: [],
+    goals: [],
+    timeBlocks: [],
     tombstones: []
   };
 }
@@ -247,6 +257,11 @@ export function isChangeSetEmpty(changeSet) {
     changeSet.tags.length === 0 &&
     changeSet.notes.length === 0 &&
     changeSet.assets.length === 0 &&
+    changeSet.tasks.length === 0 &&
+    changeSet.habits.length === 0 &&
+    changeSet.habitLogs.length === 0 &&
+    changeSet.goals.length === 0 &&
+    changeSet.timeBlocks.length === 0 &&
     changeSet.tombstones.length === 0
   );
 }
@@ -264,6 +279,11 @@ export function normalizeChangeSet(payload, fallbackDeviceId = "server") {
     tags: Array.isArray(payload.tags) ? payload.tags.filter(Boolean) : [],
     notes: Array.isArray(payload.notes) ? payload.notes.filter(Boolean) : [],
     assets: Array.isArray(payload.assets) ? payload.assets.filter(Boolean) : [],
+    tasks: Array.isArray(payload.tasks) ? payload.tasks.filter(Boolean) : [],
+    habits: Array.isArray(payload.habits) ? payload.habits.filter(Boolean) : [],
+    habitLogs: Array.isArray(payload.habitLogs) ? payload.habitLogs.filter(Boolean) : [],
+    goals: Array.isArray(payload.goals) ? payload.goals.filter(Boolean) : [],
+    timeBlocks: Array.isArray(payload.timeBlocks) ? payload.timeBlocks.filter(Boolean) : [],
     tombstones: Array.isArray(payload.tombstones) ? payload.tombstones.filter(Boolean) : []
   };
 }
@@ -293,6 +313,11 @@ export function applyChangeSetToSnapshot(snapshot, rawChangeSet) {
     tag: new Map((nextSnapshot.tags ?? []).map((record) => [String(record.id), record])),
     note: new Map((nextSnapshot.notes ?? []).map((record) => [String(record.id), record])),
     asset: new Map((nextSnapshot.assets ?? []).map((record) => [String(record.id), record])),
+    task: new Map((nextSnapshot.tasks ?? []).map((record) => [String(record.id), record])),
+    habit: new Map((nextSnapshot.habits ?? []).map((record) => [String(record.id), record])),
+    habitLog: new Map((nextSnapshot.habitLogs ?? []).map((record) => [String(record.id), record])),
+    goal: new Map((nextSnapshot.goals ?? []).map((record) => [String(record.id), record])),
+    timeBlock: new Map((nextSnapshot.timeBlocks ?? []).map((record) => [String(record.id), record])),
     tombstones: new Map((nextSnapshot.tombstones ?? []).map((record) => [String(record.key), record]))
   };
 
@@ -301,6 +326,11 @@ export function applyChangeSetToSnapshot(snapshot, rawChangeSet) {
   applyRecordsAndTombstones(maps, "tag", changeSet.tags, changeSet.tombstones);
   applyRecordsAndTombstones(maps, "note", changeSet.notes, changeSet.tombstones);
   applyRecordsAndTombstones(maps, "asset", changeSet.assets, changeSet.tombstones);
+  applyRecordsAndTombstones(maps, "task", changeSet.tasks, changeSet.tombstones);
+  applyRecordsAndTombstones(maps, "habit", changeSet.habits, changeSet.tombstones);
+  applyRecordsAndTombstones(maps, "habitLog", changeSet.habitLogs, changeSet.tombstones);
+  applyRecordsAndTombstones(maps, "goal", changeSet.goals, changeSet.tombstones);
+  applyRecordsAndTombstones(maps, "timeBlock", changeSet.timeBlocks, changeSet.tombstones);
 
   return {
     deviceId: changeSet.deviceId || nextSnapshot.deviceId || "server",
@@ -310,6 +340,11 @@ export function applyChangeSetToSnapshot(snapshot, rawChangeSet) {
     tags: sortById([...maps.tag.values()]),
     notes: sortById([...maps.note.values()]),
     assets: sortById([...maps.asset.values()]),
+    tasks: sortById([...maps.task.values()]),
+    habits: sortById([...maps.habit.values()]),
+    habitLogs: sortById([...maps.habitLog.values()]),
+    goals: sortById([...maps.goal.values()]),
+    timeBlocks: sortById([...maps.timeBlock.values()]),
     tombstones: sortTombstones([...maps.tombstones.values()])
   };
 }
@@ -326,7 +361,12 @@ export function buildChangeSetFromSnapshots(previousSnapshot, nextSnapshot) {
     ["folder", next.folders ?? [], previous.folders ?? [], (record) => record.updatedAt],
     ["tag", next.tags ?? [], previous.tags ?? [], (record) => record.updatedAt],
     ["note", next.notes ?? [], previous.notes ?? [], (record) => record.updatedAt],
-    ["asset", next.assets ?? [], previous.assets ?? [], (record) => record.updatedAt]
+    ["asset", next.assets ?? [], previous.assets ?? [], (record) => record.updatedAt],
+    ["task", next.tasks ?? [], previous.tasks ?? [], (record) => record.updatedAt],
+    ["habit", next.habits ?? [], previous.habits ?? [], (record) => record.updatedAt],
+    ["habitLog", next.habitLogs ?? [], previous.habitLogs ?? [], (record) => record.updatedAt],
+    ["goal", next.goals ?? [], previous.goals ?? [], (record) => record.updatedAt],
+    ["timeBlock", next.timeBlocks ?? [], previous.timeBlocks ?? [], (record) => record.updatedAt]
   ];
 
   entitySpecs.forEach(([entityType, nextRecords, previousRecords, timestampAccessor]) => {
@@ -368,6 +408,21 @@ export function buildChangeSetFromSnapshots(previousSnapshot, nextSnapshot) {
           case "asset":
             changeSet.assets.push(nextState.record);
             break;
+          case "task":
+            changeSet.tasks.push(nextState.record);
+            break;
+          case "habit":
+            changeSet.habits.push(nextState.record);
+            break;
+          case "habitLog":
+            changeSet.habitLogs.push(nextState.record);
+            break;
+          case "goal":
+            changeSet.goals.push(nextState.record);
+            break;
+          case "timeBlock":
+            changeSet.timeBlocks.push(nextState.record);
+            break;
         }
       }
     });
@@ -378,6 +433,11 @@ export function buildChangeSetFromSnapshots(previousSnapshot, nextSnapshot) {
   changeSet.tags = sortById(changeSet.tags);
   changeSet.notes = sortById(changeSet.notes);
   changeSet.assets = sortById(changeSet.assets);
+  changeSet.tasks = sortById(changeSet.tasks);
+  changeSet.habits = sortById(changeSet.habits);
+  changeSet.habitLogs = sortById(changeSet.habitLogs);
+  changeSet.goals = sortById(changeSet.goals);
+  changeSet.timeBlocks = sortById(changeSet.timeBlocks);
   changeSet.tombstones = sortTombstones(changeSet.tombstones);
 
   return changeSet;
@@ -391,6 +451,11 @@ export function collapseChangeSets(changeSets) {
     tag: new Map(),
     note: new Map(),
     asset: new Map(),
+    task: new Map(),
+    habit: new Map(),
+    habitLog: new Map(),
+    goal: new Map(),
+    timeBlock: new Map(),
     tombstones: new Map()
   };
   let deviceId = "server";
@@ -406,6 +471,11 @@ export function collapseChangeSets(changeSets) {
     applyRecordsAndTombstones(maps, "tag", changeSet.tags, changeSet.tombstones);
     applyRecordsAndTombstones(maps, "note", changeSet.notes, changeSet.tombstones);
     applyRecordsAndTombstones(maps, "asset", changeSet.assets, changeSet.tombstones);
+    applyRecordsAndTombstones(maps, "task", changeSet.tasks, changeSet.tombstones);
+    applyRecordsAndTombstones(maps, "habit", changeSet.habits, changeSet.tombstones);
+    applyRecordsAndTombstones(maps, "habitLog", changeSet.habitLogs, changeSet.tombstones);
+    applyRecordsAndTombstones(maps, "goal", changeSet.goals, changeSet.tombstones);
+    applyRecordsAndTombstones(maps, "timeBlock", changeSet.timeBlocks, changeSet.tombstones);
   });
 
   return {
@@ -416,6 +486,11 @@ export function collapseChangeSets(changeSets) {
     tags: sortById([...maps.tag.values()]),
     notes: sortById([...maps.note.values()]),
     assets: sortById([...maps.asset.values()]),
+    tasks: sortById([...maps.task.values()]),
+    habits: sortById([...maps.habit.values()]),
+    habitLogs: sortById([...maps.habitLog.values()]),
+    goals: sortById([...maps.goal.values()]),
+    timeBlocks: sortById([...maps.timeBlock.values()]),
     tombstones: sortTombstones([...maps.tombstones.values()])
   };
 }

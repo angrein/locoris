@@ -72,6 +72,14 @@ function LockGlyph({ unlocked = false }: { unlocked?: boolean }) {
   );
 }
 
+function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="m5.7 5.7 8.6 8.6M14.3 5.7l-8.6 8.6" />
+    </svg>
+  );
+}
+
 export default function LocalVaultSwitcher({
   label,
   activeLabel,
@@ -193,7 +201,7 @@ export default function LocalVaultSwitcher({
   };
 
   return (
-    <div className={`vault-switcher ${open ? "is-open" : ""}`} ref={shellRef}>
+    <div className={`vault-switcher ${open ? "is-open" : ""} ${createOpen ? "is-creating" : ""}`} ref={shellRef}>
       <div className="vault-switcher-head">
         <button
           type="button"
@@ -258,7 +266,10 @@ export default function LocalVaultSwitcher({
       {open ? (
         <div className="vault-switcher-menu" role="listbox" aria-label={label}>
           <div className="vault-switcher-menu-head">
-            <span className="vault-switcher-menu-title">{label}</span>
+            <div>
+              <span className="vault-switcher-menu-title">{label}</span>
+              <strong>{activeDisplayName}</strong>
+            </div>
             <span className="vault-switcher-menu-count">{items.length}</span>
           </div>
 
@@ -283,8 +294,8 @@ export default function LocalVaultSwitcher({
                     <VaultGlyph />
                   </span>
                   <span className="vault-switcher-item-copy">
-                      <span className="vault-switcher-item-titleline">
-                        <strong title={itemDisplayName}>{itemDisplayName}</strong>
+                    <span className="vault-switcher-item-titleline">
+                      <strong title={itemDisplayName}>{itemDisplayName}</strong>
                       {item.encryptionState !== "disabled" ? (
                         <span
                           className={`vault-switcher-lock-badge is-${item.encryptionState}`}
@@ -322,16 +333,21 @@ export default function LocalVaultSwitcher({
       {createOpen ? (
         <div className="vault-switcher-create-panel" role="dialog" aria-modal="false">
           <div className="vault-switcher-menu-head">
-            <span className="vault-switcher-menu-title">{t("settings.createVaultTitle")}</span>
+            <div>
+              <span className="vault-switcher-menu-title">{t("sync.localVaultCreate")}</span>
+              <strong>{t("settings.createVaultTitle")}</strong>
+            </div>
             <button
               type="button"
-              className="vault-switcher-inline-action"
+              className="vault-switcher-close-action"
               onClick={() => {
                 resetCreateDraft();
                 setCreateOpen(false);
               }}
+              aria-label={t("dialog.cancel")}
+              title={t("dialog.cancel")}
             >
-              {t("dialog.cancel")}
+              <CloseGlyph />
             </button>
           </div>
           <div className="vault-switcher-kind-grid">
@@ -340,6 +356,9 @@ export default function LocalVaultSwitcher({
               className={`vault-switcher-kind-card ${createVaultKind === "regular" ? "is-selected" : ""}`}
               onClick={() => setCreateVaultKind("regular")}
             >
+              <span className="vault-switcher-kind-icon is-regular" aria-hidden="true">
+                <VaultGlyph />
+              </span>
               <strong>{t("settings.vaultKindRegular")}</strong>
               <span>{t("settings.createVaultRegularDescription")}</span>
             </button>
@@ -348,33 +367,45 @@ export default function LocalVaultSwitcher({
               className={`vault-switcher-kind-card ${createVaultKind === "private" ? "is-selected" : ""}`}
               onClick={() => setCreateVaultKind("private")}
             >
+              <span className="vault-switcher-kind-icon is-private" aria-hidden="true">
+                <LockGlyph />
+              </span>
               <strong>{t("settings.vaultKindPrivate")}</strong>
               <span>{t("settings.createVaultPrivateDescription")}</span>
             </button>
           </div>
-          <input
-            className="vault-switcher-input"
-            value={createName}
-            onChange={(event) => setCreateName(event.target.value)}
-            placeholder={t("sync.localVaultCreatePlaceholder")}
-            autoFocus
-          />
+          <label className="vault-switcher-field">
+            <span>{t("sync.localVaultCreatePlaceholder")}</span>
+            <input
+              className="vault-switcher-input"
+              value={createName}
+              onChange={(event) => setCreateName(event.target.value)}
+              placeholder={t("sync.localVaultCreatePlaceholder")}
+              autoFocus
+            />
+          </label>
           {createVaultKind === "private" ? (
             <>
-              <input
-                className="vault-switcher-input"
-                type="password"
-                value={createPassphrase}
-                onChange={(event) => setCreatePassphrase(event.target.value)}
-                placeholder={t("settings.vaultEncryptionPassphrase")}
-              />
-              <input
-                className="vault-switcher-input"
-                type="password"
-                value={createPassphraseConfirm}
-                onChange={(event) => setCreatePassphraseConfirm(event.target.value)}
-                placeholder={t("settings.vaultEncryptionConfirmPassphrase")}
-              />
+              <label className="vault-switcher-field">
+                <span>{t("settings.vaultEncryptionPassphrase")}</span>
+                <input
+                  className="vault-switcher-input"
+                  type="password"
+                  value={createPassphrase}
+                  onChange={(event) => setCreatePassphrase(event.target.value)}
+                  placeholder={t("settings.vaultEncryptionPassphrase")}
+                />
+              </label>
+              <label className="vault-switcher-field">
+                <span>{t("settings.vaultEncryptionConfirmPassphrase")}</span>
+                <input
+                  className="vault-switcher-input"
+                  type="password"
+                  value={createPassphraseConfirm}
+                  onChange={(event) => setCreatePassphraseConfirm(event.target.value)}
+                  placeholder={t("settings.vaultEncryptionConfirmPassphrase")}
+                />
+              </label>
               <span className="vault-switcher-create-note">{t("settings.createVaultPrivateHint")}</span>
             </>
           ) : null}
@@ -398,6 +429,7 @@ export default function LocalVaultSwitcher({
                 void handleCreateSubmit();
               }}
             >
+              <PlusGlyph />
               {createBusy ? t("sync.syncing") : t("orbit.create")}
             </button>
           </div>

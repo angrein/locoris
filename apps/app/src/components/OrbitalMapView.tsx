@@ -24,6 +24,10 @@ import OrbitalInspectorContextMenu, {
   type OrbitalInspectorContextMenuAction
 } from "./OrbitalInspectorContextMenu";
 import OrbitalInspectorSubviewHeader from "./OrbitalInspectorSubviewHeader";
+import OrbitalCommandBar from "./orbital/OrbitalCommandBar";
+import TemporalMapLayer, {
+  type TemporalMapProjectNode
+} from "./orbital/TemporalMapLayer";
 import "./OrbitalChrome.css";
 import "./OrbitalMobileShell.css";
 import {
@@ -43,16 +47,21 @@ import { getCanvasMetrics } from "../lib/canvas";
 import { buildFolderPathMap, formatTimestamp } from "../lib/notes";
 import { normalizeTagLookup, sortTagsByName, uniqueTagsByName } from "../lib/tags";
 import type { AppRuntimeLayoutSnapshot } from "../lib/runtime";
-import type { OrbitalAnimationMode } from "../lib/interfacePreferences";
+import type {
+  OrbitalAnimationMode,
+  OrbitalTemporalSignalsMode
+} from "../lib/interfacePreferences";
+import { buildPlannerMapSignals } from "../lib/plannerMapSignals";
 import { useAndroidBackHandler } from "../lib/useAndroidBackHandler";
-import type { AppLanguage, Asset, Folder, Note, Project, Tag } from "../types";
+import type { AppLanguage, Asset, Folder, Note, Project, Tag, Task } from "../types";
 
 type SceneNodeKind = "core" | "folder" | "note";
 type OrbitalChild = { folder?: FolderBranch; note?: Note };
 type InspectorMenu = "overview" | "notes" | "folders" | "tags" | "files" | "pinned" | "colors";
 type InspectorHierarchyScope = "project" | "vault";
-type OrbitalMobileSection = "vault" | "documents" | "map" | "pinned";
+type OrbitalMobileSection = "vault" | "documents" | "planner" | "map" | "pinned";
 type OrbitalMobileNavSection = OrbitalMobileSection | "settings";
+type OrbitalSurfaceMode = "map" | "planner";
 type InspectorHierarchyItemKind = "core" | "folder" | "note" | "canvas";
 type InspectorCompactIconKind =
   | InspectorHierarchyItemKind
@@ -76,10 +85,12 @@ interface OrbitalMapViewProps {
   notes: Note[];
   tags: Tag[];
   assets: Asset[];
+  tasks: Task[];
   assetCount: number;
   language: AppLanguage;
   adaptiveLayout: AppRuntimeLayoutSnapshot;
   orbitalAnimationMode: OrbitalAnimationMode;
+  orbitalTemporalSignalsMode: OrbitalTemporalSignalsMode;
   activeLocalVaultId: string;
   localVaultOptions: LocalVaultSwitcherItem[];
   syncStatusChip?: {
@@ -99,6 +110,7 @@ interface OrbitalMapViewProps {
   editorOpen: boolean;
   editorMode?: Note["contentType"] | null;
   editorSlot: ReactNode;
+  plannerSlot?: ReactNode;
   editorTitle?: string;
   editorAccentColor?: string | null;
   settingsModalSlot?: ReactNode;
@@ -160,6 +172,7 @@ interface OrbitalMapViewProps {
   onCreateNote: (folderId: string | null, projectId?: string) => Promise<Note>;
   onCreateCanvas: (folderId: string | null, projectId?: string) => Promise<Note>;
   onOpenNote: (noteId: string) => void;
+  onOpenProjectPlan?: (projectId: string) => void;
   onToggleNoteChecklistItem?: (
     noteId: string,
     blockId: string,
@@ -170,6 +183,8 @@ interface OrbitalMapViewProps {
     title: string;
     subtitle: string;
     close: string;
+    mapMode: string;
+    plannerMode: string;
     pause: string;
     resume: string;
     zoomIn: string;
@@ -191,6 +206,7 @@ interface OrbitalMapViewProps {
     addChildFolder: string;
     addNote: string;
     addCanvas: string;
+    openProjectPlan: string;
     addProject: string;
     create: string;
     cancel: string;
@@ -2172,10 +2188,12 @@ export default function OrbitalMapView({
   notes,
   tags,
   assets,
+  tasks,
   assetCount,
   language,
   adaptiveLayout,
   orbitalAnimationMode,
+  orbitalTemporalSignalsMode,
   activeLocalVaultId,
   localVaultOptions,
   syncStatusChip,
@@ -2184,6 +2202,7 @@ export default function OrbitalMapView({
   editorOpen,
   editorMode = null,
   editorSlot,
+  plannerSlot,
   editorTitle,
   editorAccentColor,
   settingsModalSlot,
@@ -2216,6 +2235,7 @@ export default function OrbitalMapView({
   onCreateNote,
   onCreateCanvas,
   onOpenNote,
+  onOpenProjectPlan,
   onToggleNoteChecklistItem,
   onResolveFileUrl,
   labels
@@ -2223,6 +2243,8 @@ export default function OrbitalMapView({
   const { t } = useTranslation();
   const tagMap = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const [isPaused, setIsPaused] = useState(false);
+  const [isTemporalLayerQuickHidden, setIsTemporalLayerQuickHidden] = useState(false);
+  const [surfaceMode, setSurfaceMode] = useState<OrbitalSurfaceMode>("map");
   const [timeMs, setTimeMs] = useState(0);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -2435,7 +2457,13 @@ export default function OrbitalMapView({
     adaptiveLayout.orientation === "landscape";
   const canShowHoverPreview = !isAndroidTouchLayout && !isMobilePreviewMode;
   const isOrbitalMotionEnabled = orbitalAnimationMode === "full";
+  const isPlannerSurfaceVisible =
+    Boolean(plannerSlot) && (isAndroidMobileShell ? mobileSection === "planner" : surfaceMode === "planner");
+  const isMapSurfaceVisible = !isPlannerSurfaceVisible;
   const isMobileMapVisible = !isAndroidMobileShell || mobileSection === "map";
+  useEffect(() => {
+    setIsTemporalLayerQuickHidden(false);
+  }, [activeLocalVaultId, orbitalTemporalSignalsMode]);
 
   const stopScenePositionAnimation = () => {
     if (sceneAnimationFrameRef.current !== null) {
@@ -3134,7 +3162,39 @@ export default function OrbitalMapView({
     [animatedSceneVersion, scene]
   );
   const getSceneTone = (entityId: string): OrbitalVisualTone => sceneToneByEntityId.get(entityId) ?? "muted";
+  const isTemporalSignalsGloballyEnabled = orbitalTemporalSignalsMode === "enabled";
+  const isTemporalLayerVisible = isTemporalSignalsGloballyEnabled && !isTemporalLayerQuickHidden;
+  const temporalMapSignals = useMemo(
+    () =>
+      buildPlannerMapSignals({
+        projects: orbitalData.projects,
+        tasks
+      }),
+    [orbitalData.projects, tasks]
+  );
+  const temporalLayerProjectNodes = useMemo<TemporalMapProjectNode[]>(
+    () =>
+      renderedScene.nodes
+        .filter((node) => node.kind === "core" && node.project)
+        .map((node) => ({
+          projectId: node.project!.id,
+          x: node.x,
+          y: node.y,
+          radius: node.radius,
+          color: node.project!.color || node.color,
+          isSelected: node.entityId === selectedEntityId,
+          isPrimary:
+            node.entityId === currentProjectEntityId ||
+            getSceneTone(node.entityId) === "primary" ||
+            getSceneTone(node.entityId) === "direct"
+        })),
+    [currentProjectEntityId, renderedScene.nodes, sceneToneByEntityId, selectedEntityId]
+  );
   const selectedNode = selectedEntityId ? renderedScene.entityMap.get(selectedEntityId) ?? null : null;
+  const selectedProjectTemporalSignal =
+    selectedNode?.kind === "core" && selectedNode.project
+      ? temporalMapSignals.byProjectId.get(selectedNode.project.id) ?? null
+      : null;
   const shouldShowHierarchyInspector =
     inspectorMenu === "folders" && (selectedNode?.kind === "folder" || selectedNode?.kind === "note");
   const effectiveInspectorMenu = shouldShowHierarchyInspector ? "folders" : inspectorMenu;
@@ -3841,6 +3901,7 @@ export default function OrbitalMapView({
         : ORBIT_IDLE_FRAME_MS;
   const isOrbitAnimationSuspended =
     !isOrbitalMotionEnabled ||
+    !isMapSurfaceVisible ||
     !isMobileMapVisible ||
     isPaused ||
     editorOpen ||
@@ -5221,6 +5282,15 @@ export default function OrbitalMapView({
 
     if (section === "documents") {
       openInspectorMenu("notes");
+      return;
+    }
+
+    if (section === "planner") {
+      setActiveModal(null);
+      setIsMobileSelectionMode(false);
+      setMobileMoveItems([]);
+      setMobileMoveDestination(null);
+      setMobileMoveConflictState(null);
       return;
     }
 
@@ -7880,6 +7950,16 @@ export default function OrbitalMapView({
       );
     }
 
+    if (section === "planner") {
+      return (
+        <svg className="orbital-mobile-nav-glyph is-planner" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5.3 5.2h13.4v13.6H5.3z" />
+          <path d="M8.2 9h7.6M8.2 12.1h5.2M8.2 15.2h6.7" className="orbital-mobile-nav-glyph-accent" />
+          <path d="m15.7 5.2 1.1 2.1 2 .3-1.5 1.5.4 2.1-2-1-1.9 1 .4-2.1-1.5-1.5 2-.3z" className="orbital-mobile-nav-glyph-dot" />
+        </svg>
+      );
+    }
+
     if (section === "map") {
       return (
         <svg className="orbital-mobile-nav-glyph is-map" viewBox="0 0 24 24" aria-hidden="true">
@@ -9084,6 +9164,15 @@ export default function OrbitalMapView({
 
           void handleCreateCanvas(null, currentProjectId);
         }}
+        onOpenProjectPlan={() => {
+          if (!currentProjectId) {
+            return;
+          }
+
+          onOpenProjectPlan?.(currentProjectId);
+          setSurfaceMode("planner");
+          setMobileSection("planner");
+        }}
         onBackToVault={handleOverviewBackToVault}
         onCycleProject={cycleProject}
         onDeleteProject={() => {
@@ -9159,6 +9248,7 @@ export default function OrbitalMapView({
     !hoverPreviewNote &&
     !hoverPreviewAsset &&
     mobileSection !== "map" &&
+    mobileSection !== "planner" &&
     effectiveInspectorMenu !== "overview" &&
     (mobileMoveItems.length > 0 ||
       isMobileSelectionMode ||
@@ -9763,6 +9853,8 @@ export default function OrbitalMapView({
         isAndroidMobileShell ? `is-mobile-section-${mobileSection}` : ""
       } ${!isOrbitalMotionEnabled || isPaused ? "is-orbital-motion-reduced" : ""} ${
         isMobileMenuOpen ? "is-mobile-menu-open" : ""
+      } ${isPlannerSurfaceVisible ? "is-planner-mode" : ""} ${
+        surfaceMode === "planner" ? "is-desktop-planner-mode" : "is-desktop-map-mode"
       } ${
         mobileMoveItems.length > 0 ? "is-mobile-move-mode" : ""
       } ${isMobileSelectionMode ? "is-mobile-select-mode" : ""} ${
@@ -9789,20 +9881,35 @@ export default function OrbitalMapView({
           </div>
 
           {mobileSection === "map" ? (
-            <button
-              type="button"
-              className="orbital-mobile-animation-action"
-              onClick={() => {
-                setIsPaused(false);
-                onOrbitalAnimationModeChange(isOrbitalMotionEnabled ? "reduced" : "full");
-              }}
-              aria-pressed={!isOrbitalMotionEnabled}
-              aria-label={isOrbitalMotionEnabled ? labels.pause : labels.resume}
-              title={isOrbitalMotionEnabled ? labels.pause : labels.resume}
-            >
-              <span className="orbital-mobile-animation-dot" />
-              <span>{isOrbitalMotionEnabled ? labels.pause : labels.resume}</span>
-            </button>
+            <div className="orbital-mobile-map-actions">
+              <button
+                type="button"
+                className="orbital-mobile-animation-action"
+                onClick={() => {
+                  setIsPaused(false);
+                  onOrbitalAnimationModeChange(isOrbitalMotionEnabled ? "reduced" : "full");
+                }}
+                aria-pressed={!isOrbitalMotionEnabled}
+                aria-label={isOrbitalMotionEnabled ? labels.pause : labels.resume}
+                title={isOrbitalMotionEnabled ? labels.pause : labels.resume}
+              >
+                <span className="orbital-mobile-animation-dot" />
+                <span>{isOrbitalMotionEnabled ? labels.pause : labels.resume}</span>
+              </button>
+              {isTemporalSignalsGloballyEnabled ? (
+                <button
+                  type="button"
+                  className="orbital-mobile-animation-action orbital-mobile-time-action"
+                  onClick={() => setIsTemporalLayerQuickHidden((current) => !current)}
+                  aria-pressed={!isTemporalLayerVisible}
+                  aria-label={isTemporalLayerVisible ? t("orbit.timeLayerHide") : t("orbit.timeLayerShow")}
+                  title={isTemporalLayerVisible ? t("orbit.timeLayerHide") : t("orbit.timeLayerShow")}
+                >
+                  <span className="orbital-mobile-time-dot" />
+                  <span>{t("orbit.timeLayer")}</span>
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </header>
       ) : null}
@@ -9860,150 +9967,63 @@ export default function OrbitalMapView({
         </div>
       ) : null}
 
-      <header className="orbital-command-bar">
-        <div className="orbital-command-content">
-          <div className="orbital-command-title">
-            <h1 className="orbital-command-brand">{labels.title}</h1>
-            <p className="orbital-command-subtitle">{labels.subtitle}</p>
-          </div>
+      <OrbitalCommandBar
+        labels={labels}
+        surfaceMode={surfaceMode}
+        plannerAvailable={Boolean(plannerSlot)}
+        activeVaultLabel={t("sync.localVaultActive")}
+        localVaultOptions={localVaultOptions}
+        activeLocalVaultId={activeLocalVaultId}
+        autoFocusEnabled={autoFocusEnabled}
+        sceneFocusActive={isSceneFocusActive}
+        syncStatusChip={syncStatusChip}
+        syncTransportChip={syncTransportChip}
+        updateChip={updateChip}
+        isOrbitalMotionEnabled={isOrbitalMotionEnabled}
+        isPaused={isPaused}
+        temporalSignalsEnabled={isTemporalSignalsGloballyEnabled}
+        temporalLayerVisible={isTemporalLayerVisible}
+        temporalLayerLabel={t("orbit.timeLayer")}
+        temporalLayerShowLabel={t("orbit.timeLayerShow")}
+        temporalLayerHideLabel={t("orbit.timeLayerHide")}
+        hasTrash={Boolean(trashModalSlot)}
+        hasSettings={Boolean(settingsModalSlot)}
+        showClose={Boolean(showClose)}
+        onSurfaceModeChange={setSurfaceMode}
+        onSelectLocalVault={onSelectLocalVault}
+        onCreateLocalVault={onCreateLocalVault}
+        onToggleMotion={() => {
+          if (!isOrbitalMotionEnabled) {
+            onOrbitalAnimationModeChange("full");
+            setIsPaused(false);
+            return;
+          }
 
-          <div className="orbital-command-status">
-            <div className="orbital-command-vault">
-              <LocalVaultSwitcher
-                label={labels.localVault}
-                activeLabel={t("sync.localVaultActive")}
-                items={localVaultOptions}
-                activeVaultId={activeLocalVaultId}
-                onSelect={onSelectLocalVault}
-                onCreate={onCreateLocalVault}
-              />
-            </div>
+          setIsPaused((current) => !current);
+        }}
+        onToggleTemporalLayer={() => setIsTemporalLayerQuickHidden((current) => !current)}
+        onOpenTrash={() => setActiveModal("trash")}
+        onOpenSettings={() => setActiveModal("settings")}
+        onZoomOut={() => {
+          stopCameraAnimation();
+          setCamera((current) => ({
+            ...current,
+            scale: clamp(current.scale * 0.9, CAMERA_MIN_SCALE, CAMERA_MAX_SCALE)
+          }));
+        }}
+        onZoomIn={() => {
+          stopCameraAnimation();
+          setCamera((current) => ({
+            ...current,
+            scale: clamp(current.scale * 1.12, CAMERA_MIN_SCALE, CAMERA_MAX_SCALE)
+          }));
+        }}
+        onCenterSelection={handleCenterSelection}
+        onResetView={handleResetCamera}
+        onClose={onClose}
+      />
 
-            <div className="orbital-command-chips">
-              {autoFocusEnabled ? (
-                <span className="orbital-context-pill orbital-context-pill-state is-autofocus">
-                  {labels.autoFocus}
-                </span>
-              ) : null}
-              {isSceneFocusActive ? (
-                <span className="orbital-context-pill orbital-context-pill-state is-focus">
-                  {labels.focusMode}
-                </span>
-              ) : null}
-              {syncStatusChip ? (
-                <span
-                  className={`orbital-context-pill orbital-sync-pill is-${syncStatusChip.tone}`}
-                  title={syncStatusChip.title ?? syncStatusChip.text}
-                >
-                  {syncStatusChip.text}
-                </span>
-              ) : null}
-              {syncTransportChip ? (
-                <span
-                  className={`orbital-context-pill orbital-sync-pill orbital-sync-transport-pill is-${syncTransportChip.tone}`}
-                  title={syncTransportChip.title ?? syncTransportChip.text}
-                >
-                  {syncTransportChip.text}
-                </span>
-              ) : null}
-              {updateChip ? (
-                <button
-                  type="button"
-                  className="orbital-context-pill orbital-update-chip"
-                  title={updateChip.title ?? updateChip.text}
-                  onClick={() => {
-                    if (settingsModalSlot) {
-                      setActiveModal("settings");
-                    }
-                  }}
-                >
-                  {updateChip.text}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="orbital-command-actions" aria-label={labels.title}>
-          <div className="orbital-command-group">
-            <button
-              type="button"
-              className="orbital-command-button"
-              onClick={() => {
-                if (!isOrbitalMotionEnabled) {
-                  onOrbitalAnimationModeChange("full");
-                  setIsPaused(false);
-                  return;
-                }
-
-                setIsPaused((current) => !current);
-              }}
-            >
-              {!isOrbitalMotionEnabled || isPaused ? labels.resume : labels.pause}
-            </button>
-          </div>
-
-          {(trashModalSlot || settingsModalSlot) && (
-            <div className="orbital-command-group">
-              {trashModalSlot ? (
-                <button type="button" className="orbital-command-button" onClick={() => setActiveModal("trash")}>
-                  {labels.trash}
-                </button>
-              ) : null}
-              {settingsModalSlot ? (
-                <button type="button" className="orbital-command-button" onClick={() => setActiveModal("settings")}>
-                  {labels.settings}
-                </button>
-              ) : null}
-            </div>
-          )}
-
-          <div className="orbital-command-group">
-            <button
-              type="button"
-              className="orbital-command-button orbital-command-button-icon"
-              onClick={() => {
-                stopCameraAnimation();
-                setCamera((current) => ({
-                  ...current,
-                  scale: clamp(current.scale * 0.9, CAMERA_MIN_SCALE, CAMERA_MAX_SCALE)
-                }));
-              }}
-              aria-label={labels.zoomOut}
-              title={labels.zoomOut}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              className="orbital-command-button orbital-command-button-icon"
-              onClick={() => {
-                stopCameraAnimation();
-                setCamera((current) => ({
-                  ...current,
-                  scale: clamp(current.scale * 1.12, CAMERA_MIN_SCALE, CAMERA_MAX_SCALE)
-                }));
-              }}
-              aria-label={labels.zoomIn}
-              title={labels.zoomIn}
-            >
-              +
-            </button>
-            <button type="button" className="orbital-command-button" onClick={handleCenterSelection}>
-              {labels.centerSelection}
-            </button>
-            <button type="button" className="orbital-command-button" onClick={handleResetCamera}>
-              {labels.resetView}
-            </button>
-          </div>
-
-          {showClose ? (
-            <button type="button" className="orbital-command-button orbital-command-button-danger" onClick={onClose}>
-              {labels.close}
-            </button>
-          ) : null}
-        </div>
-      </header>
+      {isPlannerSurfaceVisible ? <div className="orbital-planner-slot">{plannerSlot}</div> : null}
 
       <div className="orbital-layout">
         <aside className="orbital-inspector panel" ref={inspectorPanelRef}>
@@ -10412,6 +10432,15 @@ export default function OrbitalMapView({
                 <span className={`orbital-filter-chip ${isSceneFocusActive ? "is-accent" : ""}`}>
                   {isSceneFocusActive ? labels.focusMode : labels.showAll}
                 </span>
+                {isTemporalLayerVisible &&
+                (temporalMapSignals.totalToday > 0 || temporalMapSignals.totalOverdue > 0) ? (
+                  <span className={`orbital-filter-chip ${temporalMapSignals.totalOverdue > 0 ? "is-warning" : "is-accent"}`}>
+                    {t("orbit.timeLayerToday")}: {temporalMapSignals.totalToday}
+                    {temporalMapSignals.totalOverdue > 0
+                      ? ` · ${t("orbit.timeLayerOverdue")}: ${temporalMapSignals.totalOverdue}`
+                      : ""}
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
@@ -10464,6 +10493,14 @@ export default function OrbitalMapView({
                   />
                 );
               })}
+
+              {isTemporalLayerVisible ? (
+                <TemporalMapLayer
+                  nodes={temporalLayerProjectNodes}
+                  signals={temporalMapSignals.byProjectId}
+                  compact={isAndroidMobileShell || isMobilePreviewMode}
+                />
+              ) : null}
 
               {renderedScene.nodes.map((node) => {
                 const nodeTone = getSceneTone(node.entityId);
@@ -10846,7 +10883,35 @@ export default function OrbitalMapView({
                 <span>{mobileSelectedKindLabel}</span>
                 <strong>{mobileSelectedTitle}</strong>
               </div>
+              {selectedProjectTemporalSignal ? (
+                <div className="orbital-mobile-temporal-summary">
+                  <span>
+                    {t("orbit.timeLayerToday")}: <strong>{selectedProjectTemporalSignal.todayCount}</strong>
+                  </span>
+                  <span className={selectedProjectTemporalSignal.overdueCount > 0 ? "is-overdue" : ""}>
+                    {t("orbit.timeLayerOverdue")}: <strong>{selectedProjectTemporalSignal.overdueCount}</strong>
+                  </span>
+                  {selectedProjectTemporalSignal.milestoneTitle ? (
+                    <span>
+                      {t("orbit.timeLayerMilestone")}:{" "}
+                      <strong>{truncateLabel(selectedProjectTemporalSignal.milestoneTitle, 18)}</strong>
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="orbital-mobile-selection-actions">
+                {selectedNode.project && onOpenProjectPlan ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenProjectPlan(selectedNode.project!.id);
+                      setSurfaceMode("planner");
+                      setMobileSection("planner");
+                    }}
+                  >
+                    {t("orbit.timeLayerOpenPlan")}
+                  </button>
+                ) : null}
                 {selectedNode.note ? (
                   <button type="button" onClick={openSelectedMobileEntry}>
                     {selectedNode.note.contentType === "canvas" ? labels.openCanvas : labels.openNote}
@@ -10879,8 +10944,8 @@ export default function OrbitalMapView({
           {[
             ["vault", labels.hierarchyScopeVault],
             ["documents", labels.documentsMenu],
-            ["map", t("orbit.mobileMap")],
-            ["pinned", labels.pinnedMenu]
+            ["planner", labels.plannerMode],
+            ["map", t("orbit.mobileMap")]
           ].map(([section, label]) => (
             <button
               key={section}

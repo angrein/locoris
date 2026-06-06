@@ -50,6 +50,9 @@ import type {
   DesktopLocalVaultBackup,
   DesktopLocalVaultBackupAsset,
   Folder,
+  Goal,
+  Habit,
+  HabitLog,
   Note,
   NoteContent,
   Project,
@@ -61,7 +64,9 @@ import type {
   SyncProvider,
   SyncedAssetRecord,
   SyncedNoteRecord,
-  Tag
+  Tag,
+  Task,
+  TimeBlock
 } from "../types";
 import type { BinaryFileData, BinaryFiles } from "@excalidraw/excalidraw/types";
 
@@ -228,6 +233,26 @@ function buildSyncShadowEntries(snapshot: SyncSnapshot, revision: string | null)
     shadows.push(createSyncShadowRecord("asset", asset, syncedAt, revision));
   });
 
+  (snapshot.tasks ?? []).forEach((task) => {
+    shadows.push(createSyncShadowRecord("task", task, syncedAt, revision));
+  });
+
+  (snapshot.habits ?? []).forEach((habit) => {
+    shadows.push(createSyncShadowRecord("habit", habit, syncedAt, revision));
+  });
+
+  (snapshot.habitLogs ?? []).forEach((habitLog) => {
+    shadows.push(createSyncShadowRecord("habitLog", habitLog, syncedAt, revision));
+  });
+
+  (snapshot.goals ?? []).forEach((goal) => {
+    shadows.push(createSyncShadowRecord("goal", goal, syncedAt, revision));
+  });
+
+  (snapshot.timeBlocks ?? []).forEach((timeBlock) => {
+    shadows.push(createSyncShadowRecord("timeBlock", timeBlock, syncedAt, revision));
+  });
+
   snapshot.tombstones.forEach((tombstone) => {
     shadows.push(createSyncTombstoneShadow(tombstone, syncedAt, revision));
   });
@@ -290,6 +315,60 @@ function hydrateImportedNote(record: SyncedNoteRecord): Note {
     excerpt,
     plainText,
     syncState: record.conflictOriginId ? "conflict" : "synced"
+  };
+}
+
+function hydrateTaskRecord(record: Task): Task {
+  return {
+    ...record,
+    tagIds: Array.isArray(record.tagIds) ? [...record.tagIds] : [],
+    links: Array.isArray(record.links) ? [...record.links] : [],
+    reminders: Array.isArray(record.reminders) ? [...record.reminders] : [],
+    recurrenceExceptionDates: Array.isArray(record.recurrenceExceptionDates)
+      ? [...record.recurrenceExceptionDates]
+      : [],
+    recurrenceCompletedDates: Array.isArray(record.recurrenceCompletedDates)
+      ? [...record.recurrenceCompletedDates]
+      : [],
+    recurrenceOverrides: Array.isArray(record.recurrenceOverrides) ? [...record.recurrenceOverrides] : [],
+    spentMinutes: record.spentMinutes ?? 0,
+    sortOrder: record.sortOrder ?? record.createdAt
+  };
+}
+
+function hydrateHabitRecord(record: Habit): Habit {
+  return {
+    ...record,
+    reminders: Array.isArray(record.reminders) ? [...record.reminders] : [],
+    targetCount: record.targetCount ?? 1,
+    targetUnit: record.targetUnit ?? "count",
+    targetPeriod: record.targetPeriod ?? "day",
+    pauseRanges: Array.isArray(record.pauseRanges) ? [...record.pauseRanges] : [],
+    sortOrder: record.sortOrder ?? record.createdAt
+  };
+}
+
+function hydrateHabitLogRecord(record: HabitLog): HabitLog {
+  return {
+    ...record,
+    value: record.value ?? 1,
+    unit: record.unit ?? "count",
+    note: record.note ?? ""
+  };
+}
+
+function hydrateGoalRecord(record: Goal): Goal {
+  return {
+    ...record,
+    sortOrder: record.sortOrder ?? record.createdAt
+  };
+}
+
+function hydrateTimeBlockRecord(record: TimeBlock): TimeBlock {
+  return {
+    ...record,
+    actualStartAt: record.actualStartAt ?? null,
+    actualEndAt: record.actualEndAt ?? null
   };
 }
 
@@ -497,6 +576,11 @@ function buildSyncDirtyEntriesFromState(input: {
   tags: Tag[];
   notes: Note[];
   assets: Asset[];
+  tasks: Task[];
+  habits: Habit[];
+  habitLogs: HabitLog[];
+  goals: Goal[];
+  timeBlocks: TimeBlock[];
   shadows: SyncShadow[];
   tombstones: SyncTombstone[];
 }) {
@@ -533,6 +617,36 @@ function buildSyncDirtyEntriesFromState(input: {
     }
   });
 
+  input.tasks.forEach((task) => {
+    if (isEntityPending(task.updatedAt, shadowsByKey.get(getSyncEntityKey("task", task.id)))) {
+      entries.push(createSyncDirtyEntry("task", task.id, task.updatedAt));
+    }
+  });
+
+  input.habits.forEach((habit) => {
+    if (isEntityPending(habit.updatedAt, shadowsByKey.get(getSyncEntityKey("habit", habit.id)))) {
+      entries.push(createSyncDirtyEntry("habit", habit.id, habit.updatedAt));
+    }
+  });
+
+  input.habitLogs.forEach((habitLog) => {
+    if (isEntityPending(habitLog.updatedAt, shadowsByKey.get(getSyncEntityKey("habitLog", habitLog.id)))) {
+      entries.push(createSyncDirtyEntry("habitLog", habitLog.id, habitLog.updatedAt));
+    }
+  });
+
+  input.goals.forEach((goal) => {
+    if (isEntityPending(goal.updatedAt, shadowsByKey.get(getSyncEntityKey("goal", goal.id)))) {
+      entries.push(createSyncDirtyEntry("goal", goal.id, goal.updatedAt));
+    }
+  });
+
+  input.timeBlocks.forEach((timeBlock) => {
+    if (isEntityPending(timeBlock.updatedAt, shadowsByKey.get(getSyncEntityKey("timeBlock", timeBlock.id)))) {
+      entries.push(createSyncDirtyEntry("timeBlock", timeBlock.id, timeBlock.updatedAt));
+    }
+  });
+
   input.tombstones.forEach((tombstone) => {
     if (isTombstonePending(tombstone, shadowsByKey.get(tombstone.key))) {
       entries.push(createSyncDirtyEntry(tombstone.entityType, tombstone.entityId, tombstone.deletedAt, true));
@@ -545,21 +659,32 @@ function buildSyncDirtyEntriesFromState(input: {
 export async function rebuildSyncDirtyEntriesFromCurrentState(
   database: ZenNotesDatabase = db
 ) {
-  const [projects, folders, tags, notes, assets, shadows, tombstones] = await Promise.all([
-    database.projects.toArray(),
-    database.folders.toArray(),
-    database.tags.toArray(),
-    database.notes.toArray(),
-    database.assets.toArray(),
-    database.syncShadows.toArray(),
-    database.syncTombstones.toArray()
-  ]);
+  const [projects, folders, tags, notes, assets, tasks, habits, habitLogs, goals, timeBlocks, shadows, tombstones] =
+    await Promise.all([
+      database.projects.toArray(),
+      database.folders.toArray(),
+      database.tags.toArray(),
+      database.notes.toArray(),
+      database.assets.toArray(),
+      database.tasks.toArray(),
+      database.habits.toArray(),
+      database.habitLogs.toArray(),
+      database.goals.toArray(),
+      database.timeBlocks.toArray(),
+      database.syncShadows.toArray(),
+      database.syncTombstones.toArray()
+    ]);
   const dirtyEntries = buildSyncDirtyEntriesFromState({
     projects,
     folders,
     tags,
     notes,
     assets,
+    tasks,
+    habits,
+    habitLogs,
+    goals,
+    timeBlocks,
     shadows,
     tombstones
   });
@@ -581,6 +706,11 @@ export class ZenNotesDatabase extends Dexie {
   tags!: EntityTable<Tag, "id">;
   notes!: EntityTable<Note, "id">;
   assets!: EntityTable<Asset, "id">;
+  tasks!: EntityTable<Task, "id">;
+  habits!: EntityTable<Habit, "id">;
+  habitLogs!: EntityTable<HabitLog, "id">;
+  goals!: EntityTable<Goal, "id">;
+  timeBlocks!: EntityTable<TimeBlock, "id">;
   settings!: EntityTable<AppSettings, "id">;
   syncDirtyEntries!: EntityTable<SyncDirtyEntry, "key">;
   syncShadows!: EntityTable<SyncShadow, "key">;
@@ -869,6 +999,11 @@ export class ZenNotesDatabase extends Dexie {
           tags,
           notes,
           assets,
+          tasks: [],
+          habits: [],
+          habitLogs: [],
+          goals: [],
+          timeBlocks: [],
           shadows,
           tombstones
         });
@@ -1001,6 +1136,26 @@ export class ZenNotesDatabase extends Dexie {
             project.sortOrder ??= sortOrderById.get(project.id) ?? project.createdAt ?? SORT_ORDER_STEP;
           });
       });
+
+    this.version(16).stores({
+      projects: "id,updatedAt",
+      folders: "id,projectId,parentId,sortOrder,updatedAt",
+      tags: "id,name,updatedAt",
+      notes:
+        "id,projectId,contentType,folderId,sortOrder,*tagIds,updatedAt,createdAt,pinned,favorite,archived,trashedAt,syncState,conflictOriginId,color",
+      assets: "id,noteId,updatedAt",
+      tasks:
+        "id,projectId,folderId,noteId,canvasId,status,kind,priority,dueAt,scheduledStartAt,completedAt,sortOrder,updatedAt,*tagIds",
+      habits: "id,projectId,noteId,status,sortOrder,updatedAt",
+      habitLogs: "id,habitId,occurredAt,updatedAt",
+      goals: "id,projectId,parentGoalId,status,dueAt,sortOrder,updatedAt",
+      timeBlocks: "id,taskId,projectId,noteId,canvasId,status,startAt,endAt,updatedAt",
+      settings:
+        "id,syncProvider,syncStatus,syncCursor,selfHostedVaultId,hostedVaultId,hostedUserId,encryptionKeyId",
+      syncDirtyEntries: "key,entityType,entityId,updatedAt,deleted",
+      syncShadows: "key,entityType,entityId",
+      syncTombstones: "key,entityType,entityId,deletedAt"
+    });
   }
 }
 
@@ -1087,18 +1242,37 @@ export async function exportLocalVaultDesktopBackup(
   localVaultId: string
 ): Promise<DesktopLocalVaultBackup | null> {
   return withLocalVaultDatabase(localVaultId, async (database) => {
-    const [projects, folders, tags, notes, assets, settings, syncDirtyEntries, syncShadows, syncTombstones] =
-      await Promise.all([
-        database.projects.toArray(),
-        database.folders.toArray(),
-        database.tags.toArray(),
-        database.notes.toArray(),
-        database.assets.toArray(),
-        database.settings.get("app"),
-        database.syncDirtyEntries.toArray(),
-        database.syncShadows.toArray(),
-        database.syncTombstones.toArray()
-      ]);
+    const [
+      projects,
+      folders,
+      tags,
+      notes,
+      assets,
+      tasks,
+      habits,
+      habitLogs,
+      goals,
+      timeBlocks,
+      settings,
+      syncDirtyEntries,
+      syncShadows,
+      syncTombstones
+    ] = await Promise.all([
+      database.projects.toArray(),
+      database.folders.toArray(),
+      database.tags.toArray(),
+      database.notes.toArray(),
+      database.assets.toArray(),
+      database.tasks.toArray(),
+      database.habits.toArray(),
+      database.habitLogs.toArray(),
+      database.goals.toArray(),
+      database.timeBlocks.toArray(),
+      database.settings.get("app"),
+      database.syncDirtyEntries.toArray(),
+      database.syncShadows.toArray(),
+      database.syncTombstones.toArray()
+    ]);
 
     if (!settings) {
       return null;
@@ -1113,6 +1287,11 @@ export async function exportLocalVaultDesktopBackup(
       tags: sortById(tags),
       notes: sortById(notes).map((note) => ({ ...note, tagIds: [...note.tagIds] })),
       assets: sortById(await Promise.all(assets.map((asset) => serializeDesktopBackupAsset(asset)))),
+      tasks: sortById(tasks).map((task) => hydrateTaskRecord(task)),
+      habits: sortById(habits).map((habit) => hydrateHabitRecord(habit)),
+      habitLogs: sortById(habitLogs).map((habitLog) => hydrateHabitLogRecord(habitLog)),
+      goals: sortById(goals).map((goal) => hydrateGoalRecord(goal)),
+      timeBlocks: sortById(timeBlocks).map((timeBlock) => hydrateTimeBlockRecord(timeBlock)),
       settings: cloneSettingsForBackup(settings),
       syncDirtyEntries: sortByKey(syncDirtyEntries),
       syncShadows: sortByKey(syncShadows),
@@ -1129,6 +1308,11 @@ export async function restoreLocalVaultDesktopBackup(
     const folders = sortById(backup.folders).map((folder) => hydrateFolderRecord(folder));
     const notes = sortById(backup.notes).map((note) => hydrateDesktopBackupNote(note));
     const assets = sortById(backup.assets).map((asset) => hydrateDesktopBackupAsset(asset));
+    const tasks = sortById(backup.tasks ?? []).map((task) => hydrateTaskRecord(task));
+    const habits = sortById(backup.habits ?? []).map((habit) => hydrateHabitRecord(habit));
+    const habitLogs = sortById(backup.habitLogs ?? []).map((habitLog) => hydrateHabitLogRecord(habitLog));
+    const goals = sortById(backup.goals ?? []).map((goal) => hydrateGoalRecord(goal));
+    const timeBlocks = sortById(backup.timeBlocks ?? []).map((timeBlock) => hydrateTimeBlockRecord(timeBlock));
     const backupSettings = stripAppSettingsSecrets(backup.settings);
     const settings =
       backupSettings
@@ -1151,6 +1335,11 @@ export async function restoreLocalVaultDesktopBackup(
         database.tags,
         database.notes,
         database.assets,
+        database.tasks,
+        database.habits,
+        database.habitLogs,
+        database.goals,
+        database.timeBlocks,
         database.settings,
         database.syncDirtyEntries,
         database.syncShadows,
@@ -1162,6 +1351,11 @@ export async function restoreLocalVaultDesktopBackup(
         await database.tags.clear();
         await database.notes.clear();
         await database.assets.clear();
+        await database.tasks.clear();
+        await database.habits.clear();
+        await database.habitLogs.clear();
+        await database.goals.clear();
+        await database.timeBlocks.clear();
         await database.settings.clear();
         await database.syncDirtyEntries.clear();
         await database.syncShadows.clear();
@@ -1185,6 +1379,26 @@ export async function restoreLocalVaultDesktopBackup(
 
         if (assets.length > 0) {
           await database.assets.bulkAdd(assets);
+        }
+
+        if (tasks.length > 0) {
+          await database.tasks.bulkAdd(tasks);
+        }
+
+        if (habits.length > 0) {
+          await database.habits.bulkAdd(habits);
+        }
+
+        if (habitLogs.length > 0) {
+          await database.habitLogs.bulkAdd(habitLogs);
+        }
+
+        if (goals.length > 0) {
+          await database.goals.bulkAdd(goals);
+        }
+
+        if (timeBlocks.length > 0) {
+          await database.timeBlocks.bulkAdd(timeBlocks);
         }
 
         await database.settings.add(settings);
@@ -1561,6 +1775,11 @@ export async function writeImportedVaultSnapshot(
     const folders = input.snapshot.folders.map((folder) => hydrateFolderRecord(folder));
     const notes = input.snapshot.notes.map((note) => hydrateImportedNote(note));
     const assets = input.snapshot.assets.map((asset) => hydrateImportedAsset(asset));
+    const tasks = (input.snapshot.tasks ?? []).map((task) => hydrateTaskRecord(task));
+    const habits = (input.snapshot.habits ?? []).map((habit) => hydrateHabitRecord(habit));
+    const habitLogs = (input.snapshot.habitLogs ?? []).map((habitLog) => hydrateHabitLogRecord(habitLog));
+    const goals = (input.snapshot.goals ?? []).map((goal) => hydrateGoalRecord(goal));
+    const timeBlocks = (input.snapshot.timeBlocks ?? []).map((timeBlock) => hydrateTimeBlockRecord(timeBlock));
     const shadows = buildSyncShadowEntries(input.snapshot, input.revision);
     const nextOpenedNoteId =
       existingSettings?.lastOpenedNoteId && notes.some((note) => note.id === existingSettings.lastOpenedNoteId)
@@ -1575,6 +1794,11 @@ export async function writeImportedVaultSnapshot(
         database.tags,
         database.notes,
         database.assets,
+        database.tasks,
+        database.habits,
+        database.habitLogs,
+        database.goals,
+        database.timeBlocks,
         database.settings,
         database.syncDirtyEntries,
         database.syncShadows,
@@ -1586,6 +1810,11 @@ export async function writeImportedVaultSnapshot(
         await database.tags.clear();
         await database.notes.clear();
         await database.assets.clear();
+        await database.tasks.clear();
+        await database.habits.clear();
+        await database.habitLogs.clear();
+        await database.goals.clear();
+        await database.timeBlocks.clear();
         await database.syncDirtyEntries.clear();
         await database.syncShadows.clear();
         await database.syncTombstones.clear();
@@ -1608,6 +1837,26 @@ export async function writeImportedVaultSnapshot(
 
         if (assets.length > 0) {
           await database.assets.bulkAdd(assets);
+        }
+
+        if (tasks.length > 0) {
+          await database.tasks.bulkAdd(tasks);
+        }
+
+        if (habits.length > 0) {
+          await database.habits.bulkAdd(habits);
+        }
+
+        if (habitLogs.length > 0) {
+          await database.habitLogs.bulkAdd(habitLogs);
+        }
+
+        if (goals.length > 0) {
+          await database.goals.bulkAdd(goals);
+        }
+
+        if (timeBlocks.length > 0) {
+          await database.timeBlocks.bulkAdd(timeBlocks);
         }
 
         if (input.snapshot.tombstones.length > 0) {
@@ -3014,6 +3263,783 @@ export async function clearTrash() {
 
   scheduleActiveLocalVaultDesktopBackup();
   return trashedNoteIds.length;
+}
+
+export type PlannerTaskCreateInput = {
+  title: string;
+  description?: string;
+  kind?: Task["kind"];
+  status?: Task["status"];
+  priority?: Task["priority"];
+  projectId?: string | null;
+  folderId?: string | null;
+  noteId?: string | null;
+  canvasId?: string | null;
+  sourceBlockId?: string | null;
+  canvasElementId?: string | null;
+  tagIds?: string[];
+  links?: Task["links"];
+  reminders?: Task["reminders"];
+  startAt?: number | null;
+  dueAt?: number | null;
+  scheduledStartAt?: number | null;
+  scheduledEndAt?: number | null;
+  recurrenceRule?: string | null;
+  recurrenceTimezone?: string | null;
+  recurrenceAnchorAt?: number | null;
+  recurrenceUntilAt?: number | null;
+  recurrenceExceptionDates?: number[];
+  recurrenceCompletedDates?: number[];
+  recurrenceOverrides?: Task["recurrenceOverrides"];
+  estimateMinutes?: number | null;
+  sortOrder?: number;
+};
+
+export type PlannerTaskUpdateInput = Partial<
+  Pick<
+    Task,
+    | "title"
+    | "description"
+    | "kind"
+    | "status"
+    | "priority"
+    | "projectId"
+    | "folderId"
+    | "noteId"
+    | "canvasId"
+    | "sourceBlockId"
+    | "canvasElementId"
+    | "tagIds"
+    | "links"
+    | "reminders"
+    | "startAt"
+    | "dueAt"
+    | "scheduledStartAt"
+    | "scheduledEndAt"
+    | "completedAt"
+    | "canceledAt"
+    | "recurrenceRule"
+    | "recurrenceTimezone"
+    | "recurrenceAnchorAt"
+    | "recurrenceUntilAt"
+    | "recurrenceExceptionDates"
+    | "recurrenceCompletedDates"
+    | "recurrenceOverrides"
+    | "estimateMinutes"
+    | "spentMinutes"
+    | "sortOrder"
+  >
+>;
+
+function normalizePlannerTaskTitle(title: string) {
+  const normalized = title.trim();
+  return normalized.length > 0 ? normalized : "Untitled task";
+}
+
+export async function createPlannerTask(input: PlannerTaskCreateInput) {
+  const timestamp = now();
+  let task: Task | null = null;
+
+  await db.transaction("rw", db.tasks, db.syncDirtyEntries, async () => {
+    const tasks = await db.tasks.toArray();
+    task = {
+      id: crypto.randomUUID(),
+      title: normalizePlannerTaskTitle(input.title),
+      description: input.description?.trim() ?? "",
+      kind: input.kind ?? "task",
+      status: input.status ?? "inbox",
+      priority: input.priority ?? "none",
+      projectId: input.projectId ?? null,
+      folderId: input.folderId ?? null,
+      noteId: input.noteId ?? null,
+      canvasId: input.canvasId ?? null,
+      sourceBlockId: input.sourceBlockId ?? null,
+      canvasElementId: input.canvasElementId ?? null,
+      tagIds: Array.isArray(input.tagIds) ? [...input.tagIds] : [],
+      links: Array.isArray(input.links) ? [...input.links] : [],
+      reminders: Array.isArray(input.reminders) ? [...input.reminders] : [],
+      startAt: input.startAt ?? null,
+      dueAt: input.dueAt ?? null,
+      scheduledStartAt: input.scheduledStartAt ?? null,
+      scheduledEndAt: input.scheduledEndAt ?? null,
+      completedAt: null,
+      canceledAt: null,
+      recurrenceRule: input.recurrenceRule ?? null,
+      recurrenceTimezone: input.recurrenceTimezone ?? null,
+      recurrenceAnchorAt: input.recurrenceAnchorAt ?? null,
+      recurrenceUntilAt: input.recurrenceUntilAt ?? null,
+      recurrenceExceptionDates: Array.isArray(input.recurrenceExceptionDates)
+        ? [...input.recurrenceExceptionDates]
+        : [],
+      recurrenceCompletedDates: Array.isArray(input.recurrenceCompletedDates)
+        ? [...input.recurrenceCompletedDates]
+        : [],
+      recurrenceOverrides: Array.isArray(input.recurrenceOverrides) ? [...input.recurrenceOverrides] : [],
+      estimateMinutes: input.estimateMinutes ?? null,
+      spentMinutes: 0,
+      sortOrder: input.sortOrder ?? getNextSortOrder(tasks),
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    await db.tasks.add(task);
+    await putSyncDirtyEntry("task", task.id, timestamp);
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
+
+  if (!task) {
+    throw new Error("Task was not created.");
+  }
+
+  return task;
+}
+
+export async function updatePlannerTask(taskId: string, patch: PlannerTaskUpdateInput) {
+  const timestamp = now();
+  let updatedTask: Task | null = null;
+
+  await db.transaction("rw", db.tasks, db.syncDirtyEntries, async () => {
+    const existingTask = await db.tasks.get(taskId);
+
+    if (!existingTask) {
+      return;
+    }
+
+    const nextPatch: PlannerTaskUpdateInput = {
+      ...patch,
+      updatedAt: timestamp
+    } as PlannerTaskUpdateInput;
+
+    if (typeof patch.title === "string") {
+      nextPatch.title = normalizePlannerTaskTitle(patch.title);
+    }
+
+    if (typeof patch.description === "string") {
+      nextPatch.description = patch.description.trim();
+    }
+
+    if (Array.isArray(patch.tagIds)) {
+      nextPatch.tagIds = [...patch.tagIds];
+    }
+
+    if (Array.isArray(patch.links)) {
+      nextPatch.links = [...patch.links];
+    }
+
+    if (Array.isArray(patch.reminders)) {
+      nextPatch.reminders = [...patch.reminders];
+    }
+
+    if (Array.isArray(patch.recurrenceExceptionDates)) {
+      nextPatch.recurrenceExceptionDates = [...patch.recurrenceExceptionDates];
+    }
+
+    if (Array.isArray(patch.recurrenceCompletedDates)) {
+      nextPatch.recurrenceCompletedDates = [...patch.recurrenceCompletedDates];
+    }
+
+    if (Array.isArray(patch.recurrenceOverrides)) {
+      nextPatch.recurrenceOverrides = [...patch.recurrenceOverrides];
+    }
+
+    await db.tasks.update(taskId, nextPatch);
+    updatedTask = hydrateTaskRecord({
+      ...existingTask,
+      ...nextPatch,
+      updatedAt: timestamp
+    });
+    await putSyncDirtyEntry("task", taskId, timestamp);
+  });
+
+  if (updatedTask) {
+    scheduleActiveLocalVaultDesktopBackup();
+  }
+
+  return updatedTask;
+}
+
+export async function setPlannerTaskDone(taskId: string, done: boolean) {
+  const existingTask = await db.tasks.get(taskId);
+
+  if (!existingTask) {
+    return null;
+  }
+
+  const timestamp = now();
+  return updatePlannerTask(taskId, {
+    status: done ? "done" : existingTask.status === "done" ? "todo" : existingTask.status,
+    completedAt: done ? timestamp : null,
+    canceledAt: done ? null : existingTask.canceledAt
+  });
+}
+
+export async function removePlannerTask(taskId: string) {
+  const timestamp = now();
+
+  await db.transaction("rw", db.tasks, db.timeBlocks, db.syncTombstones, db.syncDirtyEntries, async () => {
+    await db.tasks.delete(taskId);
+    const linkedTimeBlocks = await db.timeBlocks.where("taskId").equals(taskId).toArray();
+
+    if (linkedTimeBlocks.length > 0) {
+      await Promise.all(
+        linkedTimeBlocks.map((timeBlock) =>
+          db.timeBlocks.update(timeBlock.id, {
+            taskId: null,
+            updatedAt: timestamp
+          })
+        )
+      );
+      await Promise.all(linkedTimeBlocks.map((timeBlock) => putSyncDirtyEntry("timeBlock", timeBlock.id, timestamp)));
+    }
+
+    await putSyncTombstone("task", taskId, timestamp);
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
+}
+
+export type PlannerHabitCreateInput = {
+  title: string;
+  description?: string;
+  status?: Habit["status"];
+  projectId?: string | null;
+  noteId?: string | null;
+  color?: string;
+  icon?: string;
+  frequencyRule?: string;
+  frequencyTimezone?: string | null;
+  targetCount?: number;
+  targetUnit?: string;
+  targetPeriod?: Habit["targetPeriod"];
+  reminders?: Habit["reminders"];
+  sortOrder?: number;
+};
+
+export type PlannerHabitUpdateInput = Partial<
+  Pick<
+    Habit,
+    | "title"
+    | "description"
+    | "status"
+    | "projectId"
+    | "noteId"
+    | "color"
+    | "icon"
+    | "frequencyRule"
+    | "frequencyTimezone"
+    | "targetCount"
+    | "targetUnit"
+    | "targetPeriod"
+    | "reminders"
+    | "sortOrder"
+    | "pausedAt"
+    | "archivedAt"
+    | "pauseRanges"
+  >
+>;
+
+function normalizePlannerHabitTitle(title: string) {
+  const normalized = title.trim();
+  return normalized.length > 0 ? normalized : "Untitled habit";
+}
+
+function normalizePlannerHabitTargetCount(value: number | null | undefined) {
+  return Math.max(1, Math.min(999, Math.round(value ?? 1)));
+}
+
+function normalizePlannerHabitTargetUnit(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized ? normalized.slice(0, 24) : "count";
+}
+
+function buildPausedHabitRanges(existingHabit: Habit, nextStatus: Habit["status"], timestamp: number) {
+  const previousRanges = Array.isArray(existingHabit.pauseRanges) ? [...existingHabit.pauseRanges] : [];
+
+  if (nextStatus === "paused" && existingHabit.status !== "paused") {
+    return [
+      ...previousRanges,
+      {
+        id: crypto.randomUUID(),
+        startAt: timestamp,
+        endAt: null,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      }
+    ];
+  }
+
+  if (nextStatus === "active" && existingHabit.status === "paused") {
+    let openRangeIndex = -1;
+
+    for (let index = previousRanges.length - 1; index >= 0; index -= 1) {
+      if (previousRanges[index].endAt === null) {
+        openRangeIndex = index;
+        break;
+      }
+    }
+
+    if (openRangeIndex >= 0) {
+      previousRanges[openRangeIndex] = {
+        ...previousRanges[openRangeIndex],
+        endAt: timestamp,
+        updatedAt: timestamp
+      };
+    }
+  }
+
+  return previousRanges;
+}
+
+export async function createPlannerHabit(input: PlannerHabitCreateInput) {
+  const timestamp = now();
+  let habit: Habit | null = null;
+
+  await db.transaction("rw", db.habits, db.syncDirtyEntries, async () => {
+    const habits = await db.habits.toArray();
+    const status = input.status ?? "active";
+    habit = {
+      id: crypto.randomUUID(),
+      title: normalizePlannerHabitTitle(input.title),
+      description: input.description?.trim() ?? "",
+      status,
+      projectId: input.projectId ?? null,
+      noteId: input.noteId ?? null,
+      color: input.color ?? DEFAULT_PROJECT_COLOR,
+      icon: input.icon?.trim() || "spark",
+      frequencyRule: input.frequencyRule?.trim() || "FREQ=DAILY;INTERVAL=1",
+      frequencyTimezone: input.frequencyTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+      targetCount: normalizePlannerHabitTargetCount(input.targetCount),
+      targetUnit: normalizePlannerHabitTargetUnit(input.targetUnit),
+      targetPeriod: input.targetPeriod ?? "day",
+      reminders: Array.isArray(input.reminders) ? [...input.reminders] : [],
+      sortOrder: input.sortOrder ?? getNextSortOrder(habits),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      pausedAt: status === "paused" ? timestamp : null,
+      archivedAt: status === "archived" ? timestamp : null,
+      pauseRanges:
+        status === "paused"
+          ? [
+              {
+                id: crypto.randomUUID(),
+                startAt: timestamp,
+                endAt: null,
+                createdAt: timestamp,
+                updatedAt: timestamp
+              }
+            ]
+          : []
+    };
+
+    await db.habits.add(habit);
+    await putSyncDirtyEntry("habit", habit.id, timestamp);
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
+
+  if (!habit) {
+    throw new Error("Habit was not created.");
+  }
+
+  return habit;
+}
+
+export async function updatePlannerHabit(habitId: string, patch: PlannerHabitUpdateInput) {
+  const timestamp = now();
+  let updatedHabit: Habit | null = null;
+
+  await db.transaction("rw", db.habits, db.syncDirtyEntries, async () => {
+    const existingHabit = await db.habits.get(habitId);
+
+    if (!existingHabit) {
+      return;
+    }
+
+    const nextPatch: PlannerHabitUpdateInput & { updatedAt: number } = {
+      ...patch,
+      updatedAt: timestamp
+    };
+
+    if (typeof patch.title === "string") {
+      nextPatch.title = normalizePlannerHabitTitle(patch.title);
+    }
+
+    if (typeof patch.description === "string") {
+      nextPatch.description = patch.description.trim();
+    }
+
+    if (typeof patch.icon === "string") {
+      nextPatch.icon = patch.icon.trim() || "spark";
+    }
+
+    if (typeof patch.frequencyRule === "string") {
+      nextPatch.frequencyRule = patch.frequencyRule.trim() || existingHabit.frequencyRule;
+    }
+
+    if (typeof patch.targetCount === "number") {
+      nextPatch.targetCount = normalizePlannerHabitTargetCount(patch.targetCount);
+    }
+
+    if (typeof patch.targetUnit === "string") {
+      nextPatch.targetUnit = normalizePlannerHabitTargetUnit(patch.targetUnit);
+    }
+
+    if (Array.isArray(patch.reminders)) {
+      nextPatch.reminders = [...patch.reminders];
+    }
+
+    if (Array.isArray(patch.pauseRanges)) {
+      nextPatch.pauseRanges = [...patch.pauseRanges];
+    }
+
+    if (patch.status) {
+      nextPatch.pauseRanges = buildPausedHabitRanges(existingHabit, patch.status, timestamp);
+      nextPatch.pausedAt = patch.status === "paused" ? existingHabit.pausedAt ?? timestamp : null;
+      nextPatch.archivedAt = patch.status === "archived" ? existingHabit.archivedAt ?? timestamp : null;
+    }
+
+    await db.habits.update(habitId, nextPatch);
+    updatedHabit = hydrateHabitRecord({
+      ...existingHabit,
+      ...nextPatch,
+      updatedAt: timestamp
+    });
+    await putSyncDirtyEntry("habit", habitId, timestamp);
+  });
+
+  if (updatedHabit) {
+    scheduleActiveLocalVaultDesktopBackup();
+  }
+
+  return updatedHabit;
+}
+
+export async function removePlannerHabit(habitId: string) {
+  const timestamp = now();
+
+  await db.transaction("rw", db.habits, db.habitLogs, db.syncTombstones, db.syncDirtyEntries, async () => {
+    const linkedLogs = await db.habitLogs.where("habitId").equals(habitId).toArray();
+    await db.habits.delete(habitId);
+
+    if (linkedLogs.length > 0) {
+      await Promise.all(linkedLogs.map((log) => db.habitLogs.delete(log.id)));
+      await Promise.all(linkedLogs.map((log) => putSyncTombstone("habitLog", log.id, timestamp)));
+    }
+
+    await putSyncTombstone("habit", habitId, timestamp);
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
+}
+
+export type PlannerHabitLogCreateInput = {
+  habitId: string;
+  occurredAt?: number;
+  value?: number;
+  unit?: string;
+  note?: string;
+};
+
+export async function createPlannerHabitLog(input: PlannerHabitLogCreateInput) {
+  const timestamp = now();
+  let habitLog: HabitLog | null = null;
+
+  await db.transaction("rw", db.habitLogs, db.syncDirtyEntries, async () => {
+    habitLog = {
+      id: crypto.randomUUID(),
+      habitId: input.habitId,
+      occurredAt: input.occurredAt ?? timestamp,
+      value: Math.max(1, input.value ?? 1),
+      unit: normalizePlannerHabitTargetUnit(input.unit),
+      note: input.note?.trim() ?? "",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    await db.habitLogs.add(habitLog);
+    await putSyncDirtyEntry("habitLog", habitLog.id, timestamp);
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
+
+  if (!habitLog) {
+    throw new Error("Habit log was not created.");
+  }
+
+  return habitLog;
+}
+
+export async function removePlannerHabitLog(habitLogId: string) {
+  const timestamp = now();
+
+  await db.transaction("rw", db.habitLogs, db.syncTombstones, db.syncDirtyEntries, async () => {
+    await db.habitLogs.delete(habitLogId);
+    await putSyncTombstone("habitLog", habitLogId, timestamp);
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
+}
+
+export async function togglePlannerHabitLogForDay(habitId: string, dayAt = now(), value = 1) {
+  const timestamp = now();
+  const day = new Date(dayAt);
+  day.setHours(0, 0, 0, 0);
+  const rangeStart = day.getTime();
+  day.setHours(23, 59, 59, 999);
+  const rangeEnd = day.getTime();
+  let nextHabitLog: HabitLog | null = null;
+
+  await db.transaction("rw", db.habitLogs, db.syncDirtyEntries, db.syncTombstones, async () => {
+    const existingLogs = await db.habitLogs
+      .where("habitId")
+      .equals(habitId)
+      .filter((log) => log.occurredAt >= rangeStart && log.occurredAt <= rangeEnd)
+      .toArray();
+
+    if (existingLogs.length > 0) {
+      await Promise.all(existingLogs.map((log) => db.habitLogs.delete(log.id)));
+      await Promise.all(existingLogs.map((log) => putSyncTombstone("habitLog", log.id, timestamp)));
+      return;
+    }
+
+    nextHabitLog = {
+      id: crypto.randomUUID(),
+      habitId,
+      occurredAt: timestamp,
+      value: Math.max(1, value),
+      unit: "count",
+      note: "",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    await db.habitLogs.add(nextHabitLog);
+    await putSyncDirtyEntry("habitLog", nextHabitLog.id, timestamp);
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
+  return nextHabitLog;
+}
+
+export type PlannerTimeBlockCreateInput = {
+  title: string;
+  description?: string;
+  status?: TimeBlock["status"];
+  taskId?: string | null;
+  projectId?: string | null;
+  noteId?: string | null;
+  canvasId?: string | null;
+  startAt: number;
+  endAt: number;
+  actualStartAt?: number | null;
+  actualEndAt?: number | null;
+  color?: string;
+};
+
+export type PlannerTimeBlockUpdateInput = Partial<
+  Pick<
+    TimeBlock,
+    | "title"
+    | "description"
+    | "status"
+    | "taskId"
+    | "projectId"
+    | "noteId"
+    | "canvasId"
+    | "startAt"
+    | "endAt"
+    | "actualStartAt"
+    | "actualEndAt"
+    | "color"
+  >
+>;
+
+function normalizeTimeBlockTitle(title: string) {
+  const normalized = title.trim();
+  return normalized.length > 0 ? normalized : "Focus block";
+}
+
+function normalizeTimeBlockRange(startAt: number, endAt: number) {
+  const normalizedStartAt = Number.isFinite(startAt) ? startAt : now();
+  const fallbackEndAt = normalizedStartAt + 30 * 60 * 1000;
+  const normalizedEndAt =
+    Number.isFinite(endAt) && endAt > normalizedStartAt
+      ? endAt
+      : fallbackEndAt;
+
+  return {
+    startAt: normalizedStartAt,
+    endAt: normalizedEndAt
+  };
+}
+
+export async function createPlannerTimeBlock(input: PlannerTimeBlockCreateInput) {
+  const timestamp = now();
+  const range = normalizeTimeBlockRange(input.startAt, input.endAt);
+  let timeBlock: TimeBlock | null = null;
+
+  await db.transaction("rw", db.timeBlocks, db.tasks, db.syncDirtyEntries, async () => {
+    const linkedTask = input.taskId ? await db.tasks.get(input.taskId) : null;
+
+    timeBlock = {
+      id: crypto.randomUUID(),
+      title: normalizeTimeBlockTitle(input.title || linkedTask?.title || ""),
+      description: input.description?.trim() ?? "",
+      status: input.status ?? "planned",
+      taskId: input.taskId ?? null,
+      projectId: input.projectId ?? linkedTask?.projectId ?? null,
+      noteId: input.noteId ?? linkedTask?.noteId ?? null,
+      canvasId: input.canvasId ?? linkedTask?.canvasId ?? null,
+      startAt: range.startAt,
+      endAt: range.endAt,
+      actualStartAt: input.actualStartAt ?? null,
+      actualEndAt: input.actualEndAt ?? null,
+      color: input.color ?? "#8edcff",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    await db.timeBlocks.add(timeBlock);
+    await putSyncDirtyEntry("timeBlock", timeBlock.id, timestamp);
+
+    if (linkedTask) {
+      await db.tasks.update(linkedTask.id, {
+        status: linkedTask.status === "inbox" || linkedTask.status === "todo" ? "scheduled" : linkedTask.status,
+        scheduledStartAt: range.startAt,
+        scheduledEndAt: range.endAt,
+        updatedAt: timestamp
+      });
+      await putSyncDirtyEntry("task", linkedTask.id, timestamp);
+    }
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
+
+  if (!timeBlock) {
+    throw new Error("Time block was not created.");
+  }
+
+  return timeBlock;
+}
+
+export async function updatePlannerTimeBlock(timeBlockId: string, patch: PlannerTimeBlockUpdateInput) {
+  const timestamp = now();
+  let updatedTimeBlock: TimeBlock | null = null;
+
+  await db.transaction("rw", db.timeBlocks, db.tasks, db.syncDirtyEntries, async () => {
+    const existingTimeBlock = await db.timeBlocks.get(timeBlockId);
+
+    if (!existingTimeBlock) {
+      return;
+    }
+
+    const range =
+      typeof patch.startAt === "number" || typeof patch.endAt === "number"
+        ? normalizeTimeBlockRange(patch.startAt ?? existingTimeBlock.startAt, patch.endAt ?? existingTimeBlock.endAt)
+        : null;
+    const nextPatch: PlannerTimeBlockUpdateInput & { updatedAt: number } = {
+      ...patch,
+      ...(range ?? {}),
+      updatedAt: timestamp
+    };
+
+    if (typeof patch.title === "string") {
+      nextPatch.title = normalizeTimeBlockTitle(patch.title);
+    }
+
+    if (typeof patch.description === "string") {
+      nextPatch.description = patch.description.trim();
+    }
+
+    await db.timeBlocks.update(timeBlockId, nextPatch);
+    updatedTimeBlock = hydrateTimeBlockRecord({
+      ...existingTimeBlock,
+      ...nextPatch,
+      updatedAt: timestamp
+    });
+    await putSyncDirtyEntry("timeBlock", timeBlockId, timestamp);
+
+    const nextTaskId = nextPatch.taskId ?? existingTimeBlock.taskId;
+
+    if (existingTimeBlock.taskId && nextTaskId !== existingTimeBlock.taskId) {
+      const previousTask = await db.tasks.get(existingTimeBlock.taskId);
+
+      if (
+        previousTask &&
+        previousTask.scheduledStartAt === existingTimeBlock.startAt &&
+        previousTask.scheduledEndAt === existingTimeBlock.endAt
+      ) {
+        await db.tasks.update(previousTask.id, {
+          status: previousTask.status === "scheduled" ? "todo" : previousTask.status,
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+          updatedAt: timestamp
+        });
+        await putSyncDirtyEntry("task", previousTask.id, timestamp);
+      }
+    }
+
+    const effectiveRange =
+      range ??
+      (nextTaskId !== existingTimeBlock.taskId
+        ? {
+            startAt: existingTimeBlock.startAt,
+            endAt: existingTimeBlock.endAt
+          }
+        : null);
+
+    if (nextTaskId && effectiveRange) {
+      const linkedTask = await db.tasks.get(nextTaskId);
+
+      if (linkedTask) {
+        await db.tasks.update(nextTaskId, {
+          status: linkedTask.status === "inbox" || linkedTask.status === "todo" ? "scheduled" : linkedTask.status,
+          scheduledStartAt: effectiveRange.startAt,
+          scheduledEndAt: effectiveRange.endAt,
+          updatedAt: timestamp
+        });
+        await putSyncDirtyEntry("task", nextTaskId, timestamp);
+      }
+    }
+  });
+
+  if (updatedTimeBlock) {
+    scheduleActiveLocalVaultDesktopBackup();
+  }
+
+  return updatedTimeBlock;
+}
+
+export async function removePlannerTimeBlock(timeBlockId: string) {
+  const timestamp = now();
+
+  await db.transaction("rw", db.timeBlocks, db.tasks, db.syncTombstones, db.syncDirtyEntries, async () => {
+    const existingTimeBlock = await db.timeBlocks.get(timeBlockId);
+    await db.timeBlocks.delete(timeBlockId);
+
+    if (existingTimeBlock?.taskId) {
+      const linkedTask = await db.tasks.get(existingTimeBlock.taskId);
+
+      if (
+        linkedTask &&
+        linkedTask.scheduledStartAt === existingTimeBlock.startAt &&
+        linkedTask.scheduledEndAt === existingTimeBlock.endAt
+      ) {
+        await db.tasks.update(linkedTask.id, {
+          status: linkedTask.status === "scheduled" ? "todo" : linkedTask.status,
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+          updatedAt: timestamp
+        });
+        await putSyncDirtyEntry("task", linkedTask.id, timestamp);
+      }
+    }
+
+    await putSyncTombstone("timeBlock", timeBlockId, timestamp);
+  });
+
+  scheduleActiveLocalVaultDesktopBackup();
 }
 
 function detectAssetKind(file: File): AssetKind {

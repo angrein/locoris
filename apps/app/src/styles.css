@@ -4529,6 +4529,19 @@ button {
   display: none;
 }
 
+.orbital-modal-window.orbital-utility-modal-window.is-settings-mode
+  .orbital-utility-modal-close {
+  width: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  left: auto !important;
+  right: 12px !important;
+  justify-content: center;
+}
+
 .vault-column,
 .list-column {
   align-self: stretch;

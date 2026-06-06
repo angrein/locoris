@@ -87,12 +87,21 @@
   min-height: 44px;
 }
 
+.orbital-overlay.is-android-runtime .orbital-command-button,
+.orbital-overlay.is-android-mobile-shell .orbital-command-button {
+  min-width: 44px;
+}
+
 .orbital-overlay.is-android-tablet-landscape-shell .orbital-tree-item,
 .orbital-overlay.is-android-tablet-landscape-shell .orbital-menu-compact-item,
 .orbital-overlay.is-android-tablet-landscape-shell .orbital-command-button,
 .orbital-overlay.is-android-tablet-landscape-shell .orbital-toolbar-action,
 .orbital-overlay.is-android-tablet-landscape-shell .toolbar-action {
   min-height: 42px;
+}
+
+.orbital-overlay.is-android-tablet-landscape-shell .orbital-command-button {
+  min-width: 42px;
 }
 
 .orbital-overlay.is-android-mobile-shell {
@@ -137,6 +146,14 @@
 
 .orbital-mobile-topbar.is-map-section {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.orbital-mobile-map-actions {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .orbital-mobile-vault {
@@ -250,6 +267,20 @@
   box-shadow: none;
 }
 
+.orbital-mobile-time-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8dffcf, var(--accent-theme-primary, var(--gold)));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 44%, transparent);
+}
+
+.orbital-mobile-time-action[aria-pressed="true"] .orbital-mobile-time-dot {
+  background: rgba(205, 214, 242, 0.58);
+  box-shadow: none;
+}
+
 .orbital-mobile-search {
   grid-column: 1 / -1;
   min-width: 0;
@@ -288,6 +319,17 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 0;
+}
+
+.orbital-overlay.is-android-mobile-shell.is-planner-mode .orbital-layout,
+.orbital-overlay.is-android-mobile-shell.is-planner-mode .orbital-layout.has-editor {
+  display: none;
+}
+
+.orbital-overlay.is-android-mobile-shell .orbital-planner-slot {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .orbital-overlay.is-android-mobile-shell .orbital-inspector.panel,
@@ -439,6 +481,39 @@
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.orbital-mobile-temporal-summary {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.orbital-mobile-temporal-summary span {
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--mobile-selection-accent) 18%, rgb(var(--line-rgb) / 0.1));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mobile-selection-accent) 8%, rgba(255, 255, 255, 0.025));
+  color: rgba(223, 230, 255, 0.78);
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-mobile-temporal-summary span.is-overdue {
+  border-color: rgba(255, 145, 165, 0.34);
+  background: rgba(255, 122, 150, 0.09);
+  color: rgba(255, 209, 218, 0.94);
+}
+
+.orbital-mobile-temporal-summary strong {
+  color: rgba(250, 252, 255, 0.96);
 }
 
 .orbital-mobile-selection-actions,

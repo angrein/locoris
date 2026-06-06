@@ -7,7 +7,10 @@ import {
   resolveAppAccentThemeId,
   type AppAccentThemeId
 } from "../lib/accentThemes";
-import type { OrbitalAnimationMode } from "../lib/interfacePreferences";
+import type {
+  OrbitalAnimationMode,
+  OrbitalTemporalSignalsMode
+} from "../lib/interfacePreferences";
 import {
   deleteGeminiApiKey,
   GEMINI_MODEL_OPTIONS,
@@ -67,6 +70,7 @@ interface SettingsPanelProps {
   settings: AppSettings;
   accentThemeId: AppAccentThemeId;
   orbitalAnimationMode: OrbitalAnimationMode;
+  orbitalTemporalSignalsMode: OrbitalTemporalSignalsMode;
   online: boolean;
   localVaults: LocalVaultProfile[];
   activeLocalVaultId: string;
@@ -77,6 +81,7 @@ interface SettingsPanelProps {
   syncFeedback?: SyncFeedbackState;
   onAccentThemeChange: (themeId: AppAccentThemeId) => void;
   onOrbitalAnimationModeChange: (mode: OrbitalAnimationMode) => void;
+  onOrbitalTemporalSignalsModeChange: (mode: OrbitalTemporalSignalsMode) => void;
   onLanguageChange: (language: AppLanguage) => void;
   onSelectLocalVault: (localVaultId: string) => void;
   onCreateLocalVault: (input: {
@@ -242,6 +247,7 @@ export default function SettingsPanel({
   settings,
   accentThemeId,
   orbitalAnimationMode,
+  orbitalTemporalSignalsMode,
   online,
   localVaults,
   activeLocalVaultId,
@@ -252,6 +258,7 @@ export default function SettingsPanel({
   syncFeedback = null,
   onAccentThemeChange,
   onOrbitalAnimationModeChange,
+  onOrbitalTemporalSignalsModeChange,
   onLanguageChange,
   onSelectLocalVault,
   onCreateLocalVault,
@@ -843,6 +850,53 @@ export default function SettingsPanel({
               type="button"
               className={`settings-interface-motion-option ${active ? "is-active" : ""}`}
               onClick={() => onOrbitalAnimationModeChange(option.mode)}
+              role="radio"
+              aria-checked={active}
+            >
+              <span className="settings-interface-motion-option-head">
+                <strong>{option.title}</strong>
+                <span>{option.chip}</span>
+              </span>
+              <p>{option.description}</p>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderOrbitalTemporalSignalOptions = () => {
+    const options: Array<{
+      mode: OrbitalTemporalSignalsMode;
+      title: string;
+      chip: string;
+      description: string;
+    }> = [
+      {
+        mode: "enabled",
+        title: t("settings.interfaceTemporalEnabledTitle"),
+        chip: t("settings.interfaceTemporalEnabledChip"),
+        description: t("settings.interfaceTemporalEnabledDescription")
+      },
+      {
+        mode: "disabled",
+        title: t("settings.interfaceTemporalDisabledTitle"),
+        chip: t("settings.interfaceTemporalDisabledChip"),
+        description: t("settings.interfaceTemporalDisabledDescription")
+      }
+    ];
+
+    return (
+      <div className="settings-interface-motion-grid" role="radiogroup" aria-label={t("settings.interfaceTemporalTitle")}>
+        {options.map((option) => {
+          const active = orbitalTemporalSignalsMode === option.mode;
+
+          return (
+            <button
+              key={option.mode}
+              type="button"
+              className={`settings-interface-motion-option ${active ? "is-active" : ""}`}
+              onClick={() => onOrbitalTemporalSignalsModeChange(option.mode)}
               role="radio"
               aria-checked={active}
             >
@@ -1452,6 +1506,18 @@ export default function SettingsPanel({
             </div>
 
             {renderOrbitalAnimationOptions()}
+          </section>
+
+          <section className="settings-panel-block settings-panel-block-primary settings-interface-motion-block">
+            <div className="settings-panel-block-head">
+              <div>
+                <p className="panel-kicker settings-panel-block-kicker">{t("settings.interfaceTemporalKicker")}</p>
+                <h3 className="settings-interface-motion-title">{t("settings.interfaceTemporalTitle")}</h3>
+                <p className="settings-interface-motion-caption">{t("settings.interfaceTemporalDescription")}</p>
+              </div>
+            </div>
+
+            {renderOrbitalTemporalSignalOptions()}
           </section>
         </div>
       </section>

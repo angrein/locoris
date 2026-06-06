@@ -144,13 +144,15 @@
 .canvas-pane-file-status.is-png,
 .canvas-pane-file-status.is-svg,
 .canvas-pane-file-status.is-json,
-.canvas-pane-file-status.is-imported {
+.canvas-pane-file-status.is-imported,
+.canvas-pane-file-status.is-task-created {
   border-color: color-mix(in srgb, var(--canvas-accent) 30%, rgb(var(--gold-rgb) / 0.14));
   background: color-mix(in srgb, var(--canvas-accent) 13%, rgba(255, 255, 255, 0.03));
   color: color-mix(in srgb, var(--text) 88%, var(--canvas-accent) 12%);
 }
 
-.canvas-pane-file-status.is-error {
+.canvas-pane-file-status.is-error,
+.canvas-pane-file-status.is-task-error {
   border-color: rgba(255, 120, 120, 0.24);
   background: rgba(255, 120, 120, 0.08);
   color: color-mix(in srgb, var(--danger) 62%, var(--text) 38%);
@@ -224,9 +226,13 @@
 .canvas-ai-shell {
   position: relative;
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.canvas-ai-trigger {
+.canvas-ai-trigger,
+.canvas-task-trigger {
   min-height: 36px;
   display: inline-flex;
   gap: 7px;
@@ -249,7 +255,8 @@
 }
 
 .canvas-ai-trigger:hover,
-.canvas-ai-trigger.is-active {
+.canvas-ai-trigger.is-active,
+.canvas-task-trigger:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--canvas-accent) 44%, rgba(255, 255, 255, 0.12));
   background:
@@ -260,7 +267,8 @@
     0 12px 28px color-mix(in srgb, var(--canvas-accent) 14%, transparent);
 }
 
-.canvas-ai-trigger-icon {
+.canvas-ai-trigger-icon,
+.canvas-task-trigger-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -271,6 +279,20 @@
 .canvas-ai-trigger-icon svg {
   width: 18px;
   height: 18px;
+}
+
+.canvas-task-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.canvas-task-trigger-icon::before {
+  content: "";
+  width: 11px;
+  height: 7px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
 }
 
 .canvas-ai-popover {

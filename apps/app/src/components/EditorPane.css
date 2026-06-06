@@ -208,7 +208,8 @@
   background: transparent;
 }
 
-.editor-pane-ai-trigger {
+.editor-pane-ai-trigger,
+.editor-pane-task-trigger {
   min-height: 25px;
   display: inline-flex;
   align-items: center;
@@ -231,7 +232,8 @@
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
-.editor-pane-ai-trigger:hover {
+.editor-pane-ai-trigger:hover,
+.editor-pane-task-trigger:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--editor-accent) 46%, rgb(var(--cyan-rgb) / 0.16));
   background:
@@ -239,7 +241,8 @@
     rgba(255, 255, 255, 0.052);
 }
 
-.editor-pane-ai-trigger-glyph {
+.editor-pane-ai-trigger-glyph,
+.editor-pane-task-trigger-glyph {
   width: 20px;
   height: 20px;
   display: inline-grid;
@@ -257,6 +260,29 @@
 .editor-pane-ai-trigger-glyph svg {
   width: 13px;
   height: 13px;
+}
+
+.editor-pane-task-trigger-glyph::before {
+  content: "";
+  width: 9px;
+  height: 6px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.editor-pane-task-status {
+  border-color: color-mix(in srgb, var(--editor-accent) 28%, rgb(var(--line-rgb) / 0.12));
+}
+
+.editor-pane-task-status.is-success {
+  color: color-mix(in srgb, var(--text) 84%, var(--editor-accent) 16%);
+}
+
+.editor-pane-task-status.is-error {
+  color: #ffd9df;
+  border-color: rgba(255, 118, 138, 0.25);
+  background: rgba(255, 118, 138, 0.08);
 }
 
 .editor-pane-markdown-actions {

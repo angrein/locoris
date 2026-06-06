@@ -63,10 +63,15 @@ import {
 } from "./lib/accentThemes";
 import {
   ORBITAL_ANIMATION_MODE_STORAGE_KEY,
+  ORBITAL_TEMPORAL_SIGNALS_STORAGE_KEY,
   readStoredOrbitalAnimationMode,
+  readStoredOrbitalTemporalSignalsMode,
   resolveOrbitalAnimationMode,
+  resolveOrbitalTemporalSignalsMode,
   writeStoredOrbitalAnimationMode,
-  type OrbitalAnimationMode
+  writeStoredOrbitalTemporalSignalsMode,
+  type OrbitalAnimationMode,
+  type OrbitalTemporalSignalsMode
 } from "./lib/interfacePreferences";
 import {
   hasVaultEncryptionSession,
@@ -149,6 +154,25 @@ import { getErrorMessage } from "./lib/errors";
 import { useAdaptiveLayout } from "./lib/useAdaptiveLayout";
 import { hasMeaningfulCanvasContent } from "./lib/canvas";
 import { hasMeaningfulNoteContent } from "./lib/notes";
+import {
+  createPlannerHabit as createPlannerHabitRecord,
+  removePlannerHabit as removePlannerHabitRecord,
+  createPlannerTimeBlock as createPlannerTimeBlockRecord,
+  createPlannerTask as createPlannerTaskRecord,
+  togglePlannerHabitLogForDay as togglePlannerHabitLogForDayRecord,
+  removePlannerTimeBlock as removePlannerTimeBlockRecord,
+  removePlannerTask as removePlannerTaskRecord,
+  setPlannerTaskDone as setPlannerTaskDoneRecord,
+  updatePlannerHabit as updatePlannerHabitRecord,
+  updatePlannerTimeBlock as updatePlannerTimeBlockRecord,
+  updatePlannerTask as updatePlannerTaskRecord
+} from "./lib/planner";
+import {
+  buildPlannerTaskLinks,
+  normalizePlannerContextTaskTitle,
+  type PlannerContextTaskInput
+} from "./lib/plannerLinks";
+import { syncPlannerReminderNotifications } from "./lib/plannerReminders";
 import i18n from "./i18n";
 import type {
   AppSettings,
@@ -167,6 +191,7 @@ import type {
 const EditorPane = lazy(() => import("./components/EditorPane"));
 const CanvasPane = lazy(() => import("./components/CanvasPane"));
 const OrbitalMapView = lazy(() => import("./components/OrbitalMapView"));
+const PlannerSurface = lazy(() => import("./components/planner/PlannerSurface"));
 
 interface ConfirmDialogState {
   title: string;
@@ -209,6 +234,8 @@ export default function App() {
   );
   const [orbitalAnimationMode, setOrbitalAnimationMode] =
     useState<OrbitalAnimationMode>(() => readStoredOrbitalAnimationMode());
+  const [orbitalTemporalSignalsMode, setOrbitalTemporalSignalsMode] =
+    useState<OrbitalTemporalSignalsMode>(() => readStoredOrbitalTemporalSignalsMode());
   const [syncConnections, setSyncConnections] = useState(() => listSyncConnections());
   const [syncBindings, setSyncBindings] = useState(() => listSyncBindings());
   const [vaultEncryptionById, setVaultEncryptionById] = useState<Record<string, VaultEncryptionSummary>>({});
@@ -218,6 +245,10 @@ export default function App() {
   const tags = useLiveQuery(() => db.tags.toArray(), [activeLocalVaultId], []);
   const notes = useLiveQuery(() => db.notes.toArray(), [activeLocalVaultId], []);
   const assets = useLiveQuery(() => db.assets.toArray(), [activeLocalVaultId], []);
+  const tasks = useLiveQuery(() => db.tasks.toArray(), [activeLocalVaultId], []);
+  const habits = useLiveQuery(() => db.habits.toArray(), [activeLocalVaultId], []);
+  const habitLogs = useLiveQuery(() => db.habitLogs.toArray(), [activeLocalVaultId], []);
+  const timeBlocks = useLiveQuery(() => db.timeBlocks.toArray(), [activeLocalVaultId], []);
   const syncDirtyEntries = useLiveQuery(() => db.syncDirtyEntries.toArray(), [activeLocalVaultId], []);
   const rawSettings = useLiveQuery(() => db.settings.get("app"), [activeLocalVaultId], undefined);
   const [settings, setSettings] = useState<AppSettings | undefined>(undefined);
@@ -232,6 +263,7 @@ export default function App() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [orbitalOpen, setOrbitalOpen] = useState(false);
   const [orbitalEditorNoteId, setOrbitalEditorNoteId] = useState<string | null>(null);
+  const [plannerProjectFocusId, setPlannerProjectFocusId] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<{
     tone: "success" | "error";
     text: string;
@@ -254,6 +286,11 @@ export default function App() {
     typeof document === "undefined" ? true : document.visibilityState !== "hidden"
   );
   const currentAppLanguage = (settings?.language ?? "en") as AppLanguage;
+
+  useEffect(() => {
+    void syncPlannerReminderNotifications(tasks, currentAppLanguage);
+  }, [currentAppLanguage, tasks]);
+
   const confirmResolverRef = useRef<((value: boolean) => void) | null>(null);
   const autoSyncTimerRef = useRef<number | null>(null);
   const syncTransportTimerRef = useRef<number | null>(null);
@@ -531,6 +568,10 @@ export default function App() {
 
       if (event.key === ORBITAL_ANIMATION_MODE_STORAGE_KEY) {
         setOrbitalAnimationMode(resolveOrbitalAnimationMode(event.newValue));
+      }
+
+      if (event.key === ORBITAL_TEMPORAL_SIGNALS_STORAGE_KEY) {
+        setOrbitalTemporalSignalsMode(resolveOrbitalTemporalSignalsMode(event.newValue));
       }
     };
 
@@ -2015,6 +2056,12 @@ export default function App() {
     setOrbitalAnimationMode(nextMode);
   };
 
+  const handleChangeOrbitalTemporalSignalsMode = (mode: OrbitalTemporalSignalsMode) => {
+    const nextMode = resolveOrbitalTemporalSignalsMode(mode);
+    writeStoredOrbitalTemporalSignalsMode(nextMode);
+    setOrbitalTemporalSignalsMode(nextMode);
+  };
+
   const getVaultDescriptor = (localVaultId: string) => {
     const vault =
       localVaults.find((entry) => entry.id === localVaultId) ??
@@ -3055,6 +3102,32 @@ export default function App() {
 
     const checklistOrdering = normalizeChecklistOrdering(checklistUpdate.blocks);
     await handleContentChangeForNote(noteId, checklistOrdering.blocks, "saved");
+
+    const linkedTasks = tasks.filter(
+      (task) =>
+        task.noteId === noteId &&
+        task.sourceBlockId === blockId &&
+        task.status !== "canceled" &&
+        (checked ? task.status !== "done" : task.status === "done")
+    );
+
+    if (linkedTasks.length > 0) {
+      await Promise.all(linkedTasks.map((task) => setPlannerTaskDoneRecord(task.id, checked)));
+      requestAutoSync({
+        delayMs: 1200
+      });
+    }
+  };
+
+  const syncChecklistSourceForPlannerTask = async (
+    task: { noteId?: string | null; sourceBlockId?: string | null },
+    checked: boolean
+  ) => {
+    if (!task.noteId || !task.sourceBlockId) {
+      return;
+    }
+
+    await handleToggleChecklistItemForNote(task.noteId, task.sourceBlockId, checked);
   };
 
   const handleOpenOrbital = () => {
@@ -3074,6 +3147,170 @@ export default function App() {
     if (previousNoteId && previousNoteId !== noteId) {
       discardEmptyDocumentDraftIfNeeded(previousNoteId);
     }
+  };
+
+  const resolvePlannerContextTaskInput = (input: PlannerContextTaskInput): PlannerContextTaskInput => {
+    const sourceNote = input.noteId
+      ? notes.find((note) => note.id === input.noteId)
+      : input.canvasId
+        ? notes.find((note) => note.id === input.canvasId)
+        : null;
+
+    return {
+      ...input,
+      projectId: input.projectId ?? sourceNote?.projectId ?? null,
+      folderId: input.folderId ?? sourceNote?.folderId ?? null
+    };
+  };
+
+  const handleCreatePlannerTask = async (input: Parameters<typeof createPlannerTaskRecord>[0]) => {
+    const task = await createPlannerTaskRecord(input);
+    requestAutoSync({
+      delayMs: 1500
+    });
+    return task;
+  };
+
+  const handleUpdatePlannerTask = async (
+    taskId: string,
+    patch: Parameters<typeof updatePlannerTaskRecord>[1]
+  ) => {
+    const task = await updatePlannerTaskRecord(taskId, patch);
+
+    if (task) {
+      if (patch.status) {
+        await syncChecklistSourceForPlannerTask(task, patch.status === "done");
+      }
+
+      requestAutoSync({
+        delayMs: 1500
+      });
+    }
+
+    return task;
+  };
+
+  const handleTogglePlannerTaskDone = async (taskId: string, done: boolean) => {
+    const task = await setPlannerTaskDoneRecord(taskId, done);
+
+    if (task) {
+      await syncChecklistSourceForPlannerTask(task, done);
+
+      requestAutoSync({
+        delayMs: 1200
+      });
+    }
+
+    return task;
+  };
+
+  const handleDeletePlannerTask = async (taskId: string) => {
+    await removePlannerTaskRecord(taskId);
+    requestAutoSync({
+      delayMs: 1200
+    });
+  };
+
+  const handleCreatePlannerHabit = async (input: Parameters<typeof createPlannerHabitRecord>[0]) => {
+    const habit = await createPlannerHabitRecord(input);
+    requestAutoSync({
+      delayMs: 1500
+    });
+    return habit;
+  };
+
+  const handleUpdatePlannerHabit = async (
+    habitId: string,
+    patch: Parameters<typeof updatePlannerHabitRecord>[1]
+  ) => {
+    const habit = await updatePlannerHabitRecord(habitId, patch);
+
+    if (habit) {
+      requestAutoSync({
+        delayMs: 1500
+      });
+    }
+
+    return habit;
+  };
+
+  const handleDeletePlannerHabit = async (habitId: string) => {
+    await removePlannerHabitRecord(habitId);
+    requestAutoSync({
+      delayMs: 1200
+    });
+  };
+
+  const handleTogglePlannerHabitLog = async (habitId: string, dayAt?: number) => {
+    const habitLog = await togglePlannerHabitLogForDayRecord(habitId, dayAt);
+    requestAutoSync({
+      delayMs: 1200
+    });
+    return habitLog;
+  };
+
+  const handleCreatePlannerTimeBlock = async (input: Parameters<typeof createPlannerTimeBlockRecord>[0]) => {
+    const timeBlock = await createPlannerTimeBlockRecord(input);
+    requestAutoSync({
+      delayMs: 1500
+    });
+    return timeBlock;
+  };
+
+  const handleUpdatePlannerTimeBlock = async (
+    timeBlockId: string,
+    patch: Parameters<typeof updatePlannerTimeBlockRecord>[1]
+  ) => {
+    const timeBlock = await updatePlannerTimeBlockRecord(timeBlockId, patch);
+
+    if (timeBlock) {
+      requestAutoSync({
+        delayMs: 1500
+      });
+    }
+
+    return timeBlock;
+  };
+
+  const handleDeletePlannerTimeBlock = async (timeBlockId: string) => {
+    await removePlannerTimeBlockRecord(timeBlockId);
+    requestAutoSync({
+      delayMs: 1200
+    });
+  };
+
+  const handleCreatePlannerTaskFromContext = async (input: PlannerContextTaskInput) => {
+    const context = resolvePlannerContextTaskInput(input);
+    const fallbackTitle = currentAppLanguage === "ru" ? "Новая задача" : "New task";
+    const title = normalizePlannerContextTaskTitle(context.title, fallbackTitle);
+    const timestamp = Date.now();
+    const task = await handleCreatePlannerTask({
+      title,
+      description: context.description?.trim() ?? "",
+      status: "inbox",
+      priority: "none",
+      projectId: context.projectId ?? null,
+      folderId: context.folderId ?? null,
+      noteId: context.noteId ?? null,
+      canvasId: context.canvasId ?? null,
+      sourceBlockId: context.sourceBlockId ?? null,
+      canvasElementId: context.canvasElementId ?? null,
+      links: buildPlannerTaskLinks({
+        context,
+        projects,
+        folders,
+        notes,
+        language: currentAppLanguage,
+        createdAt: timestamp
+      })
+    });
+
+    setPlannerProjectFocusId(context.projectId ?? null);
+    return task;
+  };
+
+  const handleOpenProjectPlan = (projectId: string) => {
+    setPlannerProjectFocusId(projectId);
   };
 
   const closeConfirmDialog = (result: boolean) => {
@@ -3127,10 +3364,12 @@ export default function App() {
         <OrbitalMapView
         adaptiveLayout={adaptiveLayout}
         orbitalAnimationMode={orbitalAnimationMode}
+        orbitalTemporalSignalsMode={orbitalTemporalSignalsMode}
         onOrbitalAnimationModeChange={handleChangeOrbitalAnimationMode}
         projects={projects}
         folders={folders}
         notes={notes}
+        tasks={tasks}
         tags={tags}
         assets={assets}
         assetCount={assets.length}
@@ -3208,11 +3447,12 @@ export default function App() {
                   }
 
                   await handleSaveCanvasContentForNote(canvas.id, content, files, fileNames, "saved");
-                  setOrbitalEditorNoteId(canvas.id);
-                }}
-                libraryStorageScopeId={activeLocalVaultId}
-                privateVaultWarningContext={activePrivateVaultWarningContext}
-              />
+	                  setOrbitalEditorNoteId(canvas.id);
+	                }}
+	                onCreateTaskFromContext={handleCreatePlannerTaskFromContext}
+	                libraryStorageScopeId={activeLocalVaultId}
+	                privateVaultWarningContext={activePrivateVaultWarningContext}
+	              />
             ) : (
               <EditorPane
                 key={`orbital-note-${orbitalEditorEntry.id}-${settings.language}`}
@@ -3254,13 +3494,44 @@ export default function App() {
                   void handleContentChangeForNote(orbitalEditorEntry.id, content, state)
                 }
                 onUploadFile={(file) => handleStoreAsset(orbitalEditorEntry.id, file)}
-                onResolveFileUrl={resolveAssetUrl}
-                privateVaultWarningContext={activePrivateVaultWarningContext}
-                onClose={handleCloseOrbitalEditor}
-              />
+	                onResolveFileUrl={resolveAssetUrl}
+	                privateVaultWarningContext={activePrivateVaultWarningContext}
+	                onCreateTaskFromContext={handleCreatePlannerTaskFromContext}
+	                onClose={handleCloseOrbitalEditor}
+	              />
             )
           ) : null
         }
+        plannerSlot={
+	          <PlannerSurface
+            key={`planner-${activeLocalVaultId}-${settings.language}`}
+	            tasks={tasks}
+	            habits={habits}
+	            habitLogs={habitLogs}
+	            timeBlocks={timeBlocks}
+	            projects={projects}
+	            folders={folders}
+	            notes={notes}
+	            tags={tags}
+	            language={settings.language}
+	            adaptiveLayout={adaptiveLayout}
+	            focusProjectId={plannerProjectFocusId}
+	            onCreateTask={handleCreatePlannerTask}
+	            onUpdateTask={handleUpdatePlannerTask}
+	            onToggleTaskDone={handleTogglePlannerTaskDone}
+	            onDeleteTask={handleDeletePlannerTask}
+	            onCreateHabit={handleCreatePlannerHabit}
+	            onUpdateHabit={handleUpdatePlannerHabit}
+	            onDeleteHabit={handleDeletePlannerHabit}
+	            onToggleHabitLog={handleTogglePlannerHabitLog}
+	            onCreateTimeBlock={handleCreatePlannerTimeBlock}
+	            onUpdateTimeBlock={handleUpdatePlannerTimeBlock}
+	            onDeleteTimeBlock={handleDeletePlannerTimeBlock}
+	            onCreateTag={handleCreateTag}
+	            onClearProjectFocus={() => setPlannerProjectFocusId(null)}
+	            onOpenNote={(noteId) => void handleOpenOrbitalNote(noteId)}
+	          />
+	        }
         trashModalSlot={
           <TrashPanel
             notes={trashedNotes}
@@ -3290,6 +3561,7 @@ export default function App() {
             settings={settings}
             accentThemeId={accentThemeId}
             orbitalAnimationMode={orbitalAnimationMode}
+            orbitalTemporalSignalsMode={orbitalTemporalSignalsMode}
             online={online}
             localVaults={localVaults}
             activeLocalVaultId={activeLocalVaultId}
@@ -3300,6 +3572,7 @@ export default function App() {
             syncFeedback={syncFeedback}
             onAccentThemeChange={handleChangeAccentTheme}
             onOrbitalAnimationModeChange={handleChangeOrbitalAnimationMode}
+            onOrbitalTemporalSignalsModeChange={handleChangeOrbitalTemporalSignalsMode}
             onLanguageChange={(language) => void handleChangeLanguage(language)}
             onSelectLocalVault={(localVaultId) => setSelectedSyncVaultId(localVaultId)}
             onCreateLocalVault={(input) => handleCreateLocalVault(input)}
@@ -3411,13 +3684,16 @@ export default function App() {
           setOrbitalEditorNoteId(canvas.id);
           return canvas;
         }}
-        onOpenNote={(noteId) => void handleOpenOrbitalNote(noteId)}
-        onToggleNoteChecklistItem={handleToggleChecklistItemForNote}
+	        onOpenNote={(noteId) => void handleOpenOrbitalNote(noteId)}
+	        onOpenProjectPlan={handleOpenProjectPlan}
+	        onToggleNoteChecklistItem={handleToggleChecklistItemForNote}
         onResolveFileUrl={resolveAssetUrl}
         labels={{
           title: t("orbit.title"),
           subtitle: t("orbit.subtitle"),
           close: t("orbit.close"),
+          mapMode: t("orbit.mapMode"),
+          plannerMode: t("orbit.plannerMode"),
           pause: t("orbit.pause"),
           resume: t("orbit.resume"),
           zoomIn: t("orbit.zoomIn"),
@@ -3437,9 +3713,10 @@ export default function App() {
           closeEditor: t("orbit.closeEditor"),
           addRootFolder: t("orbit.addRootFolder"),
           addChildFolder: t("orbit.addChildFolder"),
-          addNote: t("orbit.addNote"),
-          addCanvas: t("orbit.addCanvas"),
-          create: t("orbit.create"),
+	          addNote: t("orbit.addNote"),
+	          addCanvas: t("orbit.addCanvas"),
+	          openProjectPlan: t("orbit.openProjectPlan"),
+	          create: t("orbit.create"),
           cancel: t("orbit.cancel"),
           folderNamePlaceholder: t("orbit.folderNamePlaceholder"),
           addProject: t("orbit.addProject"),

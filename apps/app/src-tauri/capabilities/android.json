@@ -22,6 +22,7 @@
     "fs:scope-appcache-recursive",
     "fs:scope-applocaldata-recursive",
     "fs:scope-applog-recursive",
+    "notification:default",
     "opener:default",
     "store:default"
   ]

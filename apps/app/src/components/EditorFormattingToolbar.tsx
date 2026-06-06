@@ -28,6 +28,7 @@ import {
   resolveEditorFontFamily
 } from "../lib/blocknoteSchema";
 import { EDITOR_AI_OPEN_EVENT } from "../lib/aiIntegration";
+import { EDITOR_CREATE_TASK_EVENT } from "../lib/plannerLinks";
 
 const AI_TEXT_BLOCK_UNSUPPORTED_TYPES = new Set(["image", "file", "audio", "video"]);
 
@@ -44,6 +45,18 @@ function AiToolbarIcon() {
           fill="currentColor"
           opacity="0.72"
         />
+      </svg>
+    </span>
+  );
+}
+
+function TaskToolbarIcon() {
+  return (
+    <span className="editor-formatting-task-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M6.4 5.2h11.2v13.6H6.4V5.2Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="m8.7 10.1 1.5 1.5 3-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8.7 15.2h6.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     </span>
   );
@@ -160,6 +173,53 @@ function AiSelectionButton() {
   );
 }
 
+function CreateTaskSelectionButton() {
+  const Components = useComponentsContext()!;
+  const editor = useBlockNoteEditor(editorBlockNoteSchema);
+  const { t } = useTranslation();
+
+  const canCreateTask = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      if (!editor.isEditable) {
+        return false;
+      }
+
+      const selectedBlocks =
+        editor.getSelection()?.blocks ?? [editor.getTextCursorPosition().block];
+
+      return (
+        selectedBlocks.length > 0 &&
+        selectedBlocks.every((block) => !AI_TEXT_BLOCK_UNSUPPORTED_TYPES.has(block.type)) &&
+        selectedBlocks.some((block) => block.content !== undefined)
+      );
+    }
+  });
+
+  if (!canCreateTask) {
+    return null;
+  }
+
+  return (
+    <Components.FormattingToolbar.Button
+      className="editor-formatting-task-button"
+      mainTooltip={t("note.createTaskFromSelection")}
+      icon={<TaskToolbarIcon />}
+      label={t("note.createTaskShort")}
+      onClick={(event) => {
+        event.preventDefault();
+        window.dispatchEvent(
+          new CustomEvent(EDITOR_CREATE_TASK_EVENT, {
+            detail: {
+              scope: "selection"
+            }
+          })
+        );
+      }}
+    />
+  );
+}
+
 export default function EditorFormattingToolbar() {
   return (
     <div className="editor-formatting-toolbar-shell">
@@ -185,6 +245,7 @@ export default function EditorFormattingToolbar() {
         <NestBlockButton />
         <UnnestBlockButton />
         <AiSelectionButton />
+        <CreateTaskSelectionButton />
       </FormattingToolbar>
     </div>
   );

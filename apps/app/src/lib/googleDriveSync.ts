@@ -242,6 +242,11 @@ function createEmptyChangeSet(deviceId = "google-drive"): SyncChangeSet {
     tags: [],
     notes: [],
     assets: [],
+    tasks: [],
+    habits: [],
+    habitLogs: [],
+    goals: [],
+    timeBlocks: [],
     tombstones: []
   };
 }
@@ -288,6 +293,11 @@ function normalizeChangeSetPayload(
     tags: Array.isArray(payload.tags) ? payload.tags.filter(Boolean) : [],
     notes: Array.isArray(payload.notes) ? payload.notes.filter(Boolean) : [],
     assets: Array.isArray(payload.assets) ? payload.assets.filter(Boolean) : [],
+    tasks: Array.isArray(payload.tasks) ? payload.tasks.filter(Boolean) : [],
+    habits: Array.isArray(payload.habits) ? payload.habits.filter(Boolean) : [],
+    habitLogs: Array.isArray(payload.habitLogs) ? payload.habitLogs.filter(Boolean) : [],
+    goals: Array.isArray(payload.goals) ? payload.goals.filter(Boolean) : [],
+    timeBlocks: Array.isArray(payload.timeBlocks) ? payload.timeBlocks.filter(Boolean) : [],
     tombstones: Array.isArray(payload.tombstones) ? payload.tombstones.filter(Boolean) : []
   };
 }
@@ -300,7 +310,20 @@ function sortTombstones(records: readonly SyncTombstone[]) {
   return [...records].sort((left, right) => left.key.localeCompare(right.key));
 }
 
-function getEntityKey(entityType: "project" | "folder" | "tag" | "note" | "asset", entityId: string) {
+function getEntityKey(
+  entityType:
+    | "project"
+    | "folder"
+    | "tag"
+    | "note"
+    | "asset"
+    | "task"
+    | "habit"
+    | "habitLog"
+    | "goal"
+    | "timeBlock",
+  entityId: string
+) {
   return `${entityType}:${entityId}`;
 }
 
@@ -311,12 +334,27 @@ function applyChangeSetIntoMaps(
     tag: Map<string, SyncChangeSet["tags"][number]>;
     note: Map<string, SyncChangeSet["notes"][number]>;
     asset: Map<string, SyncChangeSet["assets"][number]>;
+    task: Map<string, SyncChangeSet["tasks"][number]>;
+    habit: Map<string, SyncChangeSet["habits"][number]>;
+    habitLog: Map<string, SyncChangeSet["habitLogs"][number]>;
+    goal: Map<string, SyncChangeSet["goals"][number]>;
+    timeBlock: Map<string, SyncChangeSet["timeBlocks"][number]>;
     tombstones: Map<string, SyncTombstone>;
   },
   changeSet: SyncChangeSet
 ) {
   const applyRecords = <T extends { id: string }>(
-    entityType: "project" | "folder" | "tag" | "note" | "asset",
+    entityType:
+      | "project"
+      | "folder"
+      | "tag"
+      | "note"
+      | "asset"
+      | "task"
+      | "habit"
+      | "habitLog"
+      | "goal"
+      | "timeBlock",
     target: Map<string, T>,
     records: readonly T[]
   ) => {
@@ -331,6 +369,11 @@ function applyChangeSetIntoMaps(
   applyRecords("tag", maps.tag, changeSet.tags);
   applyRecords("note", maps.note, changeSet.notes);
   applyRecords("asset", maps.asset, changeSet.assets);
+  applyRecords("task", maps.task, changeSet.tasks);
+  applyRecords("habit", maps.habit, changeSet.habits);
+  applyRecords("habitLog", maps.habitLog, changeSet.habitLogs);
+  applyRecords("goal", maps.goal, changeSet.goals);
+  applyRecords("timeBlock", maps.timeBlock, changeSet.timeBlocks);
 
   changeSet.tombstones.forEach((tombstone) => {
     switch (tombstone.entityType) {
@@ -349,6 +392,21 @@ function applyChangeSetIntoMaps(
       case "asset":
         maps.asset.delete(tombstone.entityId);
         break;
+      case "task":
+        maps.task.delete(tombstone.entityId);
+        break;
+      case "habit":
+        maps.habit.delete(tombstone.entityId);
+        break;
+      case "habitLog":
+        maps.habitLog.delete(tombstone.entityId);
+        break;
+      case "goal":
+        maps.goal.delete(tombstone.entityId);
+        break;
+      case "timeBlock":
+        maps.timeBlock.delete(tombstone.entityId);
+        break;
     }
 
     maps.tombstones.set(tombstone.key, tombstone);
@@ -362,6 +420,11 @@ function collapseChangeSetBatches(changeSets: readonly SyncChangeSet[]) {
     tag: new Map<string, SyncChangeSet["tags"][number]>(),
     note: new Map<string, SyncChangeSet["notes"][number]>(),
     asset: new Map<string, SyncChangeSet["assets"][number]>(),
+    task: new Map<string, SyncChangeSet["tasks"][number]>(),
+    habit: new Map<string, SyncChangeSet["habits"][number]>(),
+    habitLog: new Map<string, SyncChangeSet["habitLogs"][number]>(),
+    goal: new Map<string, SyncChangeSet["goals"][number]>(),
+    timeBlock: new Map<string, SyncChangeSet["timeBlocks"][number]>(),
     tombstones: new Map<string, SyncTombstone>()
   };
   let deviceId = "google-drive";
@@ -382,6 +445,11 @@ function collapseChangeSetBatches(changeSets: readonly SyncChangeSet[]) {
     tags: sortById([...maps.tag.values()]),
     notes: sortById([...maps.note.values()]),
     assets: sortById([...maps.asset.values()]),
+    tasks: sortById([...maps.task.values()]),
+    habits: sortById([...maps.habit.values()]),
+    habitLogs: sortById([...maps.habitLog.values()]),
+    goals: sortById([...maps.goal.values()]),
+    timeBlocks: sortById([...maps.timeBlock.values()]),
     tombstones: sortTombstones([...maps.tombstones.values()])
   } satisfies SyncChangeSet;
 }
@@ -409,6 +477,11 @@ function createEmptyGoogleDriveEnvelope(vaultId: string, vaultName: string): Syn
     tags: [],
     notes: [],
     assets: [],
+    tasks: [],
+    habits: [],
+    habitLogs: [],
+    goals: [],
+    timeBlocks: [],
     tombstones: []
   };
 

@@ -113,6 +113,33 @@
     rgba(255, 255, 255, 0.032);
 }
 
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-task-toast {
+  position: absolute;
+  top: calc(58px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 78;
+  max-width: calc(100% - 28px);
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--editor-accent) 28%, rgb(var(--line-rgb) / 0.14));
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 18%, transparent), transparent 64%),
+    rgba(5, 11, 23, 0.88);
+  color: var(--text);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(16px) saturate(140%);
+  font-size: 0.76rem;
+  font-weight: 750;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-task-toast.is-error {
+  border-color: rgba(255, 118, 138, 0.28);
+  color: #ffd9df;
+}
+
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-mode-switch {
   min-width: 74px;
   display: grid;
@@ -640,6 +667,15 @@
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row .editor-pane-mobile-option-icon svg {
   width: 16px;
   height: 16px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-task-icon::before {
+  content: "";
+  width: 13px;
+  height: 8px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row span:last-child {

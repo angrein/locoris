@@ -1,0 +1,117 @@
+.orbital-temporal-layer {
+  pointer-events: none;
+  color: var(--text);
+}
+
+.orbital-temporal-signal {
+  --temporal-health: color-mix(in srgb, var(--temporal-color) 72%, var(--accent-theme-primary, #ffd166) 28%);
+}
+
+.orbital-temporal-signal.is-health-active {
+  --temporal-health: color-mix(in srgb, var(--temporal-color) 72%, #8dffcf 28%);
+}
+
+.orbital-temporal-signal.is-health-attention {
+  --temporal-health: color-mix(in srgb, var(--temporal-color) 54%, #ffd166 46%);
+}
+
+.orbital-temporal-signal.is-health-critical {
+  --temporal-health: color-mix(in srgb, var(--temporal-color) 34%, #ff7f98 66%);
+}
+
+.orbital-temporal-health-glow {
+  fill: var(--temporal-health);
+  opacity: 0.075;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--temporal-health) 46%, transparent));
+}
+
+.orbital-temporal-signal.is-selected .orbital-temporal-health-glow,
+.orbital-temporal-signal.is-primary .orbital-temporal-health-glow {
+  opacity: 0.13;
+}
+
+.orbital-temporal-deadline-ring {
+  fill: none;
+  stroke: var(--temporal-health);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 6 10;
+  opacity: 0.82;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbital-temporal-signal.is-health-critical .orbital-temporal-deadline-ring,
+.orbital-temporal-signal.is-health-attention .orbital-temporal-deadline-ring {
+  stroke-dasharray: 12 7;
+  opacity: 0.94;
+}
+
+.orbital-temporal-badge rect {
+  stroke-width: 1.45;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbital-temporal-badge text {
+  fill: rgba(249, 252, 255, 0.96);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  paint-order: stroke;
+  stroke: rgba(4, 8, 20, 0.62);
+  stroke-width: 2px;
+}
+
+.orbital-temporal-badge.is-today rect {
+  fill: color-mix(in srgb, var(--temporal-health) 28%, rgb(var(--surface-deep-rgb) / 0.76));
+  stroke: color-mix(in srgb, var(--temporal-health) 52%, rgba(255, 255, 255, 0.2));
+}
+
+.orbital-temporal-badge.is-overdue rect {
+  fill: color-mix(in srgb, #ff7f98 34%, rgb(var(--surface-deep-rgb) / 0.78));
+  stroke: color-mix(in srgb, #ff9caf 62%, rgba(255, 255, 255, 0.18));
+}
+
+.orbital-temporal-focus circle {
+  fill: color-mix(in srgb, var(--temporal-health) 24%, rgb(var(--surface-deep-rgb) / 0.74));
+  stroke: color-mix(in srgb, var(--temporal-health) 58%, rgba(255, 255, 255, 0.18));
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbital-temporal-focus path {
+  fill: none;
+  stroke: rgba(246, 251, 255, 0.92);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbital-temporal-milestone path {
+  fill: color-mix(in srgb, var(--temporal-health) 34%, rgb(var(--surface-deep-rgb) / 0.68));
+  stroke: color-mix(in srgb, var(--temporal-health) 64%, rgba(255, 255, 255, 0.2));
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbital-temporal-milestone circle {
+  fill: rgba(250, 253, 255, 0.94);
+}
+
+.orbital-temporal-layer.is-compact .orbital-temporal-badge text {
+  font-size: 10px;
+}
+
+.orbital-temporal-layer.is-compact .orbital-temporal-deadline-ring {
+  stroke-width: 2;
+  opacity: 0.72;
+}
+
+.orbital-overlay.is-android-runtime .orbital-temporal-health-glow {
+  filter: none;
+  opacity: 0.08;
+}
+
+.orbital-overlay.is-orbital-motion-reduced .orbital-temporal-health-glow {
+  filter: none;
+}

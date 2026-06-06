@@ -69,6 +69,7 @@ interface OrbitalInspectorOverviewCardProps {
     addRootFolder: string;
     addNote: string;
     addCanvas: string;
+    openProjectPlan: string;
     back: string;
     deleteSystem: string;
     create: string;
@@ -90,6 +91,7 @@ interface OrbitalInspectorOverviewCardProps {
   onAddFolder: () => void;
   onAddNote: () => void;
   onAddCanvas: () => void;
+  onOpenProjectPlan: () => void;
   onBackToVault: () => void;
   onCycleProject: (direction: -1 | 1) => void;
   onDeleteProject: () => void;
@@ -143,6 +145,7 @@ function Icon({
     | "color"
     | "trash"
     | "chevron"
+    | "plan"
     | "tag"
     | "file";
 }) {
@@ -225,6 +228,15 @@ function Icon({
     return (
       <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
         <path d="m9.6 6.8 5.2 5.2-5.2 5.2" />
+      </svg>
+    );
+  }
+
+  if (kind === "plan") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M6.5 5.2h11v13.6h-11V5.2Z" />
+        <path d="M9 3.7v3M15 3.7v3M8.8 10h6.4M8.8 13.3h4.4" />
       </svg>
     );
   }
@@ -710,6 +722,7 @@ export default function OrbitalInspectorOverviewCard({
   onAddFolder,
   onAddNote,
   onAddCanvas,
+  onOpenProjectPlan,
   onBackToVault,
   onCycleProject,
   onDeleteProject,
@@ -761,6 +774,18 @@ export default function OrbitalInspectorOverviewCard({
             </div>
           </div>
           <div className="orbital-inspector-overview-card-actions">
+            {isProjectMode ? (
+              <button
+                ref={colorButtonRef}
+                type="button"
+                className={`orbital-inspector-overview-icon-action is-color ${isColorPanelOpen ? "is-active" : ""}`}
+                onClick={onToggleColorPanel}
+                title={labels.projectColor}
+                aria-label={labels.projectColor}
+              >
+                <span className="orbital-inspector-overview-swatch" aria-hidden="true" />
+              </button>
+            ) : null}
             <MiniGlyph accentColor={accentColor} mode={mode} />
           </div>
         </div>
@@ -792,6 +817,9 @@ export default function OrbitalInspectorOverviewCard({
             </div>
 
             <div className="orbital-inspector-overview-quickrow">
+              <button type="button" className="orbital-inspector-overview-tool is-plan" onClick={onOpenProjectPlan} title={labels.openProjectPlan} aria-label={labels.openProjectPlan}>
+                <Icon kind="plan" />
+              </button>
               <button type="button" className="orbital-inspector-overview-tool" onClick={onAddFolder} title={labels.addRootFolder} aria-label={labels.addRootFolder}>
                 <Icon kind="folder" />
               </button>
@@ -800,16 +828,6 @@ export default function OrbitalInspectorOverviewCard({
               </button>
               <button type="button" className="orbital-inspector-overview-tool" onClick={onAddCanvas} title={labels.addCanvas} aria-label={labels.addCanvas}>
                 <Icon kind="canvas" />
-              </button>
-              <button
-                ref={colorButtonRef}
-                type="button"
-                className={`orbital-inspector-overview-tool is-color ${isColorPanelOpen ? "is-active" : ""}`}
-                onClick={onToggleColorPanel}
-                title={labels.projectColor}
-                aria-label={labels.projectColor}
-              >
-                <span className="orbital-inspector-overview-swatch" aria-hidden="true" />
               </button>
               <button type="button" className="orbital-inspector-overview-tool is-danger" onClick={onDeleteProject} title={labels.deleteSystem} aria-label={labels.deleteSystem}>
                 <Icon kind="trash" />

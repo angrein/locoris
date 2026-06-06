@@ -54,6 +54,10 @@ import {
 import { useAndroidBackHandler } from "../lib/useAndroidBackHandler";
 import { sanitizeExportFileName } from "../lib/exportImport/filenames";
 import {
+  normalizePlannerContextTaskTitle,
+  type PlannerContextTaskInput
+} from "../lib/plannerLinks";
+import {
   generateGeminiCanvasMermaid,
   generateGeminiCanvasSpec,
   readGeminiApiKey,
@@ -108,6 +112,7 @@ interface CanvasPaneProps {
     fileNames: Record<string, string>,
     title?: string
   ) => Promise<void> | void;
+  onCreateTaskFromContext?: (input: PlannerContextTaskInput) => Promise<unknown> | void;
   libraryStorageScopeId: string;
   privateVaultWarningContext?: PrivateVaultWarningContext | null;
   immersive?: boolean;
@@ -128,6 +133,7 @@ type CanvasAiCommandId =
   | "findProblems"
   | "findMissingLinks";
 type CanvasAiPreviewMethod = "mermaid" | "canvas-json";
+type CanvasTaskStatus = "created" | "error" | null;
 type CanvasExportStatus = "pdf" | "json" | "error" | null;
 
 type CanvasAiPreview = {
@@ -1026,6 +1032,7 @@ export default function CanvasPane({
   onContentChange,
   onLoadFiles,
   onCreateCanvasFromAi,
+  onCreateTaskFromContext,
   libraryStorageScopeId,
   privateVaultWarningContext = null,
   immersive = false
@@ -1054,6 +1061,7 @@ export default function CanvasPane({
   const [canvasAiMessage, setCanvasAiMessage] = useState("");
   const [canvasAiNotice, setCanvasAiNotice] = useState<CanvasAiInlineNotice | null>(null);
   const [canvasAiPreview, setCanvasAiPreview] = useState<CanvasAiPreview | null>(null);
+  const [canvasTaskStatus, setCanvasTaskStatus] = useState<CanvasTaskStatus>(null);
   const [canvasExportStatus, setCanvasExportStatus] = useState<CanvasExportStatus>(null);
   const [canvasSelectionCount, setCanvasSelectionCount] = useState(0);
   const canvasStageShellRef = useRef<HTMLDivElement | null>(null);
@@ -1061,6 +1069,7 @@ export default function CanvasPane({
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
   const canvasAiNoticeTimeoutRef = useRef<number | null>(null);
+  const canvasTaskStatusTimeoutRef = useRef<number | null>(null);
   const canvasExportStatusTimeoutRef = useRef<number | null>(null);
   const canvasAiRequestIdRef = useRef(0);
   const excalidrawApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
@@ -1173,11 +1182,15 @@ export default function CanvasPane({
 
   useEffect(
     () => () => {
-      if (canvasAiNoticeTimeoutRef.current !== null) {
-        window.clearTimeout(canvasAiNoticeTimeoutRef.current);
-      }
+	      if (canvasAiNoticeTimeoutRef.current !== null) {
+	        window.clearTimeout(canvasAiNoticeTimeoutRef.current);
+	      }
 
-      if (canvasExportStatusTimeoutRef.current !== null) {
+	      if (canvasTaskStatusTimeoutRef.current !== null) {
+	        window.clearTimeout(canvasTaskStatusTimeoutRef.current);
+	      }
+
+	      if (canvasExportStatusTimeoutRef.current !== null) {
         window.clearTimeout(canvasExportStatusTimeoutRef.current);
       }
     },
@@ -2178,7 +2191,7 @@ export default function CanvasPane({
     }, 220);
   };
 
-  const showCanvasExportStatus = (status: Exclude<CanvasExportStatus, null>) => {
+	  const showCanvasExportStatus = (status: Exclude<CanvasExportStatus, null>) => {
     setCanvasExportStatus(status);
 
     if (canvasExportStatusTimeoutRef.current !== null) {
@@ -2188,10 +2201,63 @@ export default function CanvasPane({
     canvasExportStatusTimeoutRef.current = window.setTimeout(() => {
       setCanvasExportStatus(null);
       canvasExportStatusTimeoutRef.current = null;
-    }, 2400);
-  };
+	    }, 2400);
+	  };
 
-  const handleExportCanvas = async (format: CanvasExportFormat) => {
+	  const showCanvasTaskStatus = (status: Exclude<CanvasTaskStatus, null>) => {
+	    setCanvasTaskStatus(status);
+
+	    if (canvasTaskStatusTimeoutRef.current !== null) {
+	      window.clearTimeout(canvasTaskStatusTimeoutRef.current);
+	    }
+
+	    canvasTaskStatusTimeoutRef.current = window.setTimeout(() => {
+	      setCanvasTaskStatus(null);
+	      canvasTaskStatusTimeoutRef.current = null;
+	    }, 2200);
+	  };
+
+	  const handleCreateTaskFromCanvasSelection = async () => {
+	    const api = excalidrawApiRef.current;
+
+	    if (!api || !onCreateTaskFromContext) {
+	      return;
+	    }
+
+	    const appState = api.getAppState();
+	    const selectedElementIds = appState.selectedElementIds ?? {};
+	    const selectedIds = Object.keys(selectedElementIds).filter((id) => selectedElementIds[id]);
+
+	    if (selectedIds.length === 0) {
+	      showCanvasTaskStatus("error");
+	      return;
+	    }
+
+	    const elements = api.getSceneElements() as readonly ExcalidrawElement[];
+	    const ownSelectionIds = getCanvasAiOwnSelectionIds(elements, selectedElementIds);
+	    const selectedRecord = toCanvasAiSelectedRecord(ownSelectionIds);
+	    const selectedText = collectCanvasText(elements, selectedRecord);
+	    const firstElementId = selectedIds[0] ?? null;
+	    const fallbackTitle = language === "ru" ? "Задача из холста" : "Task from canvas";
+
+	    try {
+	      await onCreateTaskFromContext({
+	        title: normalizePlannerContextTaskTitle(selectedText || titleDraft || note.title, fallbackTitle),
+	        description: selectedText.slice(0, 1800),
+	        projectId: note.projectId,
+	        folderId: note.folderId,
+	        canvasId: note.id,
+	        canvasElementId: firstElementId,
+	        sourceLabel: language === "ru" ? "Выделение на холсте" : "Canvas selection"
+	      });
+	      showCanvasTaskStatus("created");
+	    } catch (error) {
+	      console.warn("Could not create planner task from canvas selection.", error);
+	      showCanvasTaskStatus("error");
+	    }
+	  };
+
+	  const handleExportCanvas = async (format: CanvasExportFormat) => {
     const api = excalidrawApiRef.current;
 
     if (!api) {
@@ -2465,11 +2531,16 @@ export default function CanvasPane({
 
           <div className="canvas-pane-toolbar-meta">
             <span className={`editor-save-pill is-${saveState}`}>{t(`saveState.${saveState}`)}</span>
-            {canvasExportStatus ? (
-              <span className={`canvas-pane-file-status is-${canvasExportStatus}`}>
-                {t(`canvas.exportStatus.${canvasExportStatus}`)}
-              </span>
-            ) : null}
+	            {canvasExportStatus ? (
+	              <span className={`canvas-pane-file-status is-${canvasExportStatus}`}>
+	                {t(`canvas.exportStatus.${canvasExportStatus}`)}
+	              </span>
+	            ) : null}
+	            {canvasTaskStatus ? (
+	              <span className={`canvas-pane-file-status is-task-${canvasTaskStatus}`}>
+	                {canvasTaskStatus === "created" ? t("canvas.taskCreated") : t("canvas.taskFailed")}
+	              </span>
+	            ) : null}
             <span className="canvas-pane-contextmeta">
               {t("note.updated")}: {formatTimestamp(note.updatedAt, language)}
             </span>
@@ -2498,8 +2569,21 @@ export default function CanvasPane({
             </button>
           </div>
 
-          <div ref={canvasAiShellRef} className="canvas-ai-shell">
-            <button
+	          <div ref={canvasAiShellRef} className="canvas-ai-shell">
+	            {onCreateTaskFromContext ? (
+	              <button
+	                type="button"
+	                className="canvas-task-trigger"
+	                onClick={() => void handleCreateTaskFromCanvasSelection()}
+	                disabled={canvasSelectionCount === 0}
+	                aria-label={t("canvas.taskFromSelection")}
+	                title={canvasSelectionCount === 0 ? t("canvas.taskSelectionRequired") : t("canvas.taskFromSelection")}
+	              >
+	                <span className="canvas-task-trigger-icon" aria-hidden="true" />
+	                <span>{t("note.createTaskShort")}</span>
+	              </button>
+	            ) : null}
+	            <button
               type="button"
               className={`canvas-ai-trigger ${isCanvasAiOpen ? "is-active" : ""}`}
               onClick={() => {
