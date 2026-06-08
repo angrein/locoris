@@ -200,14 +200,14 @@
 
 .vault-switcher-menu,
 .vault-switcher-create-panel {
-  position: absolute;
-  top: calc(100% + 12px);
+  position: fixed;
+  right: auto;
   width: min(420px, calc(100vw - 32px));
   max-width: min(420px, calc(100vw - 32px));
   display: grid;
   gap: 10px;
   padding: 12px;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 16%, rgba(255, 255, 255, 0.13));
   border-radius: 24px;
   background:
@@ -235,12 +235,10 @@
 }
 
 .vault-switcher-menu {
-  left: 0;
   z-index: 40;
 }
 
 .vault-switcher-create-panel {
-  right: 0;
   z-index: 41;
   gap: 12px;
 }
@@ -697,7 +695,6 @@
 @media (max-width: 560px) {
   .vault-switcher-menu,
   .vault-switcher-create-panel {
-    left: 0;
     right: auto;
     width: min(420px, calc(100vw - 24px));
     max-height: min(76dvh, 620px);

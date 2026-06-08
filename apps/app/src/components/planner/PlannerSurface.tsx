@@ -29,6 +29,7 @@ import {
 } from "../../lib/plannerTaskSchedule";
 import { buildPlannerHabitSummaries } from "../../lib/plannerHabits";
 import { buildPlannerReview } from "../../lib/plannerReview";
+import { useVisualKeyboardInset } from "../../lib/useVisualKeyboardInset";
 import PlannerRail from "./PlannerRail";
 import PlannerCalendarSurface from "./PlannerCalendarSurface";
 import PlannerDateDialog from "./PlannerDateDialog";
@@ -102,8 +103,8 @@ function getDefaultComposerDateDraft(viewId: PlannerViewId) {
   return createPlannerTaskDateDraft(getDefaultDueAt(viewId));
 }
 
-function shouldCaptureUndatedTaskInInbox(viewId: PlannerViewId) {
-  return viewId !== "inbox" && viewId !== "projects";
+function shouldCaptureUndatedTaskInInbox(viewId: PlannerViewId, projectId: string | null) {
+  return viewId !== "inbox" && (viewId !== "projects" || !projectId);
 }
 
 function hasScheduleFields(scheduleFields: Partial<Pick<Task, "dueAt" | "scheduledStartAt" | "recurrenceRule">>) {
@@ -277,6 +278,8 @@ export default function PlannerSurface({
   onOpenNote
 }: PlannerSurfaceProps) {
   const isMobile = adaptiveLayout.isMobileShell;
+  const isTouchLayout = adaptiveLayout.pointer === "coarse" || adaptiveLayout.isAndroid || isMobile;
+  const keyboardInset = useVisualKeyboardInset(isMobile);
   const [activeViewId, setActiveViewId] = useState<PlannerViewId>("today");
   const [projectFilterId, setProjectFilterId] = useState<PlannerProjectFilterId>(PROJECT_FILTER_ALL);
   const [searchQuery, setSearchQuery] = useState("");
@@ -441,7 +444,7 @@ export default function PlannerSurface({
   }, [isComposerOpen]);
 
   useEffect(() => {
-    if (!isComposerOpen || isMobile) {
+    if (!isComposerOpen || isMobile || isTouchLayout) {
       return;
     }
 
@@ -468,7 +471,7 @@ export default function PlannerSurface({
 
     window.addEventListener("pointerdown", handleOutsidePointerDown, true);
     return () => window.removeEventListener("pointerdown", handleOutsidePointerDown, true);
-  }, [isComposerOpen, isMobile]);
+  }, [isComposerOpen, isMobile, isTouchLayout]);
 
   const resetComposer = () => {
     setTitleDraft("");
@@ -515,12 +518,6 @@ export default function PlannerSurface({
 
     setIsCreating(true);
     try {
-      const initialScheduleFields = buildPlannerTaskScheduleFields(dateDraft, getDefaultStatus(activeViewId));
-      const shouldMoveToInbox =
-        !hasScheduleFields(initialScheduleFields) && shouldCaptureUndatedTaskInInbox(activeViewId);
-      const scheduleFields = shouldMoveToInbox
-        ? buildPlannerTaskScheduleFields(dateDraft, "inbox")
-        : initialScheduleFields;
       const defaultProjectId =
         focusedProject?.id ??
         (activeViewId === "projects" && projectFilterId !== PROJECT_FILTER_ALL && projectFilterId !== PROJECT_FILTER_NONE
@@ -531,6 +528,12 @@ export default function PlannerSurface({
         (activeViewId === "projects" && projectFilterId === PROJECT_FILTER_NONE && projectDraft === "")
           ? null
           : projectDraft || defaultProjectId || null;
+      const initialScheduleFields = buildPlannerTaskScheduleFields(dateDraft, getDefaultStatus(activeViewId));
+      const shouldMoveToInbox =
+        !hasScheduleFields(initialScheduleFields) && shouldCaptureUndatedTaskInInbox(activeViewId, projectId);
+      const scheduleFields = shouldMoveToInbox
+        ? buildPlannerTaskScheduleFields(dateDraft, "inbox")
+        : initialScheduleFields;
       const task = await onCreateTask({
         title: normalizedTitle,
         ...scheduleFields,
@@ -751,7 +754,11 @@ export default function PlannerSurface({
   };
 
   return (
-    <section className={`planner-surface ${isMobile ? "is-mobile" : "is-desktop"} ${!isTaskView ? "is-wide-mode" : ""}`}>
+    <section
+      className={`planner-surface ${isMobile ? "is-mobile" : "is-desktop"} ${
+        isTouchLayout ? "is-touch-layout" : ""
+      } ${adaptiveLayout.isTabletLandscape ? "is-tablet-landscape" : ""} ${!isTaskView ? "is-wide-mode" : ""}`}
+    >
       {!isMobile ? (
         <PlannerRail
           activeViewId={activeViewId}
@@ -855,6 +862,7 @@ export default function PlannerSurface({
             projects={projects}
             language={language}
             isMobile={isMobile}
+            isTouchLayout={isTouchLayout}
             onCreateHabit={onCreateHabit}
             onUpdateHabit={onUpdateHabit}
             onDeleteHabit={onDeleteHabit}
@@ -955,7 +963,12 @@ export default function PlannerSurface({
       ) : null}
 
       {isMobile && isTaskView && isComposerOpen ? (
-        <div className="planner-mobile-sheet-layer" role="dialog" aria-modal="true">
+        <div
+          className="planner-mobile-sheet-layer"
+          role="dialog"
+          aria-modal="true"
+          style={{ "--planner-keyboard-inset": `${keyboardInset}px` } as CSSProperties}
+        >
           <button
             type="button"
             className="planner-mobile-sheet-backdrop"
@@ -967,7 +980,12 @@ export default function PlannerSurface({
       ) : null}
 
       {isMobile && isTaskView && selectedTask && !isCalendarOpen ? (
-        <div className="planner-mobile-sheet-layer" role="dialog" aria-modal="true">
+        <div
+          className="planner-mobile-sheet-layer"
+          role="dialog"
+          aria-modal="true"
+          style={{ "--planner-keyboard-inset": `${keyboardInset}px` } as CSSProperties}
+        >
           <button
             type="button"
             className="planner-mobile-sheet-backdrop"
@@ -997,6 +1015,8 @@ export default function PlannerSurface({
       {isCalendarOpen ? (
         <PlannerCalendarSurface
           tasks={tasks}
+          habits={habits}
+          habitLogs={habitLogs}
           timeBlocks={timeBlocks}
           projects={projects}
           language={language}
@@ -1005,6 +1025,8 @@ export default function PlannerSurface({
           onClose={() => setIsCalendarOpen(false)}
           onSelectTask={setSelectedTaskId}
           onCreateTask={onCreateTask}
+          onUpdateTask={onUpdateTask}
+          onToggleHabitLog={onToggleHabitLog}
           onCreateTimeBlock={onCreateTimeBlock}
           onUpdateTimeBlock={onUpdateTimeBlock}
           onDeleteTimeBlock={onDeleteTimeBlock}

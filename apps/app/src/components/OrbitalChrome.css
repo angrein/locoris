@@ -283,6 +283,22 @@
   cursor: default;
 }
 
+button.orbital-filter-chip {
+  appearance: none;
+  font: inherit;
+}
+
+button.orbital-filter-chip:hover,
+button.orbital-filter-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--pill-color, var(--orbital-scene-accent, var(--gold))) 42%, rgba(255, 255, 255, 0.16));
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--pill-color, var(--orbital-scene-accent, var(--gold))) 16%, transparent), transparent 56%),
+    rgba(255, 255, 255, 0.045);
+  color: #fff;
+  cursor: pointer;
+  outline: none;
+}
+
 .orbital-overlay .orbital-filter-chip.is-success {
   border-color: rgb(var(--green-rgb) / 0.2);
   background: rgba(82, 208, 152, 0.08);
@@ -320,6 +336,40 @@
   border-radius: 999px;
   background: var(--pill-color, var(--gold));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--pill-color, var(--gold)) 16%, transparent);
+}
+
+.orbital-filter-plan-chip {
+  max-width: min(320px, 72vw);
+  border-color: color-mix(in srgb, var(--pill-color, var(--orbital-scene-accent, var(--gold))) 30%, rgba(255, 255, 255, 0.12));
+}
+
+.orbital-filter-plan-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--pill-color, var(--orbital-scene-accent, var(--gold)));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--pill-color, var(--orbital-scene-accent, var(--gold))) 44%, transparent);
+}
+
+.orbital-filter-plan-copy {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.orbital-filter-plan-copy strong,
+.orbital-filter-plan-copy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-filter-plan-copy strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 880;
 }
 
 .orbital-overlay .orbital-menu-list {

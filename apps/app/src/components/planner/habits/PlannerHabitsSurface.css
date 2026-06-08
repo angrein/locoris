@@ -945,7 +945,11 @@
   justify-content: center;
   box-sizing: border-box;
   overflow: hidden;
-  padding: 14px 10px max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px));
+  padding:
+    max(12px, env(safe-area-inset-top, 0px))
+    max(10px, env(safe-area-inset-right, 0px))
+    calc(max(14px, env(safe-area-inset-bottom, 0px)) + var(--planner-keyboard-inset, 0px) + 8px)
+    max(10px, env(safe-area-inset-left, 0px));
 }
 
 .planner-habit-mobile-sheet-backdrop {
@@ -964,7 +968,7 @@
   z-index: 1;
   box-sizing: border-box;
   width: min(100%, 620px);
-  max-height: calc(100% - 28px);
+  max-height: min(720px, calc(100dvh - var(--planner-keyboard-inset, 0px) - 32px));
   min-width: 0;
   padding: 12px;
   overflow: auto;
@@ -1188,6 +1192,32 @@
   }
 }
 
+.planner-surface.is-touch-layout .planner-habit-composer.is-inline {
+  max-height: min(72dvh, 440px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.planner-surface.is-touch-layout .planner-habit-composer.is-inline .planner-habit-composer-body {
+  grid-template-areas:
+    "title title"
+    "cadence cadence"
+    "project submit";
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.34fr);
+  gap: 10px 12px;
+}
+
+.planner-surface.is-touch-layout .planner-habit-composer.is-inline .planner-habit-submit {
+  width: 100%;
+  min-width: 0;
+}
+
+.planner-surface.is-touch-layout .planner-habit-composer.is-inline .planner-habit-chip-row button {
+  min-height: 34px;
+  max-width: min(220px, 42vw);
+}
+
 @media (max-height: 720px) and (min-width: 981px) {
   .planner-habit-composer.is-inline {
     max-height: min(178px, 34vh);
@@ -1207,5 +1237,11 @@
 
   .planner-habit-composer.is-inline .planner-habit-chip-row button {
     min-height: 28px;
+  }
+}
+
+@media (max-height: 720px) {
+  .planner-surface.is-touch-layout .planner-habit-composer.is-inline {
+    max-height: min(66dvh, 380px);
   }
 }

@@ -96,6 +96,7 @@ interface OrbitalMapViewProps {
   syncStatusChip?: {
     tone: "default" | "success" | "warning" | "error";
     text: string;
+    compactText?: string;
     title?: string;
   };
   syncTransportChip?: {
@@ -9869,6 +9870,16 @@ export default function OrbitalMapView({
 
       {isAndroidMobileShell ? (
         <header className={`orbital-mobile-topbar ${mobileSection === "map" ? "is-map-section" : ""}`}>
+          <div className="orbital-mobile-brand-panel" aria-label={labels.title}>
+            <span className="orbital-mobile-brand-mark" aria-hidden="true">
+              <span />
+            </span>
+            <span className="orbital-mobile-brand-copy">
+              <strong>{labels.title}</strong>
+              <span>{labels.subtitle}</span>
+            </span>
+          </div>
+
           <div className="orbital-mobile-vault">
             <LocalVaultSwitcher
               label={labels.localVault}
@@ -10440,6 +10451,33 @@ export default function OrbitalMapView({
                       ? ` · ${t("orbit.timeLayerOverdue")}: ${temporalMapSignals.totalOverdue}`
                       : ""}
                   </span>
+                ) : null}
+                {isTemporalLayerVisible && selectedNode?.project && onOpenProjectPlan ? (
+                  <button
+                    type="button"
+                    className={`orbital-filter-chip orbital-filter-plan-chip ${
+                      (selectedProjectTemporalSignal?.overdueCount ?? 0) > 0 ? "is-warning" : "is-accent"
+                    }`}
+                    onClick={() => {
+                      onOpenProjectPlan(selectedNode.project!.id);
+                      setSurfaceMode("planner");
+                      setMobileSection("planner");
+                    }}
+                    style={{ "--pill-color": selectedNode.project.color } as CSSProperties}
+                    title={`${t("orbit.timeLayerOpenPlan")}: ${selectedNode.project.name}`}
+                    aria-label={`${t("orbit.timeLayerOpenPlan")}: ${selectedNode.project.name}`}
+                  >
+                    <span className="orbital-filter-plan-dot" aria-hidden="true" />
+                    <span className="orbital-filter-plan-copy">
+                      <strong>{t("orbit.timeLayerOpenPlan")}</strong>
+                      <span>
+                        {t("orbit.timeLayerToday")}: {selectedProjectTemporalSignal?.todayCount ?? 0}
+                        {(selectedProjectTemporalSignal?.overdueCount ?? 0) > 0
+                          ? ` · ${t("orbit.timeLayerOverdue")}: ${selectedProjectTemporalSignal?.overdueCount ?? 0}`
+                          : ""}
+                      </span>
+                    </span>
+                  </button>
                 ) : null}
               </div>
             </div>

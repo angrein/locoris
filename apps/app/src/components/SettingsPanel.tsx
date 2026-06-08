@@ -232,6 +232,26 @@ function ChevronGlyph({ expanded = false }: { expanded?: boolean }) {
 
 type SettingsView = "root" | "sync" | "accent" | "ai" | "backup";
 
+const LANGUAGE_OPTIONS: Array<{
+  value: AppLanguage;
+  code: string;
+  labelKey: "settings.languageEnglish" | "settings.languageRussian";
+  nativeLabel: string;
+}> = [
+  {
+    value: "en",
+    code: "EN",
+    labelKey: "settings.languageEnglish",
+    nativeLabel: "English"
+  },
+  {
+    value: "ru",
+    code: "RU",
+    labelKey: "settings.languageRussian",
+    nativeLabel: "Русский"
+  }
+];
+
 function UpdateGlyph() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -281,7 +301,6 @@ export default function SettingsPanel({
 }: SettingsPanelProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<SettingsView>("root");
-  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [appUpdateState, setAppUpdateState] = useState(() => readAppUpdateSnapshot());
   const [aiKeyDraft, setAiKeyDraft] = useState("");
   const [aiModelId, setAiModelId] = useState(() => readStoredGeminiModel());
@@ -301,19 +320,34 @@ export default function SettingsPanel({
   const [aiKeyLoaded, setAiKeyLoaded] = useState(false);
   const [aiInstructionsOpen, setAiInstructionsOpen] = useState(false);
   const [aiModelPickerOpen, setAiModelPickerOpen] = useState(false);
-  const languageMenuRef = useRef<HTMLDivElement | null>(null);
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+  const languagePickerRef = useRef<HTMLDivElement | null>(null);
   const appUpdatesEnabled = supportsAppUpdates();
 
   useEffect(() => {
+    if (!languagePickerOpen) {
+      return;
+    }
+
     const handlePointerDown = (event: PointerEvent) => {
-      if (!languageMenuRef.current?.contains(event.target as Node)) {
-        setLanguageMenuOpen(false);
+      if (!languagePickerRef.current?.contains(event.target as Node)) {
+        setLanguagePickerOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLanguagePickerOpen(false);
       }
     };
 
     window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [languagePickerOpen]);
 
   useEffect(() => {
     if (!aiInstructionsOpen && !aiModelPickerOpen) {
@@ -490,6 +524,8 @@ export default function SettingsPanel({
   const shouldShowOpenReleaseAction =
     appUpdateState.canOpenReleasePage &&
     (appUpdateState.phase === "available" || appUpdateState.phase === "failed");
+  const selectedLanguageOption =
+    LANGUAGE_OPTIONS.find((option) => option.value === settings.language) ?? LANGUAGE_OPTIONS[0];
   const currentAccentThemeId = resolveAppAccentThemeId(accentThemeId);
   const currentAccentTheme = getAppAccentTheme(currentAccentThemeId);
   const hasGeminiKey = aiKeyDraft.trim().length > 0;
@@ -912,6 +948,49 @@ export default function SettingsPanel({
     );
   };
 
+  const renderSettingsHeader = (
+    title: string,
+    caption: string,
+    options: { back?: boolean } = {}
+  ) => (
+    <header className={`settings-panel-header ${options.back ? "has-back-action" : "is-root-action"}`}>
+      {options.back ? (
+        <button
+          type="button"
+          className="settings-panel-nav-button settings-panel-back-button"
+          onClick={() => setView("root")}
+          aria-label={t("settings.back")}
+          title={t("settings.back")}
+        >
+          <span className="settings-row-action-icon" aria-hidden="true">
+            <BackGlyph />
+          </span>
+        </button>
+      ) : (
+        <span className="settings-panel-header-pad" aria-hidden="true" />
+      )}
+
+      <div className="settings-panel-heading">
+        <h2 className="panel-title settings-panel-title">{title}</h2>
+        <p className="settings-panel-caption">{caption}</p>
+      </div>
+
+      <div className="settings-panel-header-actions">
+        <button
+          type="button"
+          className="settings-panel-nav-button settings-panel-close-button"
+          onClick={onClose}
+          aria-label={t("orbit.closeModal")}
+          title={t("orbit.closeModal")}
+        >
+          <span className="settings-panel-close-icon" aria-hidden="true">
+            <CloseGlyph />
+          </span>
+        </button>
+      </div>
+    </header>
+  );
+
   if (view === "sync") {
     return (
       <SyncSettingsPanel
@@ -950,38 +1029,9 @@ export default function SettingsPanel({
   if (view === "ai") {
     return (
       <section className="settings-panel-shell is-ai-settings">
-        <div className="settings-panel-controls">
-          <button
-            type="button"
-            className="settings-panel-nav-button"
-            onClick={() => setView("root")}
-            aria-label={t("settings.back")}
-            title={t("settings.back")}
-          >
-            <span className="settings-row-action-icon" aria-hidden="true">
-              <BackGlyph />
-            </span>
-          </button>
-          <div className="settings-panel-controls-spacer" />
-          <button
-            type="button"
-            className="settings-panel-nav-button"
-            onClick={onClose}
-            aria-label={t("orbit.closeModal")}
-            title={t("orbit.closeModal")}
-          >
-            <span className="settings-panel-close-icon" aria-hidden="true">
-              <CloseGlyph />
-            </span>
-          </button>
-        </div>
-
-        <header className="settings-panel-header">
-          <div className="settings-panel-heading">
-            <h2 className="panel-title settings-panel-title">{t("settings.aiTitle")}</h2>
-            <p className="settings-panel-caption">{t("settings.aiPanelCaption")}</p>
-          </div>
-        </header>
+        {renderSettingsHeader(t("settings.aiTitle"), t("settings.aiPanelCaption"), {
+          back: true
+        })}
 
         <div className="settings-panel-grid">
           <section className="settings-panel-block settings-panel-block-primary settings-ai-block">
@@ -1407,39 +1457,10 @@ export default function SettingsPanel({
     const activeVaultName = activeVault?.name || t("app.localVault");
 
     return (
-      <section className="settings-panel-shell">
-        <div className="settings-panel-controls">
-          <button
-            type="button"
-            className="settings-panel-nav-button"
-            onClick={() => setView("root")}
-            aria-label={t("settings.back")}
-            title={t("settings.back")}
-          >
-            <span className="settings-row-action-icon" aria-hidden="true">
-              <BackGlyph />
-            </span>
-          </button>
-          <div className="settings-panel-controls-spacer" />
-          <button
-            type="button"
-            className="settings-panel-nav-button"
-            onClick={onClose}
-            aria-label={t("orbit.closeModal")}
-            title={t("orbit.closeModal")}
-          >
-            <span className="settings-panel-close-icon" aria-hidden="true">
-              <CloseGlyph />
-            </span>
-          </button>
-        </div>
-
-        <header className="settings-panel-header">
-          <div className="settings-panel-heading">
-            <h2 className="panel-title settings-panel-title">{t("settings.backupTitle")}</h2>
-            <p className="settings-panel-caption">{t("settings.backupCaption")}</p>
-          </div>
-        </header>
+      <section className="settings-panel-shell is-backup-settings">
+        {renderSettingsHeader(t("settings.backupTitle"), t("settings.backupCaption"), {
+          back: true
+        })}
 
         <BackupSettingsPanel
           activeLocalVaultId={activeLocalVaultId}
@@ -1453,39 +1474,10 @@ export default function SettingsPanel({
 
   if (view === "accent") {
     return (
-      <section className="settings-panel-shell">
-        <div className="settings-panel-controls">
-          <button
-            type="button"
-            className="settings-panel-nav-button"
-            onClick={() => setView("root")}
-            aria-label={t("settings.back")}
-            title={t("settings.back")}
-          >
-            <span className="settings-row-action-icon" aria-hidden="true">
-              <BackGlyph />
-            </span>
-          </button>
-          <div className="settings-panel-controls-spacer" />
-          <button
-            type="button"
-            className="settings-panel-nav-button"
-            onClick={onClose}
-            aria-label={t("orbit.closeModal")}
-            title={t("orbit.closeModal")}
-          >
-            <span className="settings-panel-close-icon" aria-hidden="true">
-              <CloseGlyph />
-            </span>
-          </button>
-        </div>
-
-        <header className="settings-panel-header">
-          <div className="settings-panel-heading">
-            <h2 className="panel-title settings-panel-title">{t("settings.accentTheme")}</h2>
-            <p className="settings-panel-caption">{t("settings.accentThemePanelCaption")}</p>
-          </div>
-        </header>
+      <section className="settings-panel-shell is-interface-settings">
+        {renderSettingsHeader(t("settings.accentTheme"), t("settings.accentThemePanelCaption"), {
+          back: true
+        })}
 
         <div className="settings-panel-grid">
           <section className="settings-panel-block settings-panel-block-primary">
@@ -1524,17 +1516,9 @@ export default function SettingsPanel({
     );
   }
 
-  const currentLanguageLabel =
-    settings.language === "ru" ? t("settings.languageRussian") : t("settings.languageEnglish");
-
   return (
-    <section className="settings-panel-shell">
-      <header className="settings-panel-header">
-        <div className="settings-panel-heading">
-          <h2 className="panel-title settings-panel-title">{t("settings.title")}</h2>
-          <p className="settings-panel-caption">{t("settings.caption")}</p>
-        </div>
-      </header>
+    <section className="settings-panel-shell is-root-settings">
+      {renderSettingsHeader(t("settings.title"), t("settings.caption"))}
 
       <div className="settings-panel-grid">
         <section className="settings-panel-block settings-panel-block-primary">
@@ -1551,52 +1535,61 @@ export default function SettingsPanel({
                 <strong>{t("settings.language")}</strong>
                 <span>{t("settings.languageDescription")}</span>
               </div>
-              <div className="settings-language-picker" ref={languageMenuRef}>
+              <div
+                className={`settings-language-picker ${languagePickerOpen ? "is-open" : ""}`}
+                ref={languagePickerRef}
+              >
                 <button
                   type="button"
-                  className="settings-row-action settings-language-trigger"
-                  onClick={() => setLanguageMenuOpen((current) => !current)}
-                  aria-expanded={languageMenuOpen}
-                  aria-haspopup="menu"
+                  className="settings-language-trigger"
+                  onClick={() => setLanguagePickerOpen((current) => !current)}
+                  aria-haspopup="listbox"
+                  aria-expanded={languagePickerOpen}
+                  aria-controls="settings-language-menu"
                 >
-                  <span>{currentLanguageLabel}</span>
-                  <span className="settings-row-action-icon" aria-hidden="true">
-                    <ChevronGlyph expanded={languageMenuOpen} />
+                  <span className="settings-language-option-mark" aria-hidden="true">
+                    {selectedLanguageOption.code}
+                  </span>
+                  <span className="settings-language-option-copy">
+                    <strong>{t(selectedLanguageOption.labelKey)}</strong>
+                    <span>{selectedLanguageOption.nativeLabel}</span>
+                  </span>
+                  <span className="settings-row-action-icon settings-language-chevron" aria-hidden="true">
+                    <ChevronGlyph expanded={languagePickerOpen} />
                   </span>
                 </button>
 
-                {languageMenuOpen ? (
-                  <div className="settings-language-menu" role="menu">
+                {languagePickerOpen ? (
+                  <div
+                    id="settings-language-menu"
+                    className="settings-language-menu"
+                    role="listbox"
+                    aria-label={t("settings.language")}
+                  >
+                  {LANGUAGE_OPTIONS.map((option) => (
                     <button
+                      key={option.value}
                       type="button"
-                      className={`settings-language-option ${settings.language === "en" ? "is-active" : ""}`}
+                      className={`settings-language-option ${settings.language === option.value ? "is-active" : ""}`}
                       onClick={() => {
-                        onLanguageChange("en");
-                        setLanguageMenuOpen(false);
+                        onLanguageChange(option.value);
+                        setLanguagePickerOpen(false);
                       }}
-                      role="menuitemradio"
-                      aria-checked={settings.language === "en"}
+                      role="option"
+                      aria-selected={settings.language === option.value}
                     >
-                      <div className="settings-language-option-copy">
-                        <strong>{t("settings.languageEnglish")}</strong>
-                        <span>English</span>
-                      </div>
+                      <span className="settings-language-option-mark" aria-hidden="true">
+                        {option.code}
+                      </span>
+                      <span className="settings-language-option-copy">
+                        <strong>{t(option.labelKey)}</strong>
+                        <span>{option.nativeLabel}</span>
+                      </span>
+                      <span className="settings-language-option-check" aria-hidden="true">
+                        {settings.language === option.value ? "✓" : ""}
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      className={`settings-language-option ${settings.language === "ru" ? "is-active" : ""}`}
-                      onClick={() => {
-                        onLanguageChange("ru");
-                        setLanguageMenuOpen(false);
-                      }}
-                      role="menuitemradio"
-                      aria-checked={settings.language === "ru"}
-                    >
-                      <div className="settings-language-option-copy">
-                        <strong>{t("settings.languageRussian")}</strong>
-                        <span>Русский</span>
-                      </div>
-                    </button>
+                  ))}
                   </div>
                 ) : null}
               </div>

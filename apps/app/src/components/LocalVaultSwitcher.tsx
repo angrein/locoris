@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getErrorMessage } from "../lib/errors";
@@ -97,6 +98,7 @@ export default function LocalVaultSwitcher({
   const [createPassphraseConfirm, setCreatePassphraseConfirm] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties | undefined>(undefined);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const activeItem = useMemo(
     () => items.find((item) => item.id === activeVaultId) ?? items[0] ?? null,
@@ -130,6 +132,55 @@ export default function LocalVaultSwitcher({
   const triggerProviderLabel = activeItem?.providerLabel ?? t("sync.localOnlyShort");
   const triggerProviderTone = activeItem?.providerTone ?? "local";
   const activeDisplayName = (activeItem?.displayName ?? activeItem?.name ?? "").trim() || label;
+  const updatePopoverPosition = useCallback(() => {
+    const shell = shellRef.current;
+
+    if (!shell || (!open && !createOpen)) {
+      setPopoverStyle(undefined);
+      return;
+    }
+
+    const viewportPadding = 12;
+    const rect = shell.getBoundingClientRect();
+    const viewportWidth = Math.max(window.innerWidth, viewportPadding * 2 + 1);
+    const viewportHeight = Math.max(window.innerHeight, 240);
+    const width = Math.min(420, viewportWidth - viewportPadding * 2);
+    const preferredLeft = createOpen ? rect.right - width : rect.left;
+    const left = Math.min(
+      Math.max(preferredLeft, viewportPadding),
+      Math.max(viewportPadding, viewportWidth - width - viewportPadding)
+    );
+    const top = Math.min(
+      Math.max(rect.bottom + 12, viewportPadding),
+      Math.max(viewportPadding, viewportHeight - 220 - viewportPadding)
+    );
+    const maxHeight = Math.max(140, viewportHeight - top - viewportPadding);
+
+    setPopoverStyle({
+      left,
+      top,
+      width,
+      maxWidth: width,
+      maxHeight
+    });
+  }, [createOpen, open]);
+
+  useEffect(() => {
+    if (!open && !createOpen) {
+      setPopoverStyle(undefined);
+      return undefined;
+    }
+
+    updatePopoverPosition();
+
+    window.addEventListener("resize", updatePopoverPosition);
+    window.addEventListener("scroll", updatePopoverPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePopoverPosition);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
+    };
+  }, [createOpen, open, updatePopoverPosition]);
 
   const resetCreateDraft = () => {
     setCreateVaultKind("regular");
@@ -264,7 +315,7 @@ export default function LocalVaultSwitcher({
       </div>
 
       {open ? (
-        <div className="vault-switcher-menu" role="listbox" aria-label={label}>
+        <div className="vault-switcher-menu" role="listbox" aria-label={label} style={popoverStyle}>
           <div className="vault-switcher-menu-head">
             <div>
               <span className="vault-switcher-menu-title">{label}</span>
@@ -331,7 +382,7 @@ export default function LocalVaultSwitcher({
       ) : null}
 
       {createOpen ? (
-        <div className="vault-switcher-create-panel" role="dialog" aria-modal="false">
+        <div className="vault-switcher-create-panel" role="dialog" aria-modal="false" style={popoverStyle}>
           <div className="vault-switcher-menu-head">
             <div>
               <span className="vault-switcher-menu-title">{t("sync.localVaultCreate")}</span>

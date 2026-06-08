@@ -27,6 +27,7 @@ type CommandIconKind =
 interface CommandChip {
   tone: CommandChipTone;
   text: string;
+  compactText?: string;
   title?: string;
 }
 
@@ -131,36 +132,41 @@ function CommandIconButton({
 function StatusChip({
   icon,
   text,
+  compactText,
   title,
   tone = "default",
+  className,
   asButton = false,
   onClick
 }: {
   icon: CommandIconKind;
   text: string;
+  compactText?: string;
   title?: string;
   tone?: CommandChipTone | "accent";
+  className?: string;
   asButton?: boolean;
   onClick?: () => void;
 }) {
-  const className = `orbital-command-status-chip is-${tone}`;
+  const chipClassName = `orbital-command-status-chip is-${tone} ${className ?? ""}`;
   const content = (
     <>
       <CommandIcon kind={icon} />
       <span className="orbital-command-status-text">{text}</span>
+      {compactText ? <span className="orbital-command-status-compact-text">{compactText}</span> : null}
     </>
   );
 
   if (asButton && onClick) {
     return (
-      <button type="button" className={className} title={title ?? text} onClick={onClick}>
+      <button type="button" className={chipClassName} title={title ?? text} onClick={onClick}>
         {content}
       </button>
     );
   }
 
   return (
-    <span className={className} title={title ?? text}>
+    <span className={chipClassName} title={title ?? text}>
       {content}
     </span>
   );
@@ -223,6 +229,54 @@ export default function OrbitalCommandBar({
         </div>
       </div>
 
+      <div className="orbital-command-vault">
+        <LocalVaultSwitcher
+          label={labels.localVault}
+          activeLabel={activeVaultLabel}
+          items={localVaultOptions}
+          activeVaultId={activeLocalVaultId}
+          onSelect={onSelectLocalVault}
+          onCreate={onCreateLocalVault}
+        />
+      </div>
+
+      {hasStatus ? (
+        <div className="orbital-command-status" aria-label={labels.title}>
+          {autoFocusEnabled ? <StatusChip icon="autofocus" text={labels.autoFocus} tone="accent" className="is-state-chip" /> : null}
+          {sceneFocusActive ? <StatusChip icon="focus" text={labels.focusMode} tone="accent" className="is-state-chip" /> : null}
+          {syncStatusChip ? (
+            <StatusChip
+              icon="sync"
+              text={syncStatusChip.text}
+              compactText={syncStatusChip.compactText}
+              title={syncStatusChip.title}
+              tone={syncStatusChip.tone}
+              className="is-sync-chip"
+            />
+          ) : null}
+          {syncTransportChip ? (
+            <StatusChip
+              icon="sync"
+              text={syncTransportChip.text}
+              title={syncTransportChip.title}
+              tone={syncTransportChip.tone}
+              className="is-transport-chip"
+            />
+          ) : null}
+          {updateChip && hasSettings ? (
+            <StatusChip
+              icon="update"
+              text={updateChip.text}
+              title={updateChip.title}
+              tone="warning"
+              className="is-update-chip"
+              asButton
+              onClick={onOpenSettings}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
       {plannerAvailable ? (
         <div className="orbital-surface-switch" role="tablist" aria-label={labels.title}>
           <button
@@ -245,45 +299,6 @@ export default function OrbitalCommandBar({
             <CommandIcon kind="planner" />
             <span>{labels.plannerMode}</span>
           </button>
-        </div>
-      ) : null}
-
-      <div className="orbital-command-vault">
-        <LocalVaultSwitcher
-          label={labels.localVault}
-          activeLabel={activeVaultLabel}
-          items={localVaultOptions}
-          activeVaultId={activeLocalVaultId}
-          onSelect={onSelectLocalVault}
-          onCreate={onCreateLocalVault}
-        />
-      </div>
-
-      {hasStatus ? (
-        <div className="orbital-command-status" aria-label={labels.title}>
-          {autoFocusEnabled ? <StatusChip icon="autofocus" text={labels.autoFocus} tone="accent" /> : null}
-          {sceneFocusActive ? <StatusChip icon="focus" text={labels.focusMode} tone="accent" /> : null}
-          {syncStatusChip ? (
-            <StatusChip icon="sync" text={syncStatusChip.text} title={syncStatusChip.title} tone={syncStatusChip.tone} />
-          ) : null}
-          {syncTransportChip ? (
-            <StatusChip
-              icon="sync"
-              text={syncTransportChip.text}
-              title={syncTransportChip.title}
-              tone={syncTransportChip.tone}
-            />
-          ) : null}
-          {updateChip && hasSettings ? (
-            <StatusChip
-              icon="update"
-              text={updateChip.text}
-              title={updateChip.title}
-              tone="warning"
-              asButton
-              onClick={onOpenSettings}
-            />
-          ) : null}
         </div>
       ) : null}
 

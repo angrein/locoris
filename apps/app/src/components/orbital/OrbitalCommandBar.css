@@ -2,15 +2,13 @@
   position: relative;
   z-index: 6;
   isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(174px, auto) auto minmax(250px, 1fr) auto;
-  grid-template-areas:
-    "brand switch vault actions"
-    "brand status status actions";
-  gap: 8px 10px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
   align-items: center;
   min-width: 0;
-  padding: 10px;
+  min-height: 58px;
+  padding: 8px 10px;
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 14%, rgba(255, 255, 255, 0.12));
   border-radius: 26px;
@@ -39,13 +37,14 @@
 }
 
 .orbital-command-brand-panel {
-  grid-area: brand;
+  flex: 0 1 clamp(150px, 17vw, 248px);
   min-width: 0;
+  max-width: 248px;
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  padding: 4px 4px 4px 5px;
+  padding: 3px 5px 3px 4px;
 }
 
 .orbital-command-brand-mark {
@@ -129,13 +128,13 @@
 }
 
 .orbital-surface-switch {
-  grid-area: switch;
+  flex: 0 0 clamp(154px, 12vw, 190px);
   position: relative;
   z-index: 8;
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
-  min-width: 176px;
+  min-width: 154px;
   padding: 4px;
   border: 1px solid color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 22%, rgba(255, 255, 255, 0.12));
   border-radius: 18px;
@@ -185,10 +184,11 @@
 }
 
 .orbital-command-vault {
-  grid-area: vault;
+  flex: 1 1 274px;
   position: relative;
   z-index: 9;
-  min-width: 0;
+  min-width: 190px;
+  max-width: min(360px, 28vw);
 }
 
 .orbital-command-vault .vault-switcher {
@@ -226,8 +226,9 @@
 }
 
 .orbital-command-status {
-  grid-area: status;
+  flex: 0 1 250px;
   min-width: 0;
+  max-width: min(300px, 22vw);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -243,7 +244,7 @@
 
 .orbital-command-status-chip {
   flex: 0 0 auto;
-  max-width: min(220px, 34vw);
+  max-width: min(210px, 18vw);
   min-height: 28px;
   display: inline-flex;
   align-items: center;
@@ -307,16 +308,23 @@ button.orbital-command-status-chip:focus-visible {
   text-overflow: ellipsis;
 }
 
-.orbital-command-actions {
-  grid-area: actions;
+.orbital-command-status-compact-text {
+  display: none;
   min-width: 0;
-  max-width: min(420px, 36vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orbital-command-actions {
+  flex: 0 0 auto;
+  min-width: max-content;
+  max-width: none;
+  margin-left: auto;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 7px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
   padding: 1px;
   scrollbar-width: none;
 }
@@ -329,6 +337,7 @@ button.orbital-command-status-chip:focus-visible {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 5px;
   padding: 4px;
   border: 1px solid rgba(255, 255, 255, 0.085);
@@ -715,62 +724,192 @@ button.orbital-command-status-chip:focus-visible {
   border-right: 2px solid currentColor;
 }
 
-@media (max-width: 1260px) {
-  .orbital-command-bar {
-    grid-template-columns: minmax(166px, auto) auto minmax(220px, 1fr);
-    grid-template-areas:
-      "brand switch actions"
-      "vault status actions";
+@media (max-width: 1360px) {
+  .orbital-command-brand-panel {
+    flex-basis: 194px;
+    max-width: 212px;
+  }
+
+  .orbital-command-vault {
+    flex-basis: 238px;
+    max-width: min(304px, 26vw);
+  }
+
+  .orbital-command-status {
+    flex-basis: 210px;
+    max-width: min(240px, 20vw);
   }
 
   .orbital-command-actions {
-    max-width: min(360px, 34vw);
+    max-width: none;
   }
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1180px) {
   .orbital-command-bar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand actions"
-      "switch actions"
-      "vault status";
+    gap: 7px;
+    padding-inline: 9px;
+  }
+
+  .orbital-command-brand-panel {
+    flex-basis: 166px;
+    max-width: 176px;
+    grid-template-columns: 32px minmax(0, 1fr);
     gap: 8px;
   }
 
-  .orbital-command-actions {
-    align-self: stretch;
-    max-width: min(280px, 42vw);
+  .orbital-command-brand-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 13px;
   }
 
-  .orbital-command-group {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+  .orbital-command-subtitle {
+    display: none;
+  }
+
+  .orbital-command-vault {
+    min-width: 172px;
+    max-width: min(260px, 24vw);
+  }
+
+  .orbital-command-status {
+    flex-basis: 150px;
+    max-width: 164px;
+  }
+
+  .orbital-command-status-chip {
+    max-width: 104px;
+    padding-inline: 7px;
+  }
+
+  .orbital-command-status-chip.is-state-chip,
+  .orbital-command-status-chip.is-transport-chip,
+  .orbital-command-status-chip.is-update-chip {
+    width: 34px;
+    justify-content: center;
+    gap: 0;
+    padding-inline: 0;
+  }
+
+  .orbital-command-status-chip.is-state-chip .orbital-command-status-text,
+  .orbital-command-status-chip.is-transport-chip .orbital-command-status-text,
+  .orbital-command-status-chip.is-update-chip .orbital-command-status-text {
+    display: none;
+  }
+
+  .orbital-command-status-chip.is-sync-chip {
+    width: auto;
+    max-width: 82px;
+    justify-content: flex-start;
+    gap: 5px;
+    padding-inline: 7px;
+  }
+
+  .orbital-command-status-chip.is-sync-chip .orbital-command-status-text {
+    display: none;
+  }
+
+  .orbital-command-status-chip.is-sync-chip .orbital-command-status-compact-text {
+    display: inline-block;
+    max-width: 48px;
   }
 
   .orbital-surface-switch {
-    width: min(260px, 100%);
+    flex-basis: 142px;
+    min-width: 142px;
+  }
+
+  .orbital-surface-switch button {
+    gap: 5px;
+    font-size: 0.7rem;
+  }
+
+  .orbital-command-actions {
+    max-width: none;
+  }
+
+  .orbital-command-button {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 13px;
+  }
+}
+
+@media (max-width: 980px) {
+  .orbital-command-brand-panel {
+    flex-basis: 42px;
+    max-width: 42px;
+    grid-template-columns: 32px;
+    padding-inline: 3px;
+  }
+
+  .orbital-command-title {
+    display: none;
+  }
+
+  .orbital-command-vault {
+    flex-basis: 210px;
+    min-width: 164px;
+    max-width: min(240px, 30vw);
+  }
+
+  .orbital-command-status {
+    flex: 0 1 auto;
+    max-width: 94px;
+  }
+
+  .orbital-command-status-chip {
+    width: 34px;
+    max-width: 42px;
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .orbital-command-status-chip .orbital-command-status-text {
+    display: none;
+  }
+
+  .orbital-command-status-chip.is-sync-chip {
+    width: auto;
+    max-width: 78px;
+    justify-content: flex-start;
+    gap: 5px;
+    padding-inline: 6px;
+  }
+
+  .orbital-command-status-chip.is-sync-chip .orbital-command-status-compact-text {
+    display: inline-block;
+    max-width: 44px;
+  }
+
+  .orbital-surface-switch {
+    flex-basis: 98px;
+    min-width: 98px;
+  }
+
+  .orbital-surface-switch button span:not(.orbital-command-icon) {
+    display: none;
+  }
+
+  .orbital-command-actions {
+    max-width: none;
   }
 }
 
 @media (max-width: 760px) {
   .orbital-command-bar {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "brand"
-      "switch"
-      "vault"
-      "status"
-      "actions";
-    gap: 8px;
-    padding: 9px;
+    gap: 6px;
+    min-height: 54px;
+    padding: 8px;
     border-radius: 24px;
   }
 
   .orbital-command-brand-panel {
-    grid-template-columns: 30px minmax(0, 1fr);
-    gap: 8px;
-    padding: 2px 3px;
+    flex: 0 0 38px;
+    max-width: 38px;
   }
 
   .orbital-command-brand-mark {
@@ -779,72 +918,87 @@ button.orbital-command-status-chip:focus-visible {
     border-radius: 12px;
   }
 
-  .orbital-command-brand {
-    font-size: 1.06rem;
-  }
-
-  .orbital-command-subtitle {
-    font-size: 0.66rem;
-  }
-
-  .orbital-surface-switch {
-    width: 100%;
-    min-width: 0;
+  .orbital-command-vault {
+    flex: 1 1 170px;
+    min-width: 128px;
+    max-width: none;
   }
 
   .orbital-command-vault .vault-switcher-trigger {
-    min-height: 40px;
+    min-height: 38px;
   }
 
   .orbital-command-vault .vault-switcher-create-trigger {
-    width: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 38px;
+    min-width: 38px;
+    min-height: 38px;
   }
 
   .orbital-command-status {
-    width: 100%;
+    display: none;
   }
 
-  .orbital-command-status-chip {
-    max-width: 68vw;
-    min-height: 31px;
+  .orbital-surface-switch {
+    flex: 0 0 86px;
+    min-width: 86px;
   }
 
   .orbital-command-actions {
-    width: 100%;
-    max-width: 100%;
-    justify-content: flex-start;
-    padding-bottom: 2px;
+    flex: 0 0 auto;
+    max-width: none;
+    justify-content: flex-end;
   }
 
   .orbital-command-group {
-    flex-wrap: nowrap;
+    gap: 3px;
+    padding: 3px;
+  }
+
+  .orbital-command-group:first-child .orbital-command-button:nth-child(n + 3) {
+    display: none;
   }
 
   .orbital-command-button {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
     border-radius: 15px;
   }
 }
 
 @media (max-width: 430px) {
   .orbital-command-bar {
-    gap: 7px;
-  }
-
-  .orbital-surface-switch button span:not(.orbital-command-icon) {
-    display: none;
+    gap: 5px;
   }
 
   .orbital-surface-switch {
-    min-width: 0;
+    flex-basis: 74px;
+    min-width: 74px;
   }
 
-  .orbital-command-status-chip {
-    max-width: 76vw;
+  .orbital-command-vault {
+    min-width: 112px;
+  }
+
+  .orbital-command-group:first-child .orbital-command-button:nth-child(n + 2) {
+    display: none;
+  }
+
+  .orbital-command-button {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 13px;
+  }
+
+  .orbital-command-vault .vault-switcher-trigger-icon,
+  .orbital-command-vault .vault-switcher-trigger-provider {
+    display: none;
+  }
+
+  .orbital-command-vault .vault-switcher-trigger {
+    grid-template-columns: minmax(0, 1fr) 12px;
   }
 }

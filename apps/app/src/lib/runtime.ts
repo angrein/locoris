@@ -68,9 +68,11 @@ function getViewportSize() {
     };
   }
 
+  // Layout classification must stay stable while the on-screen keyboard is open.
+  // visualViewport is used separately for keyboard-safe sheets.
   return {
-    width: Math.round(window.visualViewport?.width ?? window.innerWidth),
-    height: Math.round(window.visualViewport?.height ?? window.innerHeight)
+    width: Math.round(window.innerWidth),
+    height: Math.round(window.innerHeight)
   };
 }
 

@@ -801,18 +801,23 @@ export default function App() {
   );
   const activeVaultSyncChip = useMemo(() => {
     const pendingCount = activeVaultPendingSync.total;
+    const compactSyncTime = activeVaultBinding?.lastSyncAt
+      ? syncChipTimestampFormatter.format(activeVaultBinding.lastSyncAt)
+      : "—";
 
     if (!activeVaultBinding || !activeVaultConnection) {
       return {
         tone: "default" as const,
-        text: t("sync.statusLocalOnly")
+        text: t("sync.statusLocalOnly"),
+        compactText: "—"
       };
     }
 
     if (activeVaultBinding.syncStatus === "syncing") {
       return {
         tone: "warning" as const,
-        text: t("sync.statusSyncing")
+        text: t("sync.statusSyncing"),
+        compactText: activeVaultBinding.lastSyncAt ? compactSyncTime : "…"
       };
     }
 
@@ -826,6 +831,7 @@ export default function App() {
           pendingCount > 0
             ? t("sync.statusUnlockRequiredPending", { count: pendingCount })
             : t("sync.statusUnlockRequired"),
+        compactText: activeVaultBinding.lastSyncAt ? compactSyncTime : "!",
         title: t("sync.vaultEncryptionSyncLocked")
       };
     }
@@ -860,6 +866,7 @@ export default function App() {
       return {
         tone: "error" as const,
         text: message,
+        compactText: activeVaultBinding.lastSyncAt ? compactSyncTime : "!",
         title: translateSyncError(
           new Error(activeVaultBinding.lastError),
           activeVaultConnection.provider
@@ -870,14 +877,16 @@ export default function App() {
     if (!online && pendingCount > 0) {
       return {
         tone: "warning" as const,
-        text: t("sync.statusOfflinePending", { count: pendingCount })
+        text: t("sync.statusOfflinePending", { count: pendingCount }),
+        compactText: activeVaultBinding.lastSyncAt ? compactSyncTime : String(pendingCount)
       };
     }
 
     if (pendingCount > 0) {
       return {
         tone: "warning" as const,
-        text: t("sync.statusPending", { count: pendingCount })
+        text: t("sync.statusPending", { count: pendingCount }),
+        compactText: activeVaultBinding.lastSyncAt ? compactSyncTime : String(pendingCount)
       };
     }
 
@@ -886,13 +895,15 @@ export default function App() {
         tone: "success" as const,
         text: t("sync.statusSyncedAt", {
           time: syncChipTimestampFormatter.format(activeVaultBinding.lastSyncAt)
-        })
+        }),
+        compactText: compactSyncTime
       };
     }
 
     return {
       tone: "default" as const,
-      text: t("sync.statusReady")
+      text: t("sync.statusReady"),
+      compactText: "—"
     };
   }, [
     activeVaultBinding,

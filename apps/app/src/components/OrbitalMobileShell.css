@@ -128,7 +128,7 @@
 
 .orbital-mobile-topbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   padding: 9px;
@@ -145,7 +145,88 @@
 }
 
 .orbital-mobile-topbar.is-map-section {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.orbital-mobile-brand-panel {
+  min-width: 0;
+  display: inline-grid;
+  grid-template-columns: 32px minmax(0, auto);
+  align-items: center;
+  gap: 8px;
+  padding: 2px 1px;
+}
+
+.orbital-mobile-brand-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 34%, rgba(255, 255, 255, 0.14));
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 46%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 24%, transparent), rgba(255, 255, 255, 0.035));
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 12%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.11);
+}
+
+.orbital-mobile-brand-mark::before,
+.orbital-mobile-brand-mark::after,
+.orbital-mobile-brand-mark span {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+}
+
+.orbital-mobile-brand-mark::before {
+  width: 16px;
+  height: 16px;
+  border: 1.7px solid color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 82%, #fff 18%);
+}
+
+.orbital-mobile-brand-mark::after {
+  width: 24px;
+  height: 9px;
+  border: 1.2px solid rgba(255, 255, 255, 0.55);
+  transform: rotate(-18deg);
+}
+
+.orbital-mobile-brand-mark span {
+  right: 7px;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  background: #fff;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent-theme-primary, var(--gold)) 70%, transparent);
+}
+
+.orbital-mobile-brand-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.orbital-mobile-brand-copy strong,
+.orbital-mobile-brand-copy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbital-mobile-brand-copy strong {
+  color: var(--text);
+  font-family: var(--font-ui-display);
+  font-size: 0.95rem;
+  font-weight: 820;
+  line-height: 1;
+}
+
+.orbital-mobile-brand-copy span {
+  display: none;
 }
 
 .orbital-mobile-map-actions {
@@ -1101,9 +1182,44 @@
   -webkit-overflow-scrolling: touch;
 }
 
+@media (max-width: 520px) {
+  .orbital-mobile-topbar {
+    gap: 7px;
+  }
+
+  .orbital-mobile-brand-panel {
+    grid-template-columns: 32px;
+    gap: 0;
+  }
+
+  .orbital-mobile-brand-copy {
+    display: none;
+  }
+
+  .orbital-mobile-animation-action {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+  }
+
+  .orbital-mobile-animation-action span:last-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 420px) {
   .orbital-mobile-topbar {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .orbital-mobile-topbar.is-map-section {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
   }
 
   .orbital-mobile-project-chip {

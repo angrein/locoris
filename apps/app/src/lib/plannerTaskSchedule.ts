@@ -187,17 +187,27 @@ export function buildPlannerTaskScheduleFields(
   }
 
   const hasRange = Boolean(draft.endDateAt);
-  const scheduledStartAt = draft.hasTime || hasRange ? addPlannerMinutesToDay(draft.startDateAt, draft.startTimeMinutes) : null;
+  const isRepeating = draft.repeat !== "none";
+  const shouldCreateDateRange = hasRange && !isRepeating;
+  const scheduledStartAt =
+    draft.hasTime || shouldCreateDateRange
+      ? addPlannerMinutesToDay(draft.startDateAt, draft.hasTime ? draft.startTimeMinutes : 0)
+      : null;
   const scheduledEndAt = scheduledStartAt
-    ? addPlannerMinutesToDay(draft.endDateAt ?? draft.startDateAt, draft.hasTime ? draft.endTimeMinutes : 23 * 60 + 45)
+    ? addPlannerMinutesToDay(
+        shouldCreateDateRange ? draft.endDateAt ?? draft.startDateAt : draft.startDateAt,
+        draft.hasTime ? draft.endTimeMinutes : 23 * 60 + 45
+      )
     : null;
-  const dueAt = scheduledStartAt ? null : addPlannerMinutesToDay(draft.startDateAt, 12 * 60);
+  const dueAt = scheduledStartAt ? null : draft.startDateAt;
   const recurrenceUntilSource = draft.repeatUntilAt ?? draft.endDateAt;
+  const recurrenceFrequency: PlannerRecurrenceFrequency | null =
+    draft.repeat === "none" ? null : draft.repeat === "customDaily" ? "daily" : draft.repeat;
   const recurrenceRule =
-    draft.repeat === "none"
+    !recurrenceFrequency
       ? null
       : buildPlannerRRule({
-          frequency: draft.repeat === "customDaily" ? "daily" : draft.repeat,
+          frequency: recurrenceFrequency,
           interval: draft.repeat === "customDaily" ? draft.repeatIntervalDays : 1,
           untilAt: recurrenceUntilSource ? getEndOfLocalDay(recurrenceUntilSource) : null
         });
@@ -215,7 +225,7 @@ export function buildPlannerTaskScheduleFields(
     recurrenceCompletedDates: [],
     recurrenceOverrides: [],
     estimateMinutes:
-      scheduledStartAt && scheduledEndAt
+      scheduledStartAt && scheduledEndAt && draft.hasTime
         ? Math.max(15, Math.round((scheduledEndAt - scheduledStartAt) / 60_000))
         : null,
     status: scheduledStartAt && (baseStatus === "inbox" || baseStatus === "todo") ? "scheduled" : baseStatus
@@ -234,7 +244,8 @@ export function getPlannerTaskScheduleSummary(task: Task, language: AppLanguage)
     const recurrence = summarizePlannerRecurrence(task.recurrenceRule, language);
 
     if (anchor) {
-      return `${recurrence} · ${formatPlannerDateTime(anchor, language)}`;
+      const dateLabel = task.scheduledStartAt ? formatPlannerDateTime(anchor, language) : formatPlannerDate(anchor, language);
+      return `${recurrence} · ${dateLabel}`;
     }
 
     return recurrence;

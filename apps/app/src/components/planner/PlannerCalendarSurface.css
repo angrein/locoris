@@ -110,6 +110,7 @@
 
 .planner-calendar-mode-switch button,
 .planner-calendar-controls button,
+.planner-calendar-create-button,
 .planner-calendar-close,
 .planner-calendar-event-actions button,
 .planner-calendar-unscheduled-list button,
@@ -138,6 +139,37 @@
   font-size: 0.78rem;
   font-weight: 850;
   white-space: nowrap;
+}
+
+.planner-calendar-create-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--planner-calendar-accent) 42%, rgba(255, 255, 255, 0.14));
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 30% 0%, color-mix(in srgb, var(--planner-calendar-accent) 22%, transparent), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.102), rgba(255, 255, 255, 0.032)),
+    rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.8rem;
+  font-weight: 880;
+  white-space: nowrap;
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--planner-calendar-accent) 12%, transparent);
+}
+
+.planner-calendar-create-button span {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--planner-calendar-accent) 24%, rgba(255, 255, 255, 0.12));
+  color: #fff;
+  line-height: 1;
 }
 
 .planner-calendar-mode-switch button.is-active {
@@ -249,7 +281,8 @@
   padding: 12px;
 }
 
-.planner-calendar-time-slot {
+.planner-calendar-time-slot,
+.planner-calendar-all-day-slot {
   display: grid;
   grid-template-columns: 68px minmax(0, 1fr);
   gap: 12px;
@@ -261,17 +294,28 @@
   transition: border-color 150ms ease, background 150ms ease;
 }
 
-.planner-calendar-time-slot.has-events {
+.planner-calendar-all-day-slot {
+  min-height: 68px;
+  border-color: color-mix(in srgb, var(--planner-calendar-accent) 18%, rgba(255, 255, 255, 0.08));
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--planner-calendar-accent) 10%, transparent), transparent 42%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.planner-calendar-time-slot.has-events,
+.planner-calendar-all-day-slot.has-events {
   min-height: 92px;
 }
 
 .planner-calendar-time-slot:hover,
+.planner-calendar-all-day-slot:hover,
 .planner-calendar-day-cell:hover {
   border-color: color-mix(in srgb, var(--planner-calendar-accent) 34%, rgba(255, 255, 255, 0.12));
   background: color-mix(in srgb, var(--planner-calendar-accent) 8%, rgba(255, 255, 255, 0.04));
 }
 
-.planner-calendar-time-slot > time {
+.planner-calendar-time-slot > time,
+.planner-calendar-all-day-slot > time {
   padding-top: 6px;
   color: rgba(225, 234, 246, 0.54);
   font-size: 0.72rem;
@@ -279,6 +323,7 @@
 }
 
 .planner-calendar-time-slot > div,
+.planner-calendar-all-day-slot > div,
 .planner-calendar-day-stack,
 .planner-calendar-agenda-list,
 .planner-calendar-unscheduled-list {
@@ -843,6 +888,11 @@
   min-height: 72px;
 }
 
+.planner-calendar-layer.is-mobile .planner-calendar-all-day-slot {
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 9px;
+}
+
 .planner-calendar-layer.is-mobile .planner-calendar-grid {
   min-width: 0;
   min-height: 480px;
@@ -878,19 +928,19 @@
   position: relative;
   z-index: 3;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   padding: 0 10px max(10px, env(safe-area-inset-bottom));
 }
 
 .planner-calendar-layer.is-mobile .planner-calendar-mobile-dock button {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   min-height: 54px;
-  padding: 9px 10px;
+  padding: 9px 8px;
   border: 1px solid color-mix(in srgb, var(--planner-calendar-accent) 26%, rgba(255, 255, 255, 0.1));
   border-radius: 18px;
   background:
@@ -905,8 +955,8 @@
 .planner-calendar-mobile-dock-icon {
   position: relative;
   display: inline-grid;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   border-radius: 13px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--planner-calendar-accent) 72%, #fff), var(--planner-calendar-accent-2));
@@ -935,6 +985,21 @@
 
 .planner-calendar-mobile-dock-icon.is-unscheduled::before {
   border-radius: 50%;
+}
+
+.planner-calendar-mobile-dock-icon.is-create::before {
+  inset: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(5, 10, 18, 0.82);
+}
+
+.planner-calendar-mobile-dock-icon.is-create::after {
+  content: "";
+  position: absolute;
+  inset: 14px 8px;
+  border-radius: 999px;
+  background: rgba(5, 10, 18, 0.82);
 }
 
 .planner-calendar-layer.is-mobile .planner-calendar-mobile-dock button > span:last-child {

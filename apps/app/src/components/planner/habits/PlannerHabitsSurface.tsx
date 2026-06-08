@@ -9,6 +9,7 @@ import {
   type PlannerHabitSummary
 } from "../../../lib/plannerHabits";
 import type { PlannerHabitCreateInput, PlannerHabitUpdateInput } from "../../../lib/planner";
+import { useVisualKeyboardInset } from "../../../lib/useVisualKeyboardInset";
 import "./PlannerHabitsSurface.css";
 
 interface PlannerHabitsSurfaceProps {
@@ -17,6 +18,7 @@ interface PlannerHabitsSurfaceProps {
   projects: Project[];
   language: AppLanguage;
   isMobile: boolean;
+  isTouchLayout: boolean;
   onCreateHabit: (input: PlannerHabitCreateInput) => Promise<Habit>;
   onUpdateHabit: (habitId: string, patch: PlannerHabitUpdateInput) => Promise<Habit | null>;
   onDeleteHabit: (habitId: string) => Promise<void>;
@@ -193,6 +195,7 @@ export default function PlannerHabitsSurface({
   projects,
   language,
   isMobile,
+  isTouchLayout,
   onCreateHabit,
   onUpdateHabit,
   onDeleteHabit,
@@ -206,6 +209,7 @@ export default function PlannerHabitsSurface({
   const [cadenceDraft, setCadenceDraft] = useState<PlannerHabitCadencePreset>("daily");
   const [intervalDraft, setIntervalDraft] = useState(2);
   const [isCreating, setIsCreating] = useState(false);
+  const keyboardInset = useVisualKeyboardInset(isMobile);
   const summaries = useMemo(
     () =>
       buildPlannerHabitSummaries({
@@ -292,7 +296,7 @@ export default function PlannerHabitsSurface({
 
     setSelectedHabitId(null);
 
-    if (isComposerOpen) {
+    if (isComposerOpen && !isTouchLayout) {
       closeComposer();
     }
   };
@@ -619,7 +623,12 @@ export default function PlannerHabitsSurface({
       ) : null}
 
       {isMobile && isComposerOpen ? (
-        <div className="planner-habit-mobile-sheet-layer" role="dialog" aria-modal="true">
+        <div
+          className="planner-habit-mobile-sheet-layer"
+          role="dialog"
+          aria-modal="true"
+          style={{ "--planner-keyboard-inset": `${keyboardInset}px` } as CSSProperties}
+        >
           <button type="button" className="planner-habit-mobile-sheet-backdrop" onClick={closeComposer} aria-label={language === "ru" ? "Закрыть" : "Close"} />
           <section className="planner-habit-mobile-sheet is-composer">
             <div className="planner-habit-mobile-sheet-handle" aria-hidden="true" />
@@ -629,7 +638,12 @@ export default function PlannerHabitsSurface({
       ) : null}
 
       {isMobile && selectedSummary ? (
-        <div className="planner-habit-mobile-sheet-layer" role="dialog" aria-modal="true">
+        <div
+          className="planner-habit-mobile-sheet-layer"
+          role="dialog"
+          aria-modal="true"
+          style={{ "--planner-keyboard-inset": `${keyboardInset}px` } as CSSProperties}
+        >
           <button
             type="button"
             className="planner-habit-mobile-sheet-backdrop"

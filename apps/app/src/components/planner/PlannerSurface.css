@@ -1135,25 +1135,33 @@
 }
 
 .planner-mobile-sheet-layer {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 2147482800;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 14px 10px;
+  box-sizing: border-box;
+  padding:
+    max(12px, env(safe-area-inset-top, 0px))
+    max(10px, env(safe-area-inset-right, 0px))
+    calc(max(14px, env(safe-area-inset-bottom, 0px)) + var(--planner-keyboard-inset, 0px) + 8px)
+    max(10px, env(safe-area-inset-left, 0px));
+  overflow: hidden;
 }
 
 .planner-mobile-sheet-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   border: 0;
   background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(12px) saturate(122%);
 }
 
 .planner-composer.is-sheet {
   width: min(100%, 620px);
-  max-height: calc(100% - 28px);
+  box-sizing: border-box;
+  max-height: min(720px, calc(100dvh - var(--planner-keyboard-inset, 0px) - 32px));
   border-radius: 24px;
 }
 
@@ -1235,5 +1243,63 @@
   .planner-composer.is-sheet .planner-composer-title-field input,
   .planner-composer.is-sheet .planner-composer-date-card button {
     min-height: 38px;
+  }
+}
+
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline {
+  max-height: min(72dvh, 520px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline .planner-composer-capture {
+  grid-template-columns: minmax(0, 1fr) minmax(176px, 0.46fr);
+  grid-template-areas:
+    "title title"
+    "date create"
+    "project project"
+    "priority priority";
+  gap: 10px 12px;
+  align-items: end;
+}
+
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline .planner-composer-title-field {
+  grid-area: title;
+}
+
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline .planner-composer-date-card {
+  grid-area: date;
+}
+
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline .planner-composer-choice.is-project {
+  grid-area: project;
+}
+
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline .planner-composer-choice.is-priority {
+  grid-area: priority;
+}
+
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline .planner-primary-action.is-create-task {
+  grid-area: create;
+  grid-column: auto;
+  grid-row: auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline .planner-composer-chip-row button,
+.planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline .planner-composer-priority-row button {
+  min-height: 36px;
+  max-width: min(230px, 42vw);
+}
+
+@media (max-height: 720px) {
+  .planner-surface.is-touch-layout.is-desktop .planner-main-head p {
+    display: none;
+  }
+
+  .planner-surface.is-touch-layout.is-desktop .planner-composer.is-inline {
+    max-height: min(68dvh, 460px);
   }
 }

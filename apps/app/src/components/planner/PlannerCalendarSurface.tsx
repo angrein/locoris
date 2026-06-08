@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 
-import type { AppLanguage, Project, Task, TimeBlock } from "../../types";
+import type { AppLanguage, Habit, HabitLog, Project, Task, TimeBlock } from "../../types";
 import {
   formatPlannerDate,
   formatPlannerTime,
@@ -11,12 +11,19 @@ import {
   isPlannerTaskActive,
   type PlannerTimeBlockCreateInput,
   type PlannerTimeBlockUpdateInput,
-  type PlannerTaskCreateInput
+  type PlannerTaskCreateInput,
+  type PlannerTaskUpdateInput
 } from "../../lib/planner";
 import {
+  buildRecurringTaskPatch,
   getPlannerTaskOccurrencesForRange,
+  isRecurringPlannerRule,
   type PlannerTaskOccurrence
 } from "../../lib/plannerRecurrence";
+import {
+  isPlannerHabitCompletedOnDay,
+  isPlannerHabitDueOnDay
+} from "../../lib/plannerHabits";
 import "./PlannerCalendarSurface.css";
 
 type CalendarMode = "day" | "week" | "month";
@@ -25,6 +32,8 @@ type MobileCalendarPanel = "agenda" | "unscheduled" | null;
 
 interface PlannerCalendarSurfaceProps {
   tasks: Task[];
+  habits: Habit[];
+  habitLogs: HabitLog[];
   timeBlocks: TimeBlock[];
   projects: Project[];
   language: AppLanguage;
@@ -33,6 +42,8 @@ interface PlannerCalendarSurfaceProps {
   onClose: () => void;
   onSelectTask: (taskId: string) => void;
   onCreateTask: (input: PlannerTaskCreateInput) => Promise<Task>;
+  onUpdateTask: (taskId: string, patch: PlannerTaskUpdateInput) => Promise<Task | null>;
+  onToggleHabitLog: (habitId: string, dayAt?: number) => Promise<HabitLog | null>;
   onCreateTimeBlock: (input: PlannerTimeBlockCreateInput) => Promise<TimeBlock>;
   onUpdateTimeBlock: (timeBlockId: string, patch: PlannerTimeBlockUpdateInput) => Promise<TimeBlock | null>;
   onDeleteTimeBlock: (timeBlockId: string) => Promise<void>;
@@ -54,6 +65,7 @@ interface CalendarEventBase {
   startAt: number;
   endAt: number;
   color: string;
+  isAllDay: boolean;
   taskId: string | null;
 }
 
@@ -68,7 +80,13 @@ interface OccurrenceCalendarEvent extends CalendarEventBase {
   isDueOnly: boolean;
 }
 
-type CalendarEvent = TimeBlockCalendarEvent | OccurrenceCalendarEvent;
+interface HabitCalendarEvent extends CalendarEventBase {
+  kind: "habit";
+  habit: Habit;
+  completed: boolean;
+}
+
+type CalendarEvent = TimeBlockCalendarEvent | OccurrenceCalendarEvent | HabitCalendarEvent;
 type QuickCreateDraft = {
   title: string;
   startAt: number;
@@ -78,6 +96,7 @@ type QuickCreateDraft = {
 
 const QUICK_CREATE_DURATIONS = [30, 45, 60, 120] as const;
 const PLANNER_INBOX_EVENT_COLOR = "var(--planner-calendar-inbox-color, var(--planner-calendar-accent))";
+const DAY_MS = 86_400_000;
 
 function addDays(value: number, days: number) {
   const date = new Date(value);
@@ -209,6 +228,26 @@ function getCalendarEventSubtitle(event: CalendarEvent, language: AppLanguage) {
     return `${formatPlannerTime(event.startAt, language)} - ${formatPlannerTime(event.endAt, language)}`;
   }
 
+  if (event.kind === "habit") {
+    if (event.completed) {
+      return language === "ru" ? "Привычка · отмечено" : "Habit · done";
+    }
+
+    return language === "ru" ? "Привычка · весь день" : "Habit · all day";
+  }
+
+  if (event.isAllDay) {
+    const kindLabel = event.isDueOnly
+      ? language === "ru"
+        ? "срок"
+        : "due"
+      : language === "ru"
+        ? "запланировано"
+        : "scheduled";
+
+    return `${language === "ru" ? "Весь день" : "All day"} · ${kindLabel}`;
+  }
+
   const timeLabel =
     event.occurrence.scheduledEndAt && !event.isDueOnly
       ? `${formatPlannerTime(event.startAt, language)} - ${formatPlannerTime(event.endAt, language)}`
@@ -222,6 +261,26 @@ function getCalendarEventSubtitle(event: CalendarEvent, language: AppLanguage) {
       : "scheduled";
 
   return `${timeLabel} · ${kindLabel}`;
+}
+
+function isOccurrenceAllDay(occurrence: PlannerTaskOccurrence) {
+  if (!occurrence.scheduledStartAt) {
+    return true;
+  }
+
+  const duration = occurrence.endAt - occurrence.startAt;
+  const startsAtDayStart = occurrence.startAt === getStartOfLocalDay(occurrence.startAt);
+  const endsAfterWorkday = occurrence.endAt >= getEndOfLocalDay(occurrence.startAt) - 15 * 60_000;
+
+  return !occurrence.task.estimateMinutes && (duration >= DAY_MS - 30 * 60_000 || startsAtDayStart || endsAfterWorkday);
+}
+
+function getTimedEvents(events: CalendarEvent[]) {
+  return events.filter((event) => !event.isAllDay);
+}
+
+function getAllDayEvents(events: CalendarEvent[]) {
+  return events.filter((event) => event.isAllDay);
 }
 
 function getEventSlotHour(event: CalendarEvent, day: CalendarDay, firstVisibleHour: number) {
@@ -238,6 +297,8 @@ function getEventSlotHour(event: CalendarEvent, day: CalendarDay, firstVisibleHo
 
 export default function PlannerCalendarSurface({
   tasks,
+  habits,
+  habitLogs,
   timeBlocks,
   projects,
   language,
@@ -246,6 +307,8 @@ export default function PlannerCalendarSurface({
   onClose,
   onSelectTask,
   onCreateTask,
+  onUpdateTask,
+  onToggleHabitLog,
   onCreateTimeBlock,
   onUpdateTimeBlock,
   onDeleteTimeBlock
@@ -309,6 +372,28 @@ export default function PlannerCalendarSurface({
         }),
     [range.endAt, range.startAt, tasks, visibleTimeBlocks]
   );
+  const visibleHabitEvents = useMemo<CalendarEvent[]>(
+    () =>
+      range.days.flatMap((day) =>
+        habits
+          .filter((habit) => isPlannerHabitDueOnDay(habit, day.startAt))
+          .map((habit) => ({
+            id: `habit:${habit.id}:${day.startAt}`,
+            kind: "habit" as const,
+            habit,
+            title: habit.title,
+            startAt: day.startAt,
+            endAt: day.endAt,
+            color: habit.projectId
+              ? projectMap.get(habit.projectId)?.color ?? habit.color
+              : habit.color || PLANNER_INBOX_EVENT_COLOR,
+            isAllDay: true,
+            taskId: null,
+            completed: isPlannerHabitCompletedOnDay(habit, habitLogs, day.startAt)
+          }))
+      ),
+    [habitLogs, habits, projectMap, range.days]
+  );
   const events = useMemo<CalendarEvent[]>(() => {
     const blockEvents = visibleTimeBlocks.map((timeBlock) => ({
       id: `timeBlock:${timeBlock.id}`,
@@ -318,6 +403,7 @@ export default function PlannerCalendarSurface({
       startAt: timeBlock.startAt,
       endAt: timeBlock.endAt,
       color: timeBlock.projectId ? projectMap.get(timeBlock.projectId)?.color ?? timeBlock.color : timeBlock.color || PLANNER_INBOX_EVENT_COLOR,
+      isAllDay: false,
       taskId: timeBlock.taskId
     }));
     const occurrenceEvents = visibleOccurrences.map((occurrence) => ({
@@ -328,12 +414,13 @@ export default function PlannerCalendarSurface({
       startAt: occurrence.startAt,
       endAt: occurrence.endAt,
       color: getEventProjectColor(occurrence, projectMap),
+      isAllDay: isOccurrenceAllDay(occurrence),
       taskId: occurrence.task.id,
       isDueOnly: !occurrence.scheduledStartAt
     }));
 
-    return sortCalendarEvents([...blockEvents, ...occurrenceEvents]);
-  }, [projectMap, visibleOccurrences, visibleTimeBlocks]);
+    return sortCalendarEvents([...blockEvents, ...occurrenceEvents, ...visibleHabitEvents]);
+  }, [projectMap, visibleHabitEvents, visibleOccurrences, visibleTimeBlocks]);
   const unscheduledTasks = useMemo(
     () =>
       tasks
@@ -361,7 +448,7 @@ export default function PlannerCalendarSurface({
     () => (range.days[0] ? sortCalendarEvents(getEventsForDay(events, range.days[0])) : []),
     [events, range.days]
   );
-  const { startHour, endHour } = useMemo(() => getVisibleHourRange(mode === "day" ? dayModeEvents : selectedDayEvents), [
+  const { startHour, endHour } = useMemo(() => getVisibleHourRange(getTimedEvents(mode === "day" ? dayModeEvents : selectedDayEvents)), [
     dayModeEvents,
     mode,
     selectedDayEvents
@@ -421,24 +508,31 @@ export default function PlannerCalendarSurface({
     }
   };
 
+  const openQuickCreate = (dayStartAt = selectedDay?.startAt ?? getStartOfLocalDay(), hour: number | null = null) => {
+    const normalizedDayStartAt = getStartOfLocalDay(dayStartAt);
+    const rangeForBlock = getDefaultTimeBlockRange(normalizedDayStartAt, hour ?? 9);
+
+    setSelectedDayAt(normalizedDayStartAt);
+    setQuickCreateDraft({
+      title: "",
+      startAt: hour === null ? normalizedDayStartAt : rangeForBlock.startAt,
+      endAt: hour === null ? null : rangeForBlock.endAt,
+      mode: hour === null ? "date" : "time"
+    });
+  };
+
   const handleDayTap = async (dayStartAt: number, hour = 9) => {
-    setSelectedDayAt(dayStartAt);
+    const normalizedDayStartAt = getStartOfLocalDay(dayStartAt);
+    setSelectedDayAt(normalizedDayStartAt);
 
     if (!tapScheduleTaskId) {
-      const rangeForBlock = getDefaultTimeBlockRange(dayStartAt, hour);
-      setQuickCreateDraft({
-        title: "",
-        startAt: mode === "day" ? rangeForBlock.startAt : new Date(dayStartAt).setHours(12, 0, 0, 0),
-        endAt: mode === "day" ? rangeForBlock.endAt : null,
-        mode: mode === "day" ? "time" : "date"
-      });
       return;
     }
 
     const task = tasks.find((candidate) => candidate.id === tapScheduleTaskId);
 
     if (task) {
-      await scheduleTask(task, dayStartAt, hour);
+      await scheduleTask(task, normalizedDayStartAt, hour);
     }
   };
 
@@ -503,12 +597,55 @@ export default function PlannerCalendarSurface({
     });
   };
 
+  const toggleOccurrenceDone = async (event: OccurrenceCalendarEvent) => {
+    const task = event.occurrence.task;
+    const marker = event.occurrence.originalStartAt;
+
+    if (isRecurringPlannerRule(task.recurrenceRule)) {
+      if (event.occurrence.completed) {
+        await onUpdateTask(task.id, {
+          recurrenceCompletedDates: (task.recurrenceCompletedDates ?? []).filter((date) => date !== marker),
+          completedAt: null,
+          status: task.status === "done" ? (task.scheduledStartAt ? "scheduled" : "todo") : task.status
+        });
+        return;
+      }
+
+      await onUpdateTask(task.id, buildRecurringTaskPatch(task, "completeOccurrence", marker));
+      return;
+    }
+
+    await onUpdateTask(task.id, {
+      status: event.occurrence.completed ? (task.scheduledStartAt ? "scheduled" : "todo") : "done",
+      completedAt: event.occurrence.completed ? null : Date.now()
+    });
+  };
+
+  const removeOccurrenceFromCalendar = async (event: OccurrenceCalendarEvent) => {
+    const task = event.occurrence.task;
+
+    if (isRecurringPlannerRule(task.recurrenceRule)) {
+      await onUpdateTask(task.id, buildRecurringTaskPatch(task, "skipOccurrence", event.occurrence.originalStartAt));
+      return;
+    }
+
+    await onUpdateTask(task.id, {
+      dueAt: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      estimateMinutes: null,
+      status: task.status === "scheduled" ? "todo" : task.status
+    });
+  };
+
   const renderCalendarEvent = (event: CalendarEvent, variant: CalendarEventVariant = "compact") => {
     const isCompleted =
       event.kind === "timeBlock"
         ? event.timeBlock.status === "completed"
-        : event.occurrence.completed;
-    const showTimeBlockActions = event.kind === "timeBlock" && (variant === "wide" || variant === "month");
+        : event.kind === "occurrence"
+          ? event.occurrence.completed
+          : event.completed;
+    const showEventActions = variant === "wide" || variant === "month";
 
     return (
       <article
@@ -537,81 +674,126 @@ export default function PlannerCalendarSurface({
           <strong>{event.title}</strong>
           <small>{getCalendarEventSubtitle(event, language)}</small>
         </span>
-        {showTimeBlockActions ? (
+        {showEventActions ? (
           <span className="planner-calendar-event-actions">
             <button
               type="button"
               onClick={(eventObject) => {
                 eventObject.stopPropagation();
-                void onUpdateTimeBlock(event.timeBlock.id, {
-                  status: event.timeBlock.status === "completed" ? "planned" : "completed",
-                  actualEndAt: event.timeBlock.status === "completed" ? null : Date.now()
-                });
+                if (event.kind === "timeBlock") {
+                  void onUpdateTimeBlock(event.timeBlock.id, {
+                    status: event.timeBlock.status === "completed" ? "planned" : "completed",
+                    actualEndAt: event.timeBlock.status === "completed" ? null : Date.now()
+                  });
+                  return;
+                }
+
+                if (event.kind === "habit") {
+                  void onToggleHabitLog(event.habit.id, event.startAt);
+                  return;
+                }
+
+                void toggleOccurrenceDone(event);
               }}
               title={
-                event.timeBlock.status === "completed"
+                isCompleted
                   ? language === "ru"
-                    ? "Вернуть в план"
-                    : "Reopen time block"
+                    ? "Вернуть"
+                    : "Reopen"
                   : language === "ru"
                     ? "Отметить выполненным"
-                    : "Mark time block done"
+                    : "Mark done"
               }
-              aria-label={language === "ru" ? "Изменить статус блока времени" : "Toggle time block status"}
+              aria-label={language === "ru" ? "Изменить статус события" : "Toggle event status"}
             >
               <span className="planner-calendar-event-action-icon is-done" aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              onClick={(eventObject) => {
-                eventObject.stopPropagation();
-                void onDeleteTimeBlock(event.timeBlock.id);
-              }}
-              title={language === "ru" ? "Убрать из календаря" : "Remove from calendar"}
-              aria-label={language === "ru" ? "Удалить блок времени" : "Delete time block"}
-            >
-              <span className="planner-calendar-event-action-icon is-remove" aria-hidden="true" />
-            </button>
+            {event.kind !== "habit" ? (
+              <button
+                type="button"
+                onClick={(eventObject) => {
+                  eventObject.stopPropagation();
+                  if (event.kind === "timeBlock") {
+                    void onDeleteTimeBlock(event.timeBlock.id);
+                    return;
+                  }
+
+                  void removeOccurrenceFromCalendar(event);
+                }}
+                title={language === "ru" ? "Убрать из календаря" : "Remove from calendar"}
+                aria-label={language === "ru" ? "Убрать из календаря" : "Remove from calendar"}
+              >
+                <span className="planner-calendar-event-action-icon is-remove" aria-hidden="true" />
+              </button>
+            ) : null}
           </span>
         ) : null}
       </article>
     );
   };
 
-  const renderDayAgenda = (day: CalendarDay, dayEvents: CalendarEvent[]) => (
-    <div className="planner-calendar-day-agenda">
-      {hours.map((hour) => {
-        const slotEvents = dayEvents.filter((event) => getEventSlotHour(event, day, startHour) === hour);
+  const renderDayAgenda = (day: CalendarDay, dayEvents: CalendarEvent[]) => {
+    const allDayEvents = getAllDayEvents(dayEvents);
+    const timedEvents = getTimedEvents(dayEvents);
 
-        return (
-          <section
-            key={hour}
-            className={`planner-calendar-time-slot ${slotEvents.length > 0 ? "has-events" : ""}`}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => void handleTaskDrop(event, day.startAt, hour)}
-            onClick={() => void handleDayTap(day.startAt, hour)}
-          >
-            <time>{String(hour).padStart(2, "0")}:00</time>
-            <div>
-              {slotEvents.length > 0 ? (
-                slotEvents.map((event) => renderCalendarEvent(event, "wide"))
-              ) : (
-                <span className="planner-calendar-empty-slot">
-                  {tapScheduleTaskId
-                    ? language === "ru"
-                      ? "Тапни, чтобы поставить сюда"
-                      : "Tap to schedule here"
-                    : language === "ru"
-                      ? "Свободно"
-                      : "Free"}
-                </span>
-              )}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
+    return (
+      <div className="planner-calendar-day-agenda">
+        <section
+          className={`planner-calendar-all-day-slot ${allDayEvents.length > 0 ? "has-events" : ""}`}
+          onClick={() => void handleDayTap(day.startAt)}
+          onDoubleClick={() => openQuickCreate(day.startAt, null)}
+        >
+          <time>{language === "ru" ? "Весь день" : "All day"}</time>
+          <div>
+            {allDayEvents.length > 0 ? (
+              allDayEvents.map((event) => renderCalendarEvent(event, "wide"))
+            ) : (
+              <span className="planner-calendar-empty-slot">
+                {tapScheduleTaskId
+                  ? language === "ru"
+                    ? "Тапни, чтобы поставить на день"
+                    : "Tap to schedule for the day"
+                  : language === "ru"
+                    ? "Нет событий на весь день"
+                    : "No all-day events"}
+              </span>
+            )}
+          </div>
+        </section>
+        {hours.map((hour) => {
+          const slotEvents = timedEvents.filter((event) => getEventSlotHour(event, day, startHour) === hour);
+
+          return (
+            <section
+              key={hour}
+              className={`planner-calendar-time-slot ${slotEvents.length > 0 ? "has-events" : ""}`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => void handleTaskDrop(event, day.startAt, hour)}
+              onClick={() => void handleDayTap(day.startAt, hour)}
+              onDoubleClick={() => openQuickCreate(day.startAt, hour)}
+            >
+              <time>{String(hour).padStart(2, "0")}:00</time>
+              <div>
+                {slotEvents.length > 0 ? (
+                  slotEvents.map((event) => renderCalendarEvent(event, "wide"))
+                ) : (
+                  <span className="planner-calendar-empty-slot">
+                    {tapScheduleTaskId
+                      ? language === "ru"
+                        ? "Тапни, чтобы поставить сюда"
+                        : "Tap to schedule here"
+                      : language === "ru"
+                        ? "Свободно"
+                        : "Free"}
+                  </span>
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderCalendarGrid = () => (
     <div className={`planner-calendar-grid is-${mode}`}>
@@ -630,6 +812,11 @@ export default function PlannerCalendarSurface({
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => void handleTaskDrop(event, day.startAt)}
             onClick={() => void handleDayTap(day.startAt)}
+            onDoubleClick={() => {
+              if (!tapScheduleTaskId) {
+                openQuickCreate(day.startAt, null);
+              }
+            }}
           >
             <header>
               <span>{day.weekday}</span>
@@ -895,6 +1082,15 @@ export default function PlannerCalendarSurface({
               </button>
             </div>
 
+            <button
+              type="button"
+              className="planner-calendar-create-button"
+              onClick={() => openQuickCreate(selectedDay?.startAt ?? cursorAt, mode === "day" ? 9 : null)}
+            >
+              <span aria-hidden="true">+</span>
+              {language === "ru" ? "Новая" : "New"}
+            </button>
+
             <button type="button" className="planner-calendar-close" onClick={onClose} aria-label={language === "ru" ? "Закрыть календарь" : "Close calendar"}>
               ×
             </button>
@@ -939,6 +1135,13 @@ export default function PlannerCalendarSurface({
               <span>
                 <strong>{language === "ru" ? "Без времени" : "Unscheduled"}</strong>
                 <small>{unscheduledTasks.length}</small>
+              </span>
+            </button>
+            <button type="button" onClick={() => openQuickCreate(selectedDay?.startAt ?? cursorAt, null)}>
+              <span className="planner-calendar-mobile-dock-icon is-create" aria-hidden="true" />
+              <span>
+                <strong>{language === "ru" ? "Новая" : "New"}</strong>
+                <small>{selectedDay ? formatPlannerDate(selectedDay.startAt, language) : ""}</small>
               </span>
             </button>
           </nav>
