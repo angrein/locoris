@@ -264,6 +264,10 @@ export default function App() {
   const [orbitalOpen, setOrbitalOpen] = useState(false);
   const [orbitalEditorNoteId, setOrbitalEditorNoteId] = useState<string | null>(null);
   const [plannerProjectFocusId, setPlannerProjectFocusId] = useState<string | null>(null);
+  const [orbitalProjectFocusRequest, setOrbitalProjectFocusRequest] = useState<{
+    projectId: string;
+    requestId: number;
+  } | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<{
     tone: "success" | "error";
     text: string;
@@ -3324,6 +3328,14 @@ export default function App() {
     setPlannerProjectFocusId(projectId);
   };
 
+  const handleOpenProjectOnMap = (projectId: string) => {
+    setPlannerProjectFocusId(null);
+    setOrbitalProjectFocusRequest((current) => ({
+      projectId,
+      requestId: (current?.requestId ?? 0) + 1
+    }));
+  };
+
   const closeConfirmDialog = (result: boolean) => {
     const resolve = confirmResolverRef.current;
     confirmResolverRef.current = null;
@@ -3376,6 +3388,7 @@ export default function App() {
         adaptiveLayout={adaptiveLayout}
         orbitalAnimationMode={orbitalAnimationMode}
         orbitalTemporalSignalsMode={orbitalTemporalSignalsMode}
+        projectFocusRequest={orbitalProjectFocusRequest}
         onOrbitalAnimationModeChange={handleChangeOrbitalAnimationMode}
         projects={projects}
         folders={folders}
@@ -3531,16 +3544,17 @@ export default function App() {
 	            onUpdateTask={handleUpdatePlannerTask}
 	            onToggleTaskDone={handleTogglePlannerTaskDone}
 	            onDeleteTask={handleDeletePlannerTask}
-	            onCreateHabit={handleCreatePlannerHabit}
-	            onUpdateHabit={handleUpdatePlannerHabit}
-	            onDeleteHabit={handleDeletePlannerHabit}
-	            onToggleHabitLog={handleTogglePlannerHabitLog}
-	            onCreateTimeBlock={handleCreatePlannerTimeBlock}
-	            onUpdateTimeBlock={handleUpdatePlannerTimeBlock}
-	            onDeleteTimeBlock={handleDeletePlannerTimeBlock}
-	            onCreateTag={handleCreateTag}
-	            onClearProjectFocus={() => setPlannerProjectFocusId(null)}
-	            onOpenNote={(noteId) => void handleOpenOrbitalNote(noteId)}
+            onCreateHabit={handleCreatePlannerHabit}
+            onUpdateHabit={handleUpdatePlannerHabit}
+            onDeleteHabit={handleDeletePlannerHabit}
+            onToggleHabitLog={handleTogglePlannerHabitLog}
+            onCreateTimeBlock={handleCreatePlannerTimeBlock}
+            onUpdateTimeBlock={handleUpdatePlannerTimeBlock}
+            onDeleteTimeBlock={handleDeletePlannerTimeBlock}
+            onCreateTag={handleCreateTag}
+            onClearProjectFocus={() => setPlannerProjectFocusId(null)}
+            onOpenNote={(noteId) => void handleOpenOrbitalNote(noteId)}
+            onOpenProjectMap={handleOpenProjectOnMap}
 	          />
 	        }
         trashModalSlot={

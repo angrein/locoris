@@ -15,6 +15,7 @@ interface PlannerRailProps {
 const VIEW_ICON_CLASS: Record<PlannerViewId, string> = {
   inbox: "is-inbox",
   today: "is-today",
+  overdue: "is-overdue",
   upcoming: "is-upcoming",
   projects: "is-projects",
   habits: "is-habits",

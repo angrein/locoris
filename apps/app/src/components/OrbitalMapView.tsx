@@ -91,6 +91,10 @@ interface OrbitalMapViewProps {
   adaptiveLayout: AppRuntimeLayoutSnapshot;
   orbitalAnimationMode: OrbitalAnimationMode;
   orbitalTemporalSignalsMode: OrbitalTemporalSignalsMode;
+  projectFocusRequest?: {
+    projectId: string;
+    requestId: number;
+  } | null;
   activeLocalVaultId: string;
   localVaultOptions: LocalVaultSwitcherItem[];
   syncStatusChip?: {
@@ -2195,6 +2199,7 @@ export default function OrbitalMapView({
   adaptiveLayout,
   orbitalAnimationMode,
   orbitalTemporalSignalsMode,
+  projectFocusRequest = null,
   activeLocalVaultId,
   localVaultOptions,
   syncStatusChip,
@@ -4341,6 +4346,22 @@ export default function OrbitalMapView({
       y: -project.y
     }, duration);
   };
+
+  useEffect(() => {
+    if (!projectFocusRequest || !orbitalData.projectById.has(projectFocusRequest.projectId)) {
+      return;
+    }
+
+    setSurfaceMode("map");
+    setMobileSection("map");
+    setSelectedEntityId(getProjectEntityId(projectFocusRequest.projectId));
+    setActiveProjectId(null);
+    setInspectorHierarchyScope("vault");
+    setActiveFolderFilters([]);
+    setActiveNoteFilters([]);
+    setInspectorMenu("overview");
+    centerOnProject(projectFocusRequest.projectId, 760);
+  }, [orbitalData.projectById, projectFocusRequest?.projectId, projectFocusRequest?.requestId]);
 
   const getScenePointFromClient = (
     svg: SVGSVGElement,

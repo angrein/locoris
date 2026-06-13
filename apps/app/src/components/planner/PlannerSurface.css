@@ -11,13 +11,13 @@
 
 .planner-surface.is-desktop {
   display: grid;
-  grid-template-columns: minmax(190px, 0.72fr) minmax(420px, 1.8fr) minmax(300px, 0.95fr);
+  grid-template-columns: minmax(220px, 260px) minmax(420px, 1fr) minmax(300px, 340px);
   gap: 16px;
   padding: 18px;
 }
 
 .planner-surface.is-desktop.is-wide-mode {
-  grid-template-columns: minmax(190px, 0.55fr) minmax(0, 2.45fr);
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
 }
 
 .planner-rail,
@@ -177,6 +177,23 @@
   border-right: 0;
   border-radius: 0;
   transform: rotate(-45deg);
+}
+
+.planner-rail-icon.is-overdue::before {
+  inset: 6px;
+  border-radius: 50%;
+}
+
+.planner-rail-icon.is-overdue::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 6px;
+  width: 2px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(8, 12, 24, 0.82);
+  box-shadow: 0 11px 0 rgba(8, 12, 24, 0.82);
 }
 
 .planner-rail-icon.is-calendar::before {
@@ -808,6 +825,10 @@
     0 16px 38px color-mix(in srgb, var(--planner-accent) 10%, transparent);
 }
 
+.planner-task-card.is-today {
+  border-color: color-mix(in srgb, #8edcff 32%, rgba(255, 255, 255, 0.1));
+}
+
 .planner-task-check {
   display: inline-grid;
   place-items: center;
@@ -886,6 +907,12 @@
   text-decoration: line-through;
 }
 
+.planner-task-card.is-done .planner-task-description,
+.planner-task-card.is-done .planner-task-chip {
+  color: rgba(225, 234, 246, 0.46);
+  text-decoration: line-through;
+}
+
 .planner-task-description {
   display: -webkit-box;
   margin: 0;
@@ -949,9 +976,23 @@
 }
 
 .planner-task-chip.is-overdue,
+.planner-task-chip.is-overdue-status,
 .planner-task-card.is-overdue .planner-priority-chip {
+  border: 1px solid rgba(255, 125, 151, 0.28);
   color: #ffd6d6;
   background: rgba(255, 93, 115, 0.16);
+}
+
+.planner-task-chip.is-today-status {
+  border: 1px solid rgba(142, 220, 255, 0.28);
+  background: rgba(142, 220, 255, 0.13);
+  color: rgba(209, 243, 255, 0.92);
+}
+
+.planner-task-chip.is-recurring-status {
+  border: 1px solid color-mix(in srgb, var(--planner-accent-2) 34%, rgba(255, 255, 255, 0.1));
+  background: color-mix(in srgb, var(--planner-accent-2) 14%, rgba(255, 255, 255, 0.052));
+  color: color-mix(in srgb, var(--planner-accent-2) 58%, white);
 }
 
 .planner-priority-chip.is-urgent,
@@ -1220,6 +1261,10 @@
     grid-template-columns: 180px minmax(360px, 1fr) 280px;
     gap: 12px;
     padding: 12px;
+  }
+
+  .planner-surface.is-desktop.is-wide-mode {
+    grid-template-columns: 180px minmax(0, 1fr);
   }
 }
 

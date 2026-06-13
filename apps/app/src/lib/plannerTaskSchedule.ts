@@ -6,7 +6,12 @@ import {
   getEndOfLocalDay,
   getStartOfLocalDay
 } from "./planner";
-import { buildPlannerRRule, summarizePlannerRecurrence, type PlannerRecurrenceFrequency } from "./plannerRecurrence";
+import {
+  buildPlannerRRule,
+  getPlannerTaskPrimaryOccurrence,
+  summarizePlannerRecurrence,
+  type PlannerRecurrenceFrequency
+} from "./plannerRecurrence";
 
 export type PlannerTaskDateRepeat = "none" | PlannerRecurrenceFrequency | "customDaily";
 
@@ -242,6 +247,14 @@ export function getPlannerTaskScheduleSummary(task: Task, language: AppLanguage)
   if (task.recurrenceRule) {
     const anchor = task.scheduledStartAt ?? task.dueAt ?? task.recurrenceAnchorAt;
     const recurrence = summarizePlannerRecurrence(task.recurrenceRule, language);
+    const primaryOccurrence = getPlannerTaskPrimaryOccurrence(task);
+
+    if (primaryOccurrence) {
+      const dateLabel = primaryOccurrence.scheduledStartAt
+        ? formatPlannerDateTime(primaryOccurrence.startAt, language)
+        : formatPlannerDate(primaryOccurrence.startAt, language);
+      return `${recurrence} · ${dateLabel}`;
+    }
 
     if (anchor) {
       const dateLabel = task.scheduledStartAt ? formatPlannerDateTime(anchor, language) : formatPlannerDate(anchor, language);

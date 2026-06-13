@@ -21,6 +21,13 @@ import {
   type PlannerTaskUpdateInput
 } from "../data/db";
 import type { AppLanguage, PlannerTaskPriority, Project, Tag, Task, TimeBlock } from "../types";
+import {
+  getPlannerTaskOccurrenceForDay,
+  getPlannerTaskOverdueOccurrence,
+  getPlannerTaskPrimaryOccurrence,
+  getPlannerTaskUpcomingOccurrence,
+  isRecurringPlannerRule
+} from "./plannerRecurrence";
 
 export {
   createPlannerHabit,
@@ -47,11 +54,12 @@ export type {
   PlannerTimeBlockUpdateInput
 };
 
-export type PlannerViewId = "inbox" | "today" | "upcoming" | "projects" | "habits" | "review";
+export type PlannerViewId = "inbox" | "today" | "overdue" | "upcoming" | "projects" | "habits" | "review";
 
 export const PLANNER_VIEW_IDS: PlannerViewId[] = [
   "inbox",
   "today",
+  "overdue",
   "upcoming",
   "projects",
   "habits",
@@ -71,6 +79,7 @@ export function getPlannerViewLabels(language: AppLanguage): Record<PlannerViewI
     return {
       inbox: "Inbox",
       today: "Сегодня",
+      overdue: "Просрочено",
       upcoming: "Ближайшее",
       projects: "Проекты",
       habits: "Привычки",
@@ -81,6 +90,7 @@ export function getPlannerViewLabels(language: AppLanguage): Record<PlannerViewI
   return {
     inbox: "Inbox",
     today: "Today",
+    overdue: "Overdue",
     upcoming: "Upcoming",
     projects: "Projects",
     habits: "Habits",
@@ -158,20 +168,52 @@ export function isPlannerTaskActive(task: Task) {
   return !isPlannerTaskDone(task) && !isPlannerTaskCanceled(task);
 }
 
+function getPlannerTaskCalendarAnchor(task: Task) {
+  return task.dueAt ?? task.scheduledStartAt ?? task.recurrenceAnchorAt;
+}
+
+function getPlannerTaskSortAnchor(task: Task, now = Date.now()) {
+  if (isRecurringPlannerRule(task.recurrenceRule)) {
+    return getPlannerTaskPrimaryOccurrence(task, now)?.startAt ?? Number.POSITIVE_INFINITY;
+  }
+
+  return getPlannerTaskCalendarAnchor(task) ?? Number.POSITIVE_INFINITY;
+}
+
 export function isPlannerTaskDueToday(task: Task, now = Date.now()) {
-  if (!task.dueAt) {
+  if (isRecurringPlannerRule(task.recurrenceRule)) {
+    return Boolean(isPlannerTaskActive(task) && getPlannerTaskOccurrenceForDay(task, now));
+  }
+
+  const anchor = getPlannerTaskCalendarAnchor(task);
+
+  if (!anchor) {
     return false;
   }
 
-  return task.dueAt >= getStartOfLocalDay(now) && task.dueAt <= getEndOfLocalDay(now);
+  return anchor >= getStartOfLocalDay(now) && anchor <= getEndOfLocalDay(now);
 }
 
 export function isPlannerTaskOverdue(task: Task, now = Date.now()) {
-  return Boolean(task.dueAt && task.dueAt < getStartOfLocalDay(now) && isPlannerTaskActive(task));
+  if (isRecurringPlannerRule(task.recurrenceRule)) {
+    return Boolean(isPlannerTaskActive(task) && getPlannerTaskOverdueOccurrence(task, now));
+  }
+
+  const anchor = getPlannerTaskCalendarAnchor(task);
+  return Boolean(anchor && anchor < getStartOfLocalDay(now) && isPlannerTaskActive(task));
 }
 
 export function isPlannerTaskUpcoming(task: Task, now = Date.now()) {
-  return Boolean(task.dueAt && task.dueAt > getEndOfLocalDay(now) && isPlannerTaskActive(task));
+  if (isRecurringPlannerRule(task.recurrenceRule)) {
+    return Boolean(isPlannerTaskActive(task) && getPlannerTaskUpcomingOccurrence(task, now));
+  }
+
+  const anchor = getPlannerTaskCalendarAnchor(task);
+  return Boolean(anchor && anchor > getEndOfLocalDay(now) && isPlannerTaskActive(task));
+}
+
+export function isPlannerTaskInInbox(task: Task) {
+  return isPlannerTaskActive(task) && (task.status === "inbox" || !task.projectId);
 }
 
 export function formatPlannerDateInput(value: number | null | undefined) {
@@ -286,6 +328,8 @@ function taskMatchesSearch(task: Task, searchQuery: string, projects: Project[],
 }
 
 export function sortPlannerTasks(tasks: Task[]) {
+  const now = Date.now();
+
   return [...tasks].sort((left, right) => {
     const leftDone = isPlannerTaskDone(left) ? 1 : 0;
     const rightDone = isPlannerTaskDone(right) ? 1 : 0;
@@ -294,8 +338,8 @@ export function sortPlannerTasks(tasks: Task[]) {
       return leftDone - rightDone;
     }
 
-    const leftDue = left.dueAt ?? Number.POSITIVE_INFINITY;
-    const rightDue = right.dueAt ?? Number.POSITIVE_INFINITY;
+    const leftDue = getPlannerTaskSortAnchor(left, now);
+    const rightDue = getPlannerTaskSortAnchor(right, now);
 
     if (leftDue !== rightDue) {
       return leftDue - rightDue;
@@ -355,11 +399,15 @@ export function getPlannerTasksForView(input: {
     }
 
     if (input.viewId === "inbox") {
-      return task.status === "inbox" && isPlannerTaskActive(task);
+      return isPlannerTaskInInbox(task);
     }
 
     if (input.viewId === "today") {
-      return isPlannerTaskActive(task) && (isPlannerTaskDueToday(task, now) || isPlannerTaskOverdue(task, now));
+      return isPlannerTaskActive(task) && isPlannerTaskDueToday(task, now);
+    }
+
+    if (input.viewId === "overdue") {
+      return isPlannerTaskOverdue(task, now);
     }
 
     if (input.viewId === "upcoming") {
@@ -384,8 +432,9 @@ export function getPlannerStats(tasks: Task[], now = Date.now()) {
   const activeTasks = tasks.filter(isPlannerTaskActive);
 
   return {
-    inbox: activeTasks.filter((task) => task.status === "inbox").length,
-    today: activeTasks.filter((task) => isPlannerTaskDueToday(task, now) || isPlannerTaskOverdue(task, now)).length,
+    inbox: activeTasks.filter(isPlannerTaskInInbox).length,
+    today: activeTasks.filter((task) => isPlannerTaskDueToday(task, now)).length,
+    overdue: activeTasks.filter((task) => isPlannerTaskOverdue(task, now)).length,
     upcoming: activeTasks.filter((task) => isPlannerTaskUpcoming(task, now)).length,
     projects: activeTasks.length,
     habits: 0,

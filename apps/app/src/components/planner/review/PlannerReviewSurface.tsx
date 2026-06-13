@@ -45,8 +45,10 @@ function ReviewTaskRow({
   actionLabel?: string;
   onToggleDone: () => void;
 }) {
+  const completed = tone === "success";
+
   return (
-    <article className={`planner-review-row is-${tone}`}>
+    <article className={`planner-review-row is-${tone} ${completed ? "is-complete" : ""}`}>
       <button type="button" aria-label={actionLabel ?? (language === "ru" ? "Готово" : "Done")} onClick={onToggleDone}>
         <span />
       </button>

@@ -380,9 +380,17 @@
 .planner-review-row button span {
   width: 12px;
   height: 8px;
-  border-left: 2px solid rgba(236, 246, 255, 0.82);
-  border-bottom: 2px solid rgba(236, 246, 255, 0.82);
+  border-left: 2px solid transparent;
+  border-bottom: 2px solid transparent;
   transform: rotate(-45deg);
+}
+
+.planner-review-row.is-complete button {
+  background: linear-gradient(135deg, #8ef0bf, var(--planner-accent));
+}
+
+.planner-review-row.is-complete button span {
+  border-color: rgba(4, 8, 16, 0.88);
 }
 
 .planner-review-row div,
@@ -405,6 +413,12 @@
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.planner-review-row.is-complete strong,
+.planner-review-row.is-complete span {
+  color: rgba(225, 234, 246, 0.52);
+  text-decoration: line-through;
 }
 
 .planner-review-row span,

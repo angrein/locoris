@@ -4,6 +4,7 @@ import type { AppRuntimeLayoutSnapshot } from "../../lib/runtime";
 import type { AppLanguage, Folder, Habit, HabitLog, Note, PlannerTaskPriority, Project, Tag, Task, TimeBlock } from "../../types";
 import {
   formatPlannerDate,
+  getEndOfLocalDay,
   getPlannerPriorityLabel,
   getPlannerProjectName,
   getPlannerStats,
@@ -11,6 +12,7 @@ import {
   getPlannerViewLabels,
   isPlannerTaskActive,
   isPlannerTaskDone,
+  isPlannerTaskDueToday,
   isPlannerTaskOverdue,
   type PlannerHabitCreateInput,
   type PlannerHabitUpdateInput,
@@ -20,6 +22,14 @@ import {
   type PlannerTaskUpdateInput,
   type PlannerViewId
 } from "../../lib/planner";
+import {
+  buildRecurringTaskPatch,
+  buildUncompleteRecurringOccurrencePatch,
+  getPlannerTaskActionOccurrence,
+  getPlannerTaskPrimaryOccurrence,
+  isRecurringPlannerRule,
+  normalizePlannerOccurrenceMarker
+} from "../../lib/plannerRecurrence";
 import { normalizePlannerQuickAddTagName } from "../../lib/plannerQuickAdd";
 import {
   buildPlannerTaskScheduleFields,
@@ -64,6 +74,7 @@ interface PlannerSurfaceProps {
   onCreateTag?: (name: string) => Promise<Tag>;
   onClearProjectFocus?: () => void;
   onOpenNote?: (noteId: string) => void;
+  onOpenProjectMap?: (projectId: string) => void;
 }
 
 interface TaskCardProps {
@@ -75,7 +86,7 @@ interface TaskCardProps {
   isMobile: boolean;
   onSelect: () => void;
   onOpenActions: () => void;
-  onToggleDone: (done: boolean) => void;
+  onToggleDone: (done: boolean, occurrenceStartAt?: number) => void;
 }
 
 const PRIORITIES: PlannerTaskPriority[] = ["none", "low", "medium", "high", "urgent"];
@@ -148,6 +159,10 @@ function TaskCard({
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
   const done = isPlannerTaskDone(task);
   const overdue = isPlannerTaskOverdue(task);
+  const dueToday = isPlannerTaskDueToday(task);
+  const recurring = Boolean(task.recurrenceRule);
+  const primaryOccurrence = recurring ? getPlannerTaskPrimaryOccurrence(task) : null;
+  const displayDateAt = primaryOccurrence?.startAt ?? task.dueAt ?? task.scheduledStartAt;
 
   const clearLongPress = () => {
     if (longPressRef.current !== null) {
@@ -191,7 +206,9 @@ function TaskCard({
       tabIndex={0}
       className={`planner-task-card ${task.description ? "has-description" : ""} ${
         selected ? "is-selected" : ""
-      } ${done ? "is-done" : ""} ${overdue ? "is-overdue" : ""}`}
+      } ${done ? "is-done" : ""} ${overdue ? "is-overdue" : ""} ${dueToday ? "is-today" : ""} ${
+        recurring ? "is-recurring" : ""
+      }`}
       onClick={onSelect}
       onKeyDown={(event) => {
         if (event.key !== "Enter" && event.key !== " ") {
@@ -219,7 +236,7 @@ function TaskCard({
         aria-label={done ? "Отметить задачу невыполненной" : "Отметить задачу выполненной"}
         onClick={(event) => {
           event.stopPropagation();
-          onToggleDone(!done);
+          onToggleDone(!done, primaryOccurrence?.originalStartAt);
         }}
       />
       <div className="planner-task-content">
@@ -233,10 +250,18 @@ function TaskCard({
         </div>
         {task.description ? <p className="planner-task-description">{task.description}</p> : null}
         <div className="planner-task-meta">
-          {task.dueAt ? (
+          {displayDateAt ? (
             <span className={`planner-task-chip is-date ${overdue ? "is-overdue" : ""}`}>
-              {formatPlannerDate(task.dueAt, language)}
+              {formatPlannerDate(displayDateAt, language)}
             </span>
+          ) : null}
+          {overdue ? (
+            <span className="planner-task-chip is-overdue-status">{language === "ru" ? "Просрочено" : "Overdue"}</span>
+          ) : dueToday ? (
+            <span className="planner-task-chip is-today-status">{language === "ru" ? "Сегодня" : "Today"}</span>
+          ) : null}
+          {recurring ? (
+            <span className="planner-task-chip is-recurring-status">{language === "ru" ? "Повтор" : "Repeats"}</span>
           ) : null}
           {projectName ? <span className="planner-task-chip is-project">{projectName}</span> : null}
           {visibleTagNames.map((tagName) => (
@@ -274,8 +299,10 @@ export default function PlannerSurface({
   onCreateTimeBlock,
   onUpdateTimeBlock,
   onDeleteTimeBlock,
+  onCreateTag,
   onClearProjectFocus,
-  onOpenNote
+  onOpenNote,
+  onOpenProjectMap
 }: PlannerSurfaceProps) {
   const isMobile = adaptiveLayout.isMobileShell;
   const isTouchLayout = adaptiveLayout.pointer === "coarse" || adaptiveLayout.isAndroid || isMobile;
@@ -484,6 +511,43 @@ export default function PlannerSurface({
   const closeComposer = () => {
     setIsComposerOpen(false);
     setIsComposerDateOpen(false);
+  };
+
+  const getCompletedOccurrenceMarker = (task: Task) => {
+    const todayEndAt = getEndOfLocalDay();
+    const markers = (task.recurrenceCompletedDates ?? [])
+      .map(normalizePlannerOccurrenceMarker)
+      .sort((left, right) => left - right);
+
+    return markers.filter((marker) => marker <= todayEndAt).at(-1) ?? markers.at(-1) ?? null;
+  };
+
+  const handleToggleTaskDone = async (taskId: string, done: boolean, occurrenceStartAt?: number) => {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+
+    if (!task || !isRecurringPlannerRule(task.recurrenceRule)) {
+      return onToggleTaskDone(taskId, done);
+    }
+
+    if (!done) {
+      const marker = occurrenceStartAt ? normalizePlannerOccurrenceMarker(occurrenceStartAt) : getCompletedOccurrenceMarker(task);
+
+      if (!marker) {
+        return onToggleTaskDone(taskId, false);
+      }
+
+      return onUpdateTask(taskId, buildUncompleteRecurringOccurrencePatch(task, marker));
+    }
+
+    const occurrence = occurrenceStartAt
+      ? { originalStartAt: normalizePlannerOccurrenceMarker(occurrenceStartAt) }
+      : getPlannerTaskActionOccurrence(task);
+
+    if (!occurrence) {
+      return onToggleTaskDone(taskId, true);
+    }
+
+    return onUpdateTask(taskId, buildRecurringTaskPatch(task, "completeOccurrence", occurrence.originalStartAt));
   };
 
   const handleViewChange = (viewId: PlannerViewId) => {
@@ -877,7 +941,7 @@ export default function PlannerSurface({
             timeBlocks={timeBlocks}
             language={language}
             isMobile={isMobile}
-            onToggleTaskDone={onToggleTaskDone}
+            onToggleTaskDone={handleToggleTaskDone}
             onToggleHabitLog={onToggleHabitLog}
           />
         ) : (
@@ -912,7 +976,7 @@ export default function PlannerSurface({
                       isMobile={isMobile}
                       onSelect={() => setSelectedTaskId(task.id)}
                       onOpenActions={() => setSelectedTaskId(task.id)}
-                      onToggleDone={(done) => void onToggleTaskDone(task.id, done)}
+                      onToggleDone={(done, occurrenceStartAt) => void handleToggleTaskDone(task.id, done, occurrenceStartAt)}
                     />
                   );
                 })
@@ -941,8 +1005,10 @@ export default function PlannerSurface({
           tags={tags}
           language={language}
           onOpenNote={onOpenNote}
+          onOpenProjectMap={onOpenProjectMap}
+          onCreateTag={onCreateTag}
           onUpdate={(taskId, patch) => void onUpdateTask(taskId, patch)}
-          onToggleDone={(taskId, done) => void onToggleTaskDone(taskId, done)}
+          onToggleDone={(taskId, done, occurrenceStartAt) => void handleToggleTaskDone(taskId, done, occurrenceStartAt)}
           onDelete={async (taskId) => {
             await onDeleteTask(taskId);
             setSelectedTaskId(null);
@@ -1002,8 +1068,10 @@ export default function PlannerSurface({
             isMobile
             onClose={() => setSelectedTaskId(null)}
             onOpenNote={onOpenNote}
+            onOpenProjectMap={onOpenProjectMap}
+            onCreateTag={onCreateTag}
             onUpdate={(taskId, patch) => void onUpdateTask(taskId, patch)}
-            onToggleDone={(taskId, done) => void onToggleTaskDone(taskId, done)}
+            onToggleDone={(taskId, done, occurrenceStartAt) => void handleToggleTaskDone(taskId, done, occurrenceStartAt)}
             onDelete={async (taskId) => {
               await onDeleteTask(taskId);
               setSelectedTaskId(null);
@@ -1019,13 +1087,19 @@ export default function PlannerSurface({
           habitLogs={habitLogs}
           timeBlocks={timeBlocks}
           projects={projects}
+          notes={notes}
+          tags={tags}
           language={language}
           isMobile={isMobile}
           selectedTaskId={selectedTaskId}
           onClose={() => setIsCalendarOpen(false)}
           onSelectTask={setSelectedTaskId}
+          onOpenNote={onOpenNote}
+          onOpenProjectMap={onOpenProjectMap}
+          onCreateTag={onCreateTag}
           onCreateTask={onCreateTask}
           onUpdateTask={onUpdateTask}
+          onDeleteTask={onDeleteTask}
           onToggleHabitLog={onToggleHabitLog}
           onCreateTimeBlock={onCreateTimeBlock}
           onUpdateTimeBlock={onUpdateTimeBlock}

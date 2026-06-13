@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 
 import type { AppLanguage, Folder, Note, PlannerTaskPriority, Project, Reminder, Tag, Task } from "../../types";
 import { getDisplayNoteTitle } from "../../lib/displayNames";
@@ -7,6 +8,12 @@ import {
   getPlannerStatusLabel
 } from "../../lib/planner";
 import { normalizePlannerQuickAddTagName } from "../../lib/plannerQuickAdd";
+import {
+  buildRescheduleOccurrencePatch,
+  buildRescheduleRecurringSeriesPatch,
+  getPlannerTaskPrimaryOccurrence,
+  isRecurringPlannerRule
+} from "../../lib/plannerRecurrence";
 import {
   buildPlannerTaskSchedulePatch,
   getPlannerTaskDateDraft,
@@ -25,9 +32,11 @@ interface PlannerTaskInspectorViewProps {
   language: AppLanguage;
   isMobile?: boolean;
   onUpdate: (taskId: string, patch: Partial<Task>) => Promise<void> | void;
-  onToggleDone: (taskId: string, done: boolean) => Promise<void> | void;
+  onToggleDone: (taskId: string, done: boolean, occurrenceStartAt?: number) => Promise<void> | void;
   onDelete: (taskId: string) => Promise<void> | void;
   onOpenNote?: (noteId: string) => void;
+  onOpenProjectMap?: (projectId: string) => void;
+  onCreateTag?: (name: string) => Promise<Tag>;
   onClose?: () => void;
 }
 
@@ -36,6 +45,7 @@ type PlannerBacklink = {
   kind: "project" | "folder" | "note" | "canvas" | "block" | "canvasElement" | "url";
   title: string;
   subtitle: string;
+  projectId?: string | null;
   noteId?: string | null;
   url?: string | null;
 };
@@ -45,6 +55,13 @@ const STATUSES: Task["status"][] = ["inbox", "todo", "scheduled", "inProgress", 
 const REMINDER_PRESETS = ["none", "0", "15", "60", "1440"] as const;
 
 type PlannerReminderPreset = (typeof REMINDER_PRESETS)[number];
+type PlannerTaskDateScope = "this" | "future" | "all";
+type PlannerTaskScopedDateAction = {
+  originalStartAt: number;
+  currentStartAt: number;
+  nextStartAt: number;
+  nextEndAt: number | null;
+};
 
 function getBacklinkKindLabel(kind: PlannerBacklink["kind"], language: AppLanguage) {
   const labels =
@@ -77,6 +94,12 @@ function getTagKey(name: string) {
 
 function getShortId(value: string | null | undefined) {
   return value ? value.slice(0, 8) : "";
+}
+
+function shiftLocalDay(value: number, days: number) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date.getTime();
 }
 
 function getBacklinkCanonicalKey(input: {
@@ -149,7 +172,8 @@ function buildPlannerBacklinks(input: {
       key: `project:${task.projectId}`,
       kind: "project",
       title: project?.name ?? (language === "ru" ? "Проект" : "Project"),
-      subtitle: getBacklinkKindLabel("project", language)
+      subtitle: getBacklinkKindLabel("project", language),
+      projectId: task.projectId
     });
   }
 
@@ -227,6 +251,7 @@ function buildPlannerBacklinks(input: {
       kind: link.kind,
       title: link.label || getBacklinkKindLabel(link.kind, language),
       subtitle: getBacklinkKindLabel(link.kind, language),
+      projectId: link.projectId,
       noteId: link.noteId ?? link.canvasId,
       url: link.url
     });
@@ -289,7 +314,7 @@ function buildReminder(task: Task, preset: PlannerReminderPreset, language: AppL
       id: crypto.randomUUID(),
       title: language === "ru" ? "Напоминание" : "Reminder",
       remindAt: task.scheduledStartAt ? null : baseAt - offsetMinutes * 60_000,
-      offsetMinutes: task.scheduledStartAt ? offsetMinutes : null,
+      offsetMinutes,
       channel: "system",
       enabled: true,
       createdAt: timestamp,
@@ -310,21 +335,31 @@ export default function PlannerTaskInspectorView({
   onToggleDone,
   onDelete,
   onOpenNote,
+  onOpenProjectMap,
+  onCreateTag,
   onClose
 }: PlannerTaskInspectorViewProps) {
   const [titleDraft, setTitleDraft] = useState(task?.title ?? "");
   const [descriptionDraft, setDescriptionDraft] = useState(task?.description ?? "");
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false);
-  const [isProjectPickerOpen, setIsProjectPickerOpen] = useState(false);
+  const [isReminderPickerOpen, setIsReminderPickerOpen] = useState(false);
+  const [scopedDateAction, setScopedDateAction] = useState<PlannerTaskScopedDateAction | null>(null);
   const [areTagsExpanded, setAreTagsExpanded] = useState(false);
+  const [isTagCreatorOpen, setIsTagCreatorOpen] = useState(false);
+  const [tagDraft, setTagDraft] = useState("");
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
 
   useEffect(() => {
     setTitleDraft(task?.title ?? "");
     setDescriptionDraft(task?.description ?? "");
     setDeleteArmed(false);
     setIsDateSelectorOpen(false);
-    setIsProjectPickerOpen(false);
+    setIsReminderPickerOpen(false);
+    setScopedDateAction(null);
+    setIsTagCreatorOpen(false);
+    setTagDraft("");
+    setIsCreatingTag(false);
   }, [task?.description, task?.id, task?.title]);
 
   const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
@@ -385,6 +420,7 @@ export default function PlannerTaskInspectorView({
   const scheduleSummary = getPlannerTaskScheduleSummary(task, language);
   const reminderPreset = getReminderPreset(task);
   const hasAnyDate = Boolean(task.scheduledStartAt || task.dueAt || task.recurrenceRule);
+  const primaryOccurrence = getPlannerTaskPrimaryOccurrence(task);
 
   const commitTitle = () => {
     const nextTitle = titleDraft.trim();
@@ -414,9 +450,88 @@ export default function PlannerTaskInspectorView({
     void onUpdate(task.id, { tagIds: Array.from(new Set(nextTagIds)) });
   };
 
+  const createAndAttachTag = async () => {
+    if (!onCreateTag || isCreatingTag) {
+      return;
+    }
+
+    const normalizedName = tagDraft.trim();
+    if (!normalizedName) {
+      setIsTagCreatorOpen(false);
+      setTagDraft("");
+      return;
+    }
+
+    setIsCreatingTag(true);
+    try {
+      const tag = await onCreateTag(normalizedName);
+      const tagKey = getTagKey(tag.name);
+      const nextTagIds = task.tagIds.filter((tagId) => {
+        const currentTag = tagById.get(tagId);
+        return currentTag ? getTagKey(currentTag.name) !== tagKey : true;
+      });
+      await onUpdate(task.id, { tagIds: Array.from(new Set([...nextTagIds, tag.id])) });
+      setTagDraft("");
+      setIsTagCreatorOpen(false);
+      setAreTagsExpanded(false);
+    } finally {
+      setIsCreatingTag(false);
+    }
+  };
+
   const applyDateDraft = (draft: PlannerTaskDateDraft) => {
     const patch = buildPlannerTaskSchedulePatch(task, draft);
     setIsDateSelectorOpen(false);
+    void onUpdate(task.id, patch);
+  };
+
+  const shiftDate = (days: number) => {
+    if (isRecurringPlannerRule(task.recurrenceRule) && primaryOccurrence) {
+      setScopedDateAction({
+        originalStartAt: primaryOccurrence.originalStartAt,
+        currentStartAt: primaryOccurrence.startAt,
+        nextStartAt: shiftLocalDay(primaryOccurrence.startAt, days),
+        nextEndAt: primaryOccurrence.scheduledStartAt ? shiftLocalDay(primaryOccurrence.endAt, days) : null
+      });
+      return;
+    }
+
+    const baseDraft = getPlannerTaskDateDraft(task);
+    if (!baseDraft.startDateAt) {
+      return;
+    }
+
+    applyDateDraft({
+      ...baseDraft,
+      startDateAt: shiftLocalDay(baseDraft.startDateAt, days),
+      endDateAt: baseDraft.endDateAt ? shiftLocalDay(baseDraft.endDateAt, days) : null,
+      repeatUntilAt: baseDraft.repeatUntilAt ? shiftLocalDay(baseDraft.repeatUntilAt, days) : null
+    });
+  };
+
+  const applyScopedDateAction = (scope: PlannerTaskDateScope) => {
+    if (!scopedDateAction) {
+      return;
+    }
+
+    const patch =
+      scope === "this"
+        ? buildRescheduleOccurrencePatch(
+            task,
+            scopedDateAction.originalStartAt,
+            scopedDateAction.nextStartAt,
+            scopedDateAction.nextEndAt
+          )
+        : buildRescheduleRecurringSeriesPatch(
+            task,
+            scopedDateAction.originalStartAt,
+            scopedDateAction.nextStartAt,
+            scopedDateAction.nextEndAt,
+            scope,
+            scopedDateAction.currentStartAt
+          );
+
+    setScopedDateAction(null);
     void onUpdate(task.id, patch);
   };
 
@@ -425,23 +540,34 @@ export default function PlannerTaskInspectorView({
       return;
     }
 
+    setIsReminderPickerOpen(false);
     void onUpdate(task.id, { reminders: buildReminder(task, preset, language) });
   };
 
   return (
     <aside className={`planner-task-inspector planner-task-panel ${isMobile ? "is-mobile-sheet" : ""}`}>
-      <header className="planner-task-panel-head">
-        <div>
+      <header className="planner-task-inspector-head">
+        <div
+          className="planner-task-inspector-orb"
+          style={{ "--planner-task-project-color": selectedProject?.color ?? "var(--planner-task-accent)" } as CSSProperties}
+          aria-hidden="true"
+        />
+        <div className="planner-task-inspector-title">
           <span className="planner-task-panel-kicker">{language === "ru" ? "Задача" : "Task"}</span>
-          <button
-            type="button"
-            className="planner-task-project-chip"
-            onClick={() => setIsProjectPickerOpen((current) => !current)}
-            style={{ "--planner-task-project-color": selectedProject?.color ?? "var(--planner-accent)" } as CSSProperties}
-          >
-            <span />
-            <strong>{selectedProject?.name ?? (language === "ru" ? "Без проекта" : "No project")}</strong>
-          </button>
+          <input
+            type="text"
+            value={titleDraft}
+            onChange={(event) => setTitleDraft(event.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            placeholder={language === "ru" ? "Что нужно сделать?" : "What needs to happen?"}
+          />
+          <small>{scheduleSummary}</small>
         </div>
         {onClose ? (
           <button type="button" className="planner-task-panel-close" onClick={onClose} aria-label={language === "ru" ? "Закрыть" : "Close"}>
@@ -450,54 +576,12 @@ export default function PlannerTaskInspectorView({
         ) : null}
       </header>
 
-      {isProjectPickerOpen ? (
-        <section className="planner-task-project-menu">
-          <button
-            type="button"
-            className={!task.projectId ? "is-active" : ""}
-            onClick={() => {
-              setIsProjectPickerOpen(false);
-              void onUpdate(task.id, { projectId: null });
-            }}
-          >
-            <span style={{ "--planner-task-project-color": "var(--planner-accent)" } as CSSProperties} />
-            <strong>{language === "ru" ? "Без проекта" : "No project"}</strong>
-          </button>
-          {projects.map((project) => (
-            <button
-              key={project.id}
-              type="button"
-              className={project.id === task.projectId ? "is-active" : ""}
-              onClick={() => {
-                setIsProjectPickerOpen(false);
-                void onUpdate(task.id, { projectId: project.id });
-              }}
-            >
-              <span style={{ "--planner-task-project-color": project.color } as CSSProperties} />
-              <strong>{project.name}</strong>
-            </button>
-          ))}
-        </section>
-      ) : null}
-
-      <section className="planner-task-title-block">
-        <input
-          type="text"
-          value={titleDraft}
-          onChange={(event) => setTitleDraft(event.target.value)}
-          onBlur={commitTitle}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              event.currentTarget.blur();
-            }
-          }}
-          placeholder={language === "ru" ? "Что нужно сделать?" : "What needs to happen?"}
-        />
-      </section>
-
       <div className="planner-task-action-row">
-        <button type="button" className={done ? "is-done" : ""} onClick={() => void onToggleDone(task.id, !done)}>
+        <button
+          type="button"
+          className={done ? "is-done" : ""}
+          onClick={() => void onToggleDone(task.id, !done, primaryOccurrence?.originalStartAt)}
+        >
           <span className={`planner-task-action-icon ${done ? "is-return" : "is-check"}`} aria-hidden="true" />
           <span>{done ? (language === "ru" ? "Вернуть" : "Reopen") : language === "ru" ? "Готово" : "Done"}</span>
         </button>
@@ -519,9 +603,36 @@ export default function PlannerTaskInspectorView({
 
       <section className="planner-task-choice-section">
         <div className="planner-task-section-title">
+          <span>{language === "ru" ? "Проект" : "Project"}</span>
+        </div>
+        <div className="planner-task-chip-row is-projects">
+          <button
+            type="button"
+            className={!task.projectId ? "is-active" : ""}
+            onClick={() => void onUpdate(task.id, { projectId: null })}
+          >
+            <span className="planner-task-project-dot" style={{ "--planner-task-project-color": "var(--planner-task-accent)" } as CSSProperties} />
+            <strong>{language === "ru" ? "Без проекта" : "No project"}</strong>
+          </button>
+          {projects.map((project) => (
+            <button
+              key={project.id}
+              type="button"
+              className={project.id === task.projectId ? "is-active" : ""}
+              onClick={() => void onUpdate(task.id, { projectId: project.id })}
+            >
+              <span className="planner-task-project-dot" style={{ "--planner-task-project-color": project.color } as CSSProperties} />
+              <strong>{project.name}</strong>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="planner-task-choice-section">
+        <div className="planner-task-section-title">
           <span>{language === "ru" ? "Статус" : "Status"}</span>
         </div>
-        <div className="planner-task-segment-grid is-status">
+        <div className="planner-task-chip-row is-status">
           {STATUSES.map((status) => (
             <button
               key={status}
@@ -539,7 +650,7 @@ export default function PlannerTaskInspectorView({
         <div className="planner-task-section-title">
           <span>{language === "ru" ? "Приоритет" : "Priority"}</span>
         </div>
-        <div className="planner-task-priority-row">
+        <div className="planner-task-chip-row planner-task-priority-row">
           {PRIORITIES.map((priority) => (
             <button
               key={priority}
@@ -562,26 +673,48 @@ export default function PlannerTaskInspectorView({
             <strong>{scheduleSummary}</strong>
           </span>
         </button>
+        <div className="planner-task-date-stepper-row">
+          <button type="button" onClick={() => shiftDate(-1)} disabled={!hasAnyDate}>
+            {language === "ru" ? "− день" : "- day"}
+          </button>
+          <button type="button" onClick={() => shiftDate(1)} disabled={!hasAnyDate}>
+            {language === "ru" ? "+ день" : "+ day"}
+          </button>
+        </div>
       </section>
 
       <section className="planner-task-choice-section">
         <div className="planner-task-section-title">
-          <span>{language === "ru" ? "Напомнить" : "Reminder"}</span>
+          <span>{language === "ru" ? "Напоминание" : "Reminder"}</span>
           {!hasAnyDate ? <small>{language === "ru" ? "Сначала дата" : "Choose date first"}</small> : null}
         </div>
-        <div className="planner-task-reminder-row">
-          {REMINDER_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              className={reminderPreset === preset ? "is-active" : ""}
-              disabled={preset !== "none" && !hasAnyDate}
-              onClick={() => updateReminder(preset)}
-            >
-              {getReminderLabel(preset, language)}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          className="planner-task-reminder-card"
+          onClick={() => setIsReminderPickerOpen((current) => !current)}
+          disabled={!hasAnyDate && reminderPreset === "none"}
+        >
+          <span className="planner-task-reminder-icon" aria-hidden="true" />
+          <span>
+            <small>{reminderPreset === "none" ? (language === "ru" ? "Добавить" : "Add") : language === "ru" ? "Выбрано" : "Selected"}</small>
+            <strong>{getReminderLabel(reminderPreset, language)}</strong>
+          </span>
+        </button>
+        {isReminderPickerOpen ? (
+          <div className="planner-task-chip-row planner-task-reminder-row">
+            {REMINDER_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={reminderPreset === preset ? "is-active" : ""}
+                disabled={preset !== "none" && !hasAnyDate}
+                onClick={() => updateReminder(preset)}
+              >
+                {getReminderLabel(preset, language)}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="planner-task-description-block">
@@ -621,9 +754,79 @@ export default function PlannerTaskInspectorView({
                 {areTagsExpanded ? (language === "ru" ? "Свернуть" : "Less") : `+${hiddenTagCount}`}
               </button>
             ) : null}
+            {onCreateTag ? (
+              isTagCreatorOpen ? (
+                <span className="planner-task-tag-create">
+                  <input
+                    value={tagDraft}
+                    autoFocus
+                    disabled={isCreatingTag}
+                    onChange={(event) => setTagDraft(event.target.value)}
+                    onBlur={() => {
+                      if (!tagDraft.trim()) {
+                        setIsTagCreatorOpen(false);
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void createAndAttachTag();
+                      }
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setTagDraft("");
+                        setIsTagCreatorOpen(false);
+                      }
+                    }}
+                    placeholder={language === "ru" ? "Новый тег" : "New tag"}
+                  />
+                  <button type="button" className="is-create-confirm" disabled={isCreatingTag} onMouseDown={(event) => event.preventDefault()} onClick={() => void createAndAttachTag()}>
+                    +
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="is-create" onClick={() => setIsTagCreatorOpen(true)}>
+                  + {language === "ru" ? "тег" : "tag"}
+                </button>
+              )
+            ) : null}
           </div>
         ) : (
-          <p className="planner-task-muted">{language === "ru" ? "Теги можно добавить в документах." : "Tags can be added in documents."}</p>
+          <div className="planner-task-tag-row">
+            {onCreateTag ? (
+              isTagCreatorOpen ? (
+                <span className="planner-task-tag-create">
+                  <input
+                    value={tagDraft}
+                    autoFocus
+                    disabled={isCreatingTag}
+                    onChange={(event) => setTagDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void createAndAttachTag();
+                      }
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setTagDraft("");
+                        setIsTagCreatorOpen(false);
+                      }
+                    }}
+                    placeholder={language === "ru" ? "Новый тег" : "New tag"}
+                  />
+                  <button type="button" className="is-create-confirm" disabled={isCreatingTag} onMouseDown={(event) => event.preventDefault()} onClick={() => void createAndAttachTag()}>
+                    +
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="is-create" onClick={() => setIsTagCreatorOpen(true)}>
+                  + {language === "ru" ? "создать тег" : "create tag"}
+                </button>
+              )
+            ) : (
+              <p className="planner-task-muted">{language === "ru" ? "Теги можно добавить в документах." : "Tags can be added in documents."}</p>
+            )}
+          </div>
         )}
       </section>
 
@@ -633,19 +836,39 @@ export default function PlannerTaskInspectorView({
             <span>{language === "ru" ? "Связи" : "Links"}</span>
             <small>{backlinks.length}</small>
           </div>
-          <div className="planner-task-link-list">
+          <div className="planner-task-calendar-link-list">
             {backlinks.map((backlink) => {
-              const canOpen = Boolean(backlink.noteId && onOpenNote) || Boolean(backlink.url);
+              const canOpen =
+                Boolean(backlink.noteId && onOpenNote) ||
+                Boolean(backlink.projectId && onOpenProjectMap) ||
+                Boolean(backlink.url);
+              const linkedProject =
+                backlink.kind === "project" && task.projectId ? projectMap.get(task.projectId) ?? selectedProject : null;
+              const content = (
+                <>
+                  {linkedProject ? <i style={{ "--project-color": linkedProject.color } as CSSProperties} /> : null}
+                  <span>
+                    {backlink.subtitle} · {backlink.title}
+                  </span>
+                </>
+              );
+
+              if (!canOpen) {
+                return <span key={backlink.key}>{content}</span>;
+              }
 
               return (
                 <button
                   key={backlink.key}
                   type="button"
                   className={`is-${backlink.kind}`}
-                  disabled={!canOpen}
                   onClick={() => {
                     if (backlink.noteId && onOpenNote) {
                       onOpenNote(backlink.noteId);
+                      return;
+                    }
+                    if (backlink.projectId && onOpenProjectMap) {
+                      onOpenProjectMap(backlink.projectId);
                       return;
                     }
                     if (backlink.url) {
@@ -653,11 +876,7 @@ export default function PlannerTaskInspectorView({
                     }
                   }}
                 >
-                  <span className="planner-task-link-icon" aria-hidden="true" />
-                  <span>
-                    <strong>{backlink.title}</strong>
-                    <small>{backlink.subtitle}</small>
-                  </span>
+                  {content}
                 </button>
               );
             })}
@@ -672,6 +891,42 @@ export default function PlannerTaskInspectorView({
         onClose={() => setIsDateSelectorOpen(false)}
         onApply={applyDateDraft}
       />
+      {scopedDateAction
+        ? createPortal(
+            <div className="planner-task-scope-layer" role="dialog" aria-modal="true">
+              <button
+                type="button"
+                className="planner-task-scope-backdrop"
+                onClick={() => setScopedDateAction(null)}
+                aria-label={language === "ru" ? "Отмена" : "Cancel"}
+              />
+              <section className="planner-task-scope-dialog">
+                <span className="planner-task-panel-kicker">{language === "ru" ? "Повторяющаяся задача" : "Recurring task"}</span>
+                <h3>{language === "ru" ? "Перенести повтор?" : "Move repeating event?"}</h3>
+                <p>
+                  {language === "ru"
+                    ? "Выбери, применить перенос только к ближайшему событию, к будущим повторам или ко всей серии."
+                    : "Choose whether to move only the nearest event, future events, or the whole series."}
+                </p>
+                <div>
+                  <button type="button" onClick={() => applyScopedDateAction("this")}>
+                    <strong>{language === "ru" ? "Только это" : "Only this"}</strong>
+                    <small>{language === "ru" ? "Аккуратный override выбранного повтора" : "A precise override for this occurrence"}</small>
+                  </button>
+                  <button type="button" onClick={() => applyScopedDateAction("future")}>
+                    <strong>{language === "ru" ? "Это и будущие" : "This and future"}</strong>
+                    <small>{language === "ru" ? "Остается одна задача без дублей" : "Keeps one task without duplicates"}</small>
+                  </button>
+                  <button type="button" onClick={() => applyScopedDateAction("all")}>
+                    <strong>{language === "ru" ? "Вся серия" : "Whole series"}</strong>
+                    <small>{language === "ru" ? "Перенести регулярность целиком" : "Move the recurrence as a whole"}</small>
+                  </button>
+                </div>
+              </section>
+            </div>,
+            document.body
+          )
+        : null}
     </aside>
   );
 }

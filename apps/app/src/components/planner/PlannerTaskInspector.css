@@ -689,3 +689,633 @@
     max-width: min(100%, 142px);
   }
 }
+
+/* Calendar-style task inspector refresh */
+.planner-task-panel {
+  gap: 12px;
+  padding: 16px;
+}
+
+.planner-task-inspector-head {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--planner-task-accent) 24%, rgba(255, 255, 255, 0.1));
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--planner-task-accent) 14%, transparent), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.032);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.075);
+}
+
+.planner-task-inspector-orb {
+  width: 46px;
+  height: 46px;
+  border-radius: 17px;
+  border: 1px solid color-mix(in srgb, var(--planner-task-project-color, var(--planner-task-accent)) 56%, rgba(255, 255, 255, 0.18));
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.62) 0 9%, transparent 11%),
+    linear-gradient(135deg, color-mix(in srgb, var(--planner-task-project-color, var(--planner-task-accent)) 72%, #fff), var(--planner-task-accent-2));
+  box-shadow:
+    0 16px 34px color-mix(in srgb, var(--planner-task-project-color, var(--planner-task-accent)) 16%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.planner-task-inspector-title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.planner-task-inspector-title input {
+  height: 30px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: var(--display-font, inherit);
+  font-size: clamp(1.05rem, 1.5vw, 1.32rem);
+  font-weight: 940;
+  line-height: 1;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+}
+
+.planner-task-inspector-title input::placeholder {
+  color: rgba(230, 238, 255, 0.38);
+}
+
+.planner-task-inspector-title > small {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(224, 234, 247, 0.58);
+  font-size: 0.72rem;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-task-inspector-head .planner-task-panel-close {
+  width: 36px;
+  min-height: 36px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 30% 0%, color-mix(in srgb, var(--planner-task-accent) 18%, transparent), transparent 64%),
+    rgba(255, 255, 255, 0.06);
+}
+
+.planner-task-action-row {
+  gap: 8px;
+}
+
+.planner-task-action-row button {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 14px;
+  font-size: 0.78rem;
+}
+
+.planner-task-action-icon {
+  width: 21px;
+  height: 21px;
+  border-radius: 9px;
+}
+
+.planner-task-action-icon.is-check::before {
+  left: 6px;
+  top: 7px;
+  width: 10px;
+  height: 6px;
+}
+
+.planner-task-action-icon.is-return::before {
+  left: 6px;
+  top: 7px;
+  width: 10px;
+  height: 8px;
+}
+
+.planner-task-action-icon.is-return::after {
+  left: 5px;
+  top: 6px;
+}
+
+.planner-task-action-icon.is-trash::before,
+.planner-task-action-icon.is-confirm-delete::before {
+  left: 7px;
+  top: 8px;
+  width: 8px;
+  height: 9px;
+}
+
+.planner-task-action-icon.is-trash::after,
+.planner-task-action-icon.is-confirm-delete::after {
+  left: 6px;
+  top: 5px;
+  width: 10px;
+}
+
+.planner-task-chip-row,
+.planner-task-date-stepper-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 1px 1px 4px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.planner-task-chip-row::-webkit-scrollbar,
+.planner-task-date-stepper-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.planner-task-chip-row::-webkit-scrollbar-thumb,
+.planner-task-date-stepper-row::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--planner-task-accent) 42%, rgba(255, 255, 255, 0.16));
+}
+
+.planner-task-chip-row button,
+.planner-task-date-stepper-row button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 34px;
+  max-width: 210px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.04);
+  color: rgba(236, 244, 255, 0.76);
+  font-size: 0.75rem;
+  font-weight: 860;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.planner-task-chip-row button:hover,
+.planner-task-date-stepper-row button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--planner-task-accent) 42%, rgba(255, 255, 255, 0.16));
+}
+
+.planner-task-chip-row button.is-active,
+.planner-task-date-stepper-row button.is-primary {
+  border-color: color-mix(in srgb, var(--planner-task-accent) 54%, rgba(255, 255, 255, 0.16));
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--planner-task-accent) 18%, transparent), transparent 58%),
+    color-mix(in srgb, var(--planner-task-accent) 14%, rgba(255, 255, 255, 0.055));
+  color: #fff;
+}
+
+.planner-task-chip-row button:disabled,
+.planner-task-date-stepper-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.planner-task-date-stepper-row button.is-muted {
+  color: rgba(224, 234, 247, 0.58);
+}
+
+.planner-task-project-dot,
+.planner-task-chip-row.is-projects button > span,
+.planner-task-tag-row button > span {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--planner-task-project-color, var(--planner-task-tag-color, var(--planner-task-accent)));
+  box-shadow: 0 0 14px var(--planner-task-project-color, var(--planner-task-tag-color, var(--planner-task-accent)));
+}
+
+.planner-task-chip-row strong,
+.planner-task-chip-row button {
+  min-width: 0;
+}
+
+.planner-task-chip-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-task-tag-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 7px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.planner-task-tag-row::-webkit-scrollbar {
+  display: none;
+}
+
+.planner-task-tag-row button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  max-width: 180px;
+  min-height: 36px;
+  padding: 0 11px;
+  white-space: nowrap;
+  border-color: color-mix(in srgb, var(--planner-task-tag-color, var(--planner-task-accent)) 22%, rgba(255, 255, 255, 0.08));
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--planner-task-tag-color, var(--planner-task-accent)) 16%, transparent), transparent 56%),
+    rgba(255, 255, 255, 0.046);
+}
+
+.planner-task-tag-row button > span {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--planner-task-tag-color, var(--planner-task-accent));
+  box-shadow: 0 0 12px var(--planner-task-tag-color, var(--planner-task-accent));
+}
+
+.planner-task-tag-row button strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planner-task-tag-row button.is-active {
+  border-color: color-mix(in srgb, var(--planner-task-tag-color, var(--planner-task-accent)) 58%, rgba(255, 255, 255, 0.16));
+  background: color-mix(in srgb, var(--planner-task-tag-color, var(--planner-task-accent)) 17%, rgba(255, 255, 255, 0.07));
+  color: #fff;
+}
+
+.planner-task-tag-row button.is-more,
+.planner-task-tag-row button.is-create {
+  border-color: color-mix(in srgb, var(--planner-task-accent) 42%, rgba(255, 255, 255, 0.12));
+}
+
+.planner-task-tag-create {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  max-width: min(260px, 100%);
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--planner-task-accent) 42%, rgba(255, 255, 255, 0.12));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--planner-task-accent) 10%, rgba(255, 255, 255, 0.045));
+}
+
+.planner-task-tag-create input {
+  width: min(150px, 34vw);
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+  outline: none;
+}
+
+.planner-task-tag-create input::placeholder {
+  color: rgba(224, 234, 247, 0.46);
+}
+
+.planner-task-tag-row .planner-task-tag-create .is-create-confirm {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  min-width: 28px;
+  place-items: center;
+  padding: 0;
+  border-color: color-mix(in srgb, var(--planner-task-accent) 50%, rgba(255, 255, 255, 0.14));
+  background: color-mix(in srgb, var(--planner-task-accent) 22%, rgba(255, 255, 255, 0.08));
+}
+
+.planner-task-priority-row {
+  flex-wrap: nowrap;
+}
+
+.planner-task-priority-row button > span {
+  flex: 0 0 auto;
+}
+
+.planner-task-date-card {
+  padding: 1px 0;
+}
+
+.planner-task-date-summary {
+  min-height: 52px;
+  border-radius: 17px;
+}
+
+.planner-task-reminder-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--planner-task-accent) 22%, rgba(255, 255, 255, 0.1));
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--planner-task-accent) 13%, transparent), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.035);
+  color: inherit;
+  text-align: left;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.planner-task-reminder-card:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--planner-task-accent) 42%, rgba(255, 255, 255, 0.14));
+}
+
+.planner-task-reminder-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.planner-task-reminder-icon {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--planner-task-accent) 68%, white), var(--planner-task-accent-2));
+}
+
+.planner-task-reminder-icon::before,
+.planner-task-reminder-icon::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.planner-task-reminder-icon::before {
+  left: 11px;
+  top: 9px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(4, 8, 18, 0.88);
+  border-radius: 50%;
+}
+
+.planner-task-reminder-icon::after {
+  left: 17px;
+  top: 13px;
+  width: 6px;
+  height: 7px;
+  border-left: 2px solid rgba(4, 8, 18, 0.88);
+  border-bottom: 2px solid rgba(4, 8, 18, 0.88);
+}
+
+.planner-task-reminder-card > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.planner-task-reminder-card small,
+.planner-task-reminder-card strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-task-reminder-card small {
+  color: color-mix(in srgb, var(--planner-task-accent) 54%, rgba(225, 235, 249, 0.62));
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.planner-task-reminder-card strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.planner-task-description-block textarea {
+  min-height: 70px;
+  border-radius: 17px;
+}
+
+.planner-task-link-list {
+  gap: 7px;
+}
+
+.planner-task-link-list button {
+  min-height: 44px;
+  border-radius: 15px;
+}
+
+.planner-task-calendar-link-list {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.planner-task-calendar-link-list button,
+.planner-task-calendar-link-list > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(242, 247, 255, 0.86);
+  font-size: 0.76rem;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-task-calendar-link-list button {
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.planner-task-calendar-link-list button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--planner-task-accent) 44%, rgba(255, 255, 255, 0.14));
+  background: color-mix(in srgb, var(--planner-task-accent) 13%, rgba(255, 255, 255, 0.06));
+}
+
+.planner-task-calendar-link-list i {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--project-color);
+  box-shadow: 0 0 12px var(--project-color);
+}
+
+.planner-task-calendar-link-list span span,
+.planner-task-calendar-link-list button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-task-scope-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  pointer-events: auto;
+}
+
+.planner-task-scope-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(3, 7, 18, 0.54);
+  backdrop-filter: blur(12px);
+}
+
+.planner-task-scope-dialog {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  width: min(100%, 440px);
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--planner-task-accent) 34%, rgba(255, 255, 255, 0.14));
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--planner-task-accent) 18%, transparent), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.036)),
+    color-mix(in srgb, #08111f 82%, var(--planner-task-accent) 7%);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(22px) saturate(145%);
+}
+
+.planner-task-scope-dialog h3,
+.planner-task-scope-dialog p {
+  margin: 0;
+}
+
+.planner-task-scope-dialog h3 {
+  color: #fff;
+  font-family: var(--display-font, inherit);
+  font-size: 1.35rem;
+  font-weight: 940;
+}
+
+.planner-task-scope-dialog p {
+  color: rgba(224, 234, 247, 0.66);
+  line-height: 1.42;
+}
+
+.planner-task-scope-dialog > div {
+  display: grid;
+  gap: 8px;
+}
+
+.planner-task-scope-dialog button {
+  display: grid;
+  gap: 4px;
+  min-height: 62px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(242, 247, 255, 0.88);
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.planner-task-scope-dialog button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--planner-task-accent) 46%, rgba(255, 255, 255, 0.14));
+  background: color-mix(in srgb, var(--planner-task-accent) 13%, rgba(255, 255, 255, 0.06));
+}
+
+.planner-task-scope-dialog strong,
+.planner-task-scope-dialog small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planner-task-scope-dialog strong {
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.planner-task-scope-dialog small {
+  color: rgba(224, 234, 247, 0.58);
+  font-size: 0.74rem;
+  font-weight: 760;
+}
+
+@media (max-width: 760px) {
+  .planner-task-panel {
+    padding: 14px;
+  }
+
+  .planner-task-inspector-head {
+    grid-template-columns: 42px minmax(0, 1fr) 34px;
+    gap: 10px;
+    padding: 9px;
+    border-radius: 19px;
+  }
+
+  .planner-task-inspector-orb {
+    width: 42px;
+    height: 42px;
+    border-radius: 16px;
+  }
+
+  .planner-task-inspector-title input {
+    height: 28px;
+    font-size: 1.04rem;
+  }
+
+  .planner-task-action-row button {
+    min-height: 35px;
+    font-size: 0.74rem;
+  }
+
+  .planner-task-chip-row button,
+  .planner-task-date-stepper-row button {
+    min-height: 36px;
+    max-width: 176px;
+  }
+}
