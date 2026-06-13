@@ -3781,13 +3781,15 @@ export async function removePlannerHabitLog(habitLogId: string) {
   scheduleActiveLocalVaultDesktopBackup();
 }
 
-export async function togglePlannerHabitLogForDay(habitId: string, dayAt = now(), value = 1) {
+export async function togglePlannerHabitLogForDay(habitId: string, dayAt?: number, value = 1) {
   const timestamp = now();
-  const day = new Date(dayAt);
+  const targetAt = dayAt ?? timestamp;
+  const day = new Date(targetAt);
   day.setHours(0, 0, 0, 0);
   const rangeStart = day.getTime();
   day.setHours(23, 59, 59, 999);
   const rangeEnd = day.getTime();
+  const occurredAt = timestamp >= rangeStart && timestamp <= rangeEnd ? timestamp : Math.min(rangeEnd, Math.max(rangeStart, targetAt));
   let nextHabitLog: HabitLog | null = null;
 
   await db.transaction("rw", db.habitLogs, db.syncDirtyEntries, db.syncTombstones, async () => {
@@ -3806,7 +3808,7 @@ export async function togglePlannerHabitLogForDay(habitId: string, dayAt = now()
     nextHabitLog = {
       id: crypto.randomUUID(),
       habitId,
-      occurredAt: timestamp,
+      occurredAt,
       value: Math.max(1, value),
       unit: "count",
       note: "",

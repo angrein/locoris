@@ -35,6 +35,9 @@ import "./PlannerCalendarSurface.css";
 type CalendarMode = "day" | "week" | "month";
 type CalendarEventVariant = "compact" | "wide" | "month";
 type MobileCalendarPanel = "agenda" | "unscheduled" | null;
+type CalendarFilterId = "tasks" | "habits" | "futureHabits" | "completed";
+type CalendarFilters = Record<CalendarFilterId, boolean>;
+type HabitCalendarDayState = "past-done" | "past-missed" | "today-done" | "today-waiting" | "future";
 
 interface PlannerCalendarSurfaceProps {
   tasks: Task[];
@@ -97,6 +100,7 @@ interface HabitCalendarEvent extends CalendarEventBase {
   kind: "habit";
   habit: Habit;
   completed: boolean;
+  dayState: HabitCalendarDayState;
 }
 
 type CalendarEvent = TimeBlockCalendarEvent | OccurrenceCalendarEvent | HabitCalendarEvent;
@@ -105,6 +109,10 @@ type QuickCreateDraft = {
   startAt: number;
   endAt: number | null;
   mode: "date" | "time";
+};
+type CalendarTimeEditorDraft = {
+  startMinutes: number;
+  durationMinutes: number;
 };
 type CalendarOccurrenceScope = "this" | "future" | "all";
 type CalendarScopedActionKind = "complete" | "remove" | "reschedule" | "resize";
@@ -138,6 +146,16 @@ type CalendarResizePreview = {
   startAt: number;
   endAt: number;
 };
+type CalendarEventPointerDragState = {
+  eventId: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  dragging: boolean;
+  isTouch: boolean;
+  armed: boolean;
+  longPressTimer: number | null;
+};
 
 const QUICK_CREATE_DURATIONS = [30, 45, 60, 120] as const;
 const TASK_PRIORITIES: PlannerTaskPriority[] = ["none", "low", "medium", "high", "urgent"];
@@ -150,6 +168,14 @@ const MINUTE_MS = 60_000;
 const SNAP_MINUTES = 15;
 const MIN_EVENT_DURATION_MS = 15 * MINUTE_MS;
 const MANUAL_DRAG_THRESHOLD_PX = 8;
+const TOUCH_LONG_PRESS_DRAG_MS = 420;
+const TOUCH_DRAG_CANCEL_PX = 10;
+const DEFAULT_CALENDAR_FILTERS: CalendarFilters = {
+  tasks: true,
+  habits: true,
+  futureHabits: false,
+  completed: true
+};
 
 function addDays(value: number, days: number) {
   const date = new Date(value);
@@ -223,6 +249,10 @@ function getDefaultTimeBlockRange(dayStartAt: number, hour = 9) {
   };
 }
 
+function getCalendarDropKey(dayStartAt: number, hour: number | null = null) {
+  return `${getStartOfLocalDay(dayStartAt)}:${hour === null ? "all" : hour}`;
+}
+
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -230,6 +260,17 @@ function clampNumber(value: number, min: number, max: number) {
 function snapTimestamp(value: number, minutes = SNAP_MINUTES) {
   const snapMs = minutes * MINUTE_MS;
   return Math.round(value / snapMs) * snapMs;
+}
+
+function getMinutesOfDay(value: number) {
+  const date = new Date(value);
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function getTimestampOnDay(dayStartAt: number, minutesOfDay: number) {
+  const date = new Date(getStartOfLocalDay(dayStartAt));
+  date.setHours(0, minutesOfDay, 0, 0);
+  return date.getTime();
 }
 
 function getTimeOnDay(dayStartAt: number, sourceAt: number) {
@@ -263,6 +304,45 @@ function getCalendarEventTimedDuration(event: CalendarEvent) {
   }
 
   return 45 * MINUTE_MS;
+}
+
+function getTimeEditorDraftForEvent(event: CalendarEvent): CalendarTimeEditorDraft {
+  const startMinutes = event.isAllDay ? 9 * 60 : getMinutesOfDay(event.startAt);
+  const durationMinutes = Math.max(
+    SNAP_MINUTES,
+    Math.round(getCalendarEventTimedDuration(event) / MINUTE_MS / SNAP_MINUTES) * SNAP_MINUTES
+  );
+
+  return {
+    startMinutes: clampNumber(startMinutes, 0, 23 * 60 + 45),
+    durationMinutes: clampNumber(durationMinutes, SNAP_MINUTES, getTimeEditorMaxDuration(startMinutes))
+  };
+}
+
+function formatTimeEditorMinutes(minutesOfDay: number) {
+  const normalizedMinutes = ((minutesOfDay % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hours = Math.floor(normalizedMinutes / 60);
+  const minutes = normalizedMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function formatDurationMinutes(minutes: number, language: AppLanguage) {
+  if (minutes < 60) {
+    return language === "ru" ? `${minutes} мин` : `${minutes}m`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+
+  if (rest === 0) {
+    return language === "ru" ? `${hours} ч` : `${hours}h`;
+  }
+
+  return language === "ru" ? `${hours} ч ${rest} мин` : `${hours}h ${rest}m`;
+}
+
+function getTimeEditorMaxDuration(startMinutes: number) {
+  return Math.max(SNAP_MINUTES, Math.min(12 * 60, 24 * 60 - startMinutes));
 }
 
 function getTaskUndoPatch(task: Task): PlannerTaskUpdateInput {
@@ -435,6 +515,32 @@ function getCalendarEventKindOrder(event: CalendarEvent) {
   return 0;
 }
 
+function getHabitCalendarDayState(dayStartAt: number, completed: boolean, todayStartAt = getStartOfLocalDay()): HabitCalendarDayState {
+  const normalizedDayStartAt = getStartOfLocalDay(dayStartAt);
+
+  if (normalizedDayStartAt > todayStartAt) {
+    return "future";
+  }
+
+  if (normalizedDayStartAt === todayStartAt) {
+    return completed ? "today-done" : "today-waiting";
+  }
+
+  return completed ? "past-done" : "past-missed";
+}
+
+function isHabitCalendarEventToday(event: HabitCalendarEvent) {
+  return event.dayState === "today-done" || event.dayState === "today-waiting";
+}
+
+function canToggleHabitCalendarEvent(event: HabitCalendarEvent, source: "quick" | "inspector") {
+  if (event.habit.status === "archived" || event.habit.status === "paused" || event.dayState === "future") {
+    return false;
+  }
+
+  return source === "inspector" || isHabitCalendarEventToday(event);
+}
+
 function sortCalendarEvents(events: CalendarEvent[]) {
   return [...events].sort((left, right) => {
     const leftCompleted = isCalendarEventCompleted(left) ? 1 : 0;
@@ -465,11 +571,19 @@ function getCalendarEventSubtitle(event: CalendarEvent, language: AppLanguage) {
   }
 
   if (event.kind === "habit") {
+    if (event.dayState === "future") {
+      return language === "ru" ? "Привычка · будущий ритм" : "Habit · future rhythm";
+    }
+
+    if (event.dayState === "past-missed") {
+      return language === "ru" ? "Привычка · пропущено" : "Habit · missed";
+    }
+
     if (event.completed) {
       return language === "ru" ? "Привычка · отмечено" : "Habit · done";
     }
 
-    return language === "ru" ? "Привычка · весь день" : "Habit · all day";
+    return language === "ru" ? "Привычка · сегодня" : "Habit · today";
   }
 
   if (event.isAllDay) {
@@ -631,6 +745,8 @@ export default function PlannerCalendarSurface({
   const [mode, setMode] = useState<CalendarMode>(isMobile ? "day" : "week");
   const [cursorAt, setCursorAt] = useState(getStartOfLocalDay());
   const [selectedDayAt, setSelectedDayAt] = useState(getStartOfLocalDay());
+  const [selectedSlotHour, setSelectedSlotHour] = useState<number | null>(null);
+  const [calendarFilters, setCalendarFilters] = useState<CalendarFilters>(DEFAULT_CALENDAR_FILTERS);
   const [tapScheduleTaskId, setTapScheduleTaskId] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState<MobileCalendarPanel>(null);
   const [quickCreateDraft, setQuickCreateDraft] = useState<QuickCreateDraft | null>(null);
@@ -645,9 +761,18 @@ export default function PlannerCalendarSurface({
   const [isTagCreatorOpen, setIsTagCreatorOpen] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
   const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [timeEditorEventId, setTimeEditorEventId] = useState<string | null>(null);
+  const [timeEditorDraft, setTimeEditorDraft] = useState<CalendarTimeEditorDraft | null>(null);
   const [manualDragTaskId, setManualDragTaskId] = useState<string | null>(null);
+  const [manualEventDragId, setManualEventDragId] = useState<string | null>(null);
+  const [manualEventDropKey, setManualEventDropKey] = useState<string | null>(null);
   const undoTimerRef = useRef<number | null>(null);
+  const scrollFocusTimerRef = useRef<number | null>(null);
+  const calendarBoardRef = useRef<HTMLElement | null>(null);
+  const dayElementRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const timeSlotElementRefs = useRef<Map<string, HTMLElement>>(new Map());
   const resizeRef = useRef<CalendarResizeState | null>(null);
+  const eventPointerDragRef = useRef<CalendarEventPointerDragState | null>(null);
   const manualDragRef = useRef<{
     taskId: string;
     pointerId: number;
@@ -656,9 +781,11 @@ export default function PlannerCalendarSurface({
     dragging: boolean;
   } | null>(null);
   const suppressNextUnscheduledClickRef = useRef<string | null>(null);
+  const suppressNextCalendarEventClickRef = useRef<string | null>(null);
   const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const noteMap = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes]);
   const tagMap = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
+  const todayStartAt = getStartOfLocalDay();
   const range = useMemo(() => {
     if (mode === "month") {
       const startAt = startOfMonth(cursorAt);
@@ -714,28 +841,40 @@ export default function PlannerCalendarSurface({
   );
   const visibleHabitEvents = useMemo<CalendarEvent[]>(
     () =>
-      range.days.flatMap((day) =>
-        habits
-          .filter((habit) => isPlannerHabitDueOnDay(habit, day.startAt))
-          .map((habit) => ({
-            id: `habit:${habit.id}:${day.startAt}`,
-            kind: "habit" as const,
-            habit,
-            title: habit.title,
-            startAt: day.startAt,
-            endAt: day.endAt,
-            color: habit.projectId
-              ? projectMap.get(habit.projectId)?.color ?? habit.color
-              : habit.color || PLANNER_INBOX_EVENT_COLOR,
-            isAllDay: true,
-            taskId: null,
-            completed: isPlannerHabitCompletedOnDay(habit, habitLogs, day.startAt)
-          }))
-      ),
-    [habitLogs, habits, projectMap, range.days]
+      calendarFilters.habits
+        ? range.days.flatMap((day) => {
+            if (!calendarFilters.futureHabits && day.startAt > todayStartAt) {
+              return [];
+            }
+
+            return habits
+              .filter((habit) => isPlannerHabitDueOnDay(habit, day.startAt))
+              .map((habit) => {
+                const completed = isPlannerHabitCompletedOnDay(habit, habitLogs, day.startAt);
+
+                return {
+                  id: `habit:${habit.id}:${day.startAt}`,
+                  kind: "habit" as const,
+                  habit,
+                  title: habit.title,
+                  startAt: day.startAt,
+                  endAt: day.endAt,
+                  color: habit.projectId
+                    ? projectMap.get(habit.projectId)?.color ?? habit.color
+                    : habit.color || PLANNER_INBOX_EVENT_COLOR,
+                  isAllDay: true,
+                  taskId: null,
+                  completed,
+                  dayState: getHabitCalendarDayState(day.startAt, completed, todayStartAt)
+                };
+              });
+          })
+        : [],
+    [calendarFilters.futureHabits, calendarFilters.habits, habitLogs, habits, projectMap, range.days, todayStartAt]
   );
   const events = useMemo<CalendarEvent[]>(() => {
-    const blockEvents = visibleTimeBlocks.map((timeBlock) => ({
+    const blockEvents = calendarFilters.tasks
+      ? visibleTimeBlocks.map((timeBlock) => ({
       id: `timeBlock:${timeBlock.id}`,
       kind: "timeBlock" as const,
       timeBlock,
@@ -745,8 +884,10 @@ export default function PlannerCalendarSurface({
       color: timeBlock.projectId ? projectMap.get(timeBlock.projectId)?.color ?? timeBlock.color : timeBlock.color || PLANNER_INBOX_EVENT_COLOR,
       isAllDay: false,
       taskId: timeBlock.taskId
-    }));
-    const occurrenceEvents = visibleOccurrences.map((occurrence) => ({
+      }))
+      : [];
+    const occurrenceEvents = calendarFilters.tasks
+      ? visibleOccurrences.map((occurrence) => ({
       id: `occurrence:${occurrence.id}`,
       kind: "occurrence" as const,
       occurrence,
@@ -757,10 +898,13 @@ export default function PlannerCalendarSurface({
       isAllDay: isOccurrenceAllDay(occurrence),
       taskId: occurrence.task.id,
       isDueOnly: !occurrence.scheduledStartAt
-    }));
+      }))
+      : [];
 
-    return sortCalendarEvents([...blockEvents, ...occurrenceEvents, ...visibleHabitEvents]);
-  }, [projectMap, visibleHabitEvents, visibleOccurrences, visibleTimeBlocks]);
+    return sortCalendarEvents([...blockEvents, ...occurrenceEvents, ...visibleHabitEvents]).filter(
+      (event) => calendarFilters.completed || !isCalendarEventCompleted(event)
+    );
+  }, [calendarFilters.completed, calendarFilters.tasks, projectMap, visibleHabitEvents, visibleOccurrences, visibleTimeBlocks]);
   const inspectedEvent = useMemo(
     () => (eventInspector ? events.find((event) => event.id === eventInspector.eventId) ?? null : null),
     [eventInspector, events]
@@ -819,6 +963,10 @@ export default function PlannerCalendarSurface({
       range.days[0],
     [range.days, selectedDayAt]
   );
+  const selectedDayAgendaLabel = useMemo(
+    () => formatPlannerDate(selectedDay?.startAt ?? selectedDayAt, language),
+    [language, selectedDay?.startAt, selectedDayAt]
+  );
   const selectedDayEvents = useMemo(
     () => (selectedDay ? sortCalendarEvents(getEventsForDay(events, selectedDay)) : []),
     [events, selectedDay]
@@ -836,6 +984,41 @@ export default function PlannerCalendarSurface({
     () => Array.from({ length: endHour - startHour + 1 }, (_item, index) => startHour + index),
     [endHour, startHour]
   );
+  const selectedQuickCreateDayAt = selectedDay?.startAt ?? selectedDayAt ?? cursorAt;
+  const selectedQuickCreateHour = mode === "day" ? selectedSlotHour : null;
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (scrollFocusTimerRef.current !== null) {
+      window.clearTimeout(scrollFocusTimerRef.current);
+    }
+
+    scrollFocusTimerRef.current = window.setTimeout(() => {
+      const dayStartAt = selectedDay?.startAt ?? getStartOfLocalDay(selectedDayAt);
+      const currentHour = dayStartAt === todayStartAt ? new Date().getHours() : null;
+      const target =
+        mode === "day"
+          ? timeSlotElementRefs.current.get(getCalendarDropKey(dayStartAt, selectedSlotHour ?? currentHour)) ??
+            timeSlotElementRefs.current.get(getCalendarDropKey(dayStartAt, null))
+          : dayElementRefs.current.get(dayStartAt);
+
+      target?.scrollIntoView({
+        behavior: "auto",
+        block: mode === "day" ? "center" : "nearest",
+        inline: "nearest"
+      });
+    }, 80);
+
+    return () => {
+      if (scrollFocusTimerRef.current !== null) {
+        window.clearTimeout(scrollFocusTimerRef.current);
+        scrollFocusTimerRef.current = null;
+      }
+    };
+  }, [mode, range.startAt, range.endAt, selectedDay?.startAt, selectedDayAt, selectedSlotHour, todayStartAt]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -883,6 +1066,8 @@ export default function PlannerCalendarSurface({
       setIsTagCreatorOpen(false);
       setTagDraft("");
       setIsCreatingTag(false);
+      setTimeEditorEventId(null);
+      setTimeEditorDraft(null);
       return;
     }
 
@@ -899,6 +1084,8 @@ export default function PlannerCalendarSurface({
     setIsTagCreatorOpen(false);
     setTagDraft("");
     setIsCreatingTag(false);
+    setTimeEditorEventId(null);
+    setTimeEditorDraft(null);
   }, [inspectedEvent?.id]);
 
   useEffect(
@@ -955,6 +1142,57 @@ export default function PlannerCalendarSurface({
     onSelectTask(task.id);
     setTapScheduleTaskId(null);
     setSelectedDayAt(normalizedDayStartAt);
+    setSelectedSlotHour(hour);
+  };
+
+  const getCalendarDropInfoFromPoint = (clientX: number, clientY: number) => {
+    if (typeof document === "undefined") {
+      return null;
+    }
+
+    const dropTarget = document
+      .elementFromPoint(clientX, clientY)
+      ?.closest<HTMLElement>("[data-planner-calendar-drop='true']");
+
+    if (!dropTarget) {
+      return null;
+    }
+
+    const dayStartAt = Number(dropTarget.dataset.plannerCalendarDay);
+    const hour = dropTarget.dataset.plannerCalendarHour ? Number(dropTarget.dataset.plannerCalendarHour) : null;
+
+    if (!Number.isFinite(dayStartAt)) {
+      return null;
+    }
+
+    return {
+      dayStartAt,
+      hour: typeof hour === "number" && Number.isFinite(hour) ? hour : null
+    };
+  };
+
+  const applyCalendarEventDrop = async (calendarEvent: CalendarEvent, dayStartAt: number, hour: number | null = null) => {
+    if (calendarEvent.kind === "habit") {
+      return;
+    }
+
+    const normalizedDayStartAt = getStartOfLocalDay(dayStartAt);
+    setSelectedDayAt(normalizedDayStartAt);
+    setSelectedSlotHour(hour);
+
+    if (calendarEvent.kind === "occurrence" && hour === null) {
+      await applyEventReschedule(calendarEvent, normalizedDayStartAt, null);
+      return;
+    }
+
+    if (calendarEvent.kind === "timeBlock" && hour === null && calendarEvent.timeBlock.taskId) {
+      await convertTimeBlockTaskToAllDay(calendarEvent.timeBlock, normalizedDayStartAt);
+      return;
+    }
+
+    const nextStartAt = snapTimestamp(getDropStartAt(normalizedDayStartAt, hour, calendarEvent.startAt));
+    const nextEndAt = nextStartAt + (calendarEvent.isAllDay ? getCalendarEventTimedDuration(calendarEvent) : getCalendarEventDuration(calendarEvent));
+    await applyEventReschedule(calendarEvent, nextStartAt, nextEndAt);
   };
 
   const handleCalendarDrop = async (event: DragEvent<HTMLElement>, dayStartAt: number, hour: number | null = null) => {
@@ -969,19 +1207,7 @@ export default function PlannerCalendarSurface({
         return;
       }
 
-      if (calendarEvent.kind === "occurrence" && hour === null) {
-        await applyEventReschedule(calendarEvent, getStartOfLocalDay(dayStartAt), null);
-        return;
-      }
-
-      if (calendarEvent.kind === "timeBlock" && hour === null && calendarEvent.timeBlock.taskId) {
-        await convertTimeBlockTaskToAllDay(calendarEvent.timeBlock, dayStartAt);
-        return;
-      }
-
-      const nextStartAt = snapTimestamp(getDropStartAt(getStartOfLocalDay(dayStartAt), hour, calendarEvent.startAt));
-      const nextEndAt = nextStartAt + (calendarEvent.isAllDay ? getCalendarEventTimedDuration(calendarEvent) : getCalendarEventDuration(calendarEvent));
-      await applyEventReschedule(calendarEvent, nextStartAt, nextEndAt);
+      await applyCalendarEventDrop(calendarEvent, dayStartAt, hour);
       return;
     }
 
@@ -1000,15 +1226,154 @@ export default function PlannerCalendarSurface({
     event.dataTransfer.dropEffect = "move";
   };
 
-  const handleEventDragStart = (eventObject: DragEvent<HTMLElement>, calendarEvent: CalendarEvent) => {
-    if (isMobile || calendarEvent.kind === "habit") {
-      eventObject.preventDefault();
+  const handleEventPointerDragStart = (eventObject: PointerEvent<HTMLElement>, calendarEvent: CalendarEvent) => {
+    const isTouchPointer = eventObject.pointerType === "touch";
+
+    if ((!isTouchPointer && eventObject.button !== 0) || calendarEvent.kind === "habit") {
       return;
     }
 
-    eventObject.dataTransfer.effectAllowed = "move";
-    eventObject.dataTransfer.setData("application/x-locoris-calendar-event-id", calendarEvent.id);
-    eventObject.dataTransfer.setData("text/plain", calendarEvent.id);
+    const interactiveTarget = (eventObject.target as HTMLElement | null)?.closest(
+      "button, input, textarea, select, [data-planner-calendar-drag-block='true']"
+    );
+
+    if (interactiveTarget) {
+      return;
+    }
+
+    const target = eventObject.currentTarget;
+    const longPressTimer =
+      isTouchPointer && typeof window !== "undefined"
+        ? window.setTimeout(() => {
+            const currentDragState = eventPointerDragRef.current;
+
+            if (!currentDragState || currentDragState.pointerId !== eventObject.pointerId || currentDragState.eventId !== calendarEvent.id) {
+              return;
+            }
+
+            currentDragState.armed = true;
+            currentDragState.dragging = true;
+            currentDragState.longPressTimer = null;
+            setManualEventDragId(currentDragState.eventId);
+            setManualEventDropKey(null);
+            setEventInspector(null);
+            target.setPointerCapture?.(eventObject.pointerId);
+          }, TOUCH_LONG_PRESS_DRAG_MS)
+        : null;
+
+    eventPointerDragRef.current = {
+      eventId: calendarEvent.id,
+      pointerId: eventObject.pointerId,
+      startX: eventObject.clientX,
+      startY: eventObject.clientY,
+      dragging: false,
+      isTouch: isTouchPointer,
+      armed: !isTouchPointer,
+      longPressTimer
+    };
+
+    if (!isTouchPointer) {
+      eventObject.currentTarget.setPointerCapture?.(eventObject.pointerId);
+    }
+  };
+
+  const handleEventPointerDragMove = (eventObject: PointerEvent<HTMLElement>) => {
+    const dragState = eventPointerDragRef.current;
+
+    if (!dragState || dragState.pointerId !== eventObject.pointerId) {
+      return;
+    }
+
+    const distance = Math.hypot(eventObject.clientX - dragState.startX, eventObject.clientY - dragState.startY);
+
+    if (dragState.isTouch && !dragState.armed) {
+      if (distance > TOUCH_DRAG_CANCEL_PX) {
+        if (dragState.longPressTimer !== null) {
+          window.clearTimeout(dragState.longPressTimer);
+        }
+        eventPointerDragRef.current = null;
+      }
+
+      return;
+    }
+
+    if (!dragState.dragging && distance < MANUAL_DRAG_THRESHOLD_PX) {
+      return;
+    }
+
+    if (!dragState.dragging) {
+      dragState.dragging = true;
+      setManualEventDragId(dragState.eventId);
+      setManualEventDropKey(null);
+      setEventInspector(null);
+    }
+
+    const dropInfo = getCalendarDropInfoFromPoint(eventObject.clientX, eventObject.clientY);
+    setManualEventDropKey(dropInfo ? getCalendarDropKey(dropInfo.dayStartAt, dropInfo.hour) : null);
+    eventObject.preventDefault();
+    eventObject.stopPropagation();
+  };
+
+  const handleEventPointerDragEnd = async (eventObject: PointerEvent<HTMLElement>) => {
+    const dragState = eventPointerDragRef.current;
+
+    if (!dragState || dragState.pointerId !== eventObject.pointerId) {
+      return;
+    }
+
+    eventPointerDragRef.current = null;
+    setManualEventDragId(null);
+    setManualEventDropKey(null);
+
+    if (dragState.longPressTimer !== null) {
+      window.clearTimeout(dragState.longPressTimer);
+    }
+
+    if (eventObject.currentTarget.hasPointerCapture?.(eventObject.pointerId)) {
+      eventObject.currentTarget.releasePointerCapture(eventObject.pointerId);
+    }
+
+    if (!dragState.dragging) {
+      return;
+    }
+
+    suppressNextCalendarEventClickRef.current = dragState.eventId;
+    window.setTimeout(() => {
+      if (suppressNextCalendarEventClickRef.current === dragState.eventId) {
+        suppressNextCalendarEventClickRef.current = null;
+      }
+    }, 350);
+    eventObject.preventDefault();
+    eventObject.stopPropagation();
+
+    const calendarEvent = events.find((candidate) => candidate.id === dragState.eventId);
+    const dropInfo = getCalendarDropInfoFromPoint(eventObject.clientX, eventObject.clientY);
+
+    if (!calendarEvent || !dropInfo) {
+      return;
+    }
+
+    await applyCalendarEventDrop(calendarEvent, dropInfo.dayStartAt, dropInfo.hour);
+  };
+
+  const handleEventPointerDragCancel = (eventObject: PointerEvent<HTMLElement>) => {
+    const dragState = eventPointerDragRef.current;
+
+    if (dragState?.pointerId !== eventObject.pointerId) {
+      return;
+    }
+
+    eventPointerDragRef.current = null;
+    setManualEventDragId(null);
+    setManualEventDropKey(null);
+
+    if (dragState.longPressTimer !== null) {
+      window.clearTimeout(dragState.longPressTimer);
+    }
+
+    if (eventObject.currentTarget.hasPointerCapture?.(eventObject.pointerId)) {
+      eventObject.currentTarget.releasePointerCapture(eventObject.pointerId);
+    }
   };
 
   const handleResizeStart = (eventObject: PointerEvent<HTMLButtonElement>, calendarEvent: CalendarEvent, edge: "start" | "end") => {
@@ -1164,6 +1529,7 @@ export default function PlannerCalendarSurface({
     const rangeForBlock = getDefaultTimeBlockRange(normalizedDayStartAt, hour ?? 9);
 
     setSelectedDayAt(normalizedDayStartAt);
+    setSelectedSlotHour(hour);
     setQuickCreateDraft({
       title: "",
       startAt: hour === null ? normalizedDayStartAt : rangeForBlock.startAt,
@@ -1175,6 +1541,7 @@ export default function PlannerCalendarSurface({
   const handleDayTap = async (dayStartAt: number, hour: number | null = null) => {
     const normalizedDayStartAt = getStartOfLocalDay(dayStartAt);
     setSelectedDayAt(normalizedDayStartAt);
+    setSelectedSlotHour(hour);
 
     if (!tapScheduleTaskId) {
       return;
@@ -1190,19 +1557,48 @@ export default function PlannerCalendarSurface({
   const shiftCursor = (direction: -1 | 1) => {
     setCursorAt((current) => {
       if (mode === "month") {
-        return addMonths(current, direction);
+        const next = addMonths(current, direction);
+        setSelectedDayAt(addMonths(selectedDayAt, direction));
+        return next;
       }
 
-      return addDays(current, direction * (mode === "week" ? 7 : 1));
+      const dayOffset = direction * (mode === "week" ? 7 : 1);
+      const next = addDays(current, dayOffset);
+      setSelectedDayAt(addDays(selectedDayAt, dayOffset));
+      return next;
     });
   };
 
   const handleModeChange = (nextMode: CalendarMode) => {
     setMode(nextMode);
+    setCursorAt(selectedDayAt);
+  };
 
-    if (nextMode === "day") {
-      setCursorAt(selectedDayAt);
-    }
+  const toggleCalendarFilter = (filterId: CalendarFilterId) => {
+    setCalendarFilters((current) => {
+      if (filterId === "habits") {
+        const nextHabits = !current.habits;
+
+        return {
+          ...current,
+          habits: nextHabits,
+          futureHabits: nextHabits ? current.futureHabits : false
+        };
+      }
+
+      if (filterId === "futureHabits") {
+        return {
+          ...current,
+          habits: true,
+          futureHabits: !current.futureHabits
+        };
+      }
+
+      return {
+        ...current,
+        [filterId]: !current[filterId]
+      };
+    });
   };
 
   const selectEventTask = (taskId: string | null) => {
@@ -1578,6 +1974,10 @@ export default function PlannerCalendarSurface({
     }
 
     if (calendarEvent.kind === "habit") {
+      if (!canToggleHabitCalendarEvent(calendarEvent, "quick")) {
+        return;
+      }
+
       await onToggleHabitLog(calendarEvent.habit.id, calendarEvent.startAt);
       showUndoToast(language === "ru" ? "Отметка привычки изменена" : "Habit check changed", async () => {
         await onToggleHabitLog(calendarEvent.habit.id, calendarEvent.startAt);
@@ -1660,8 +2060,10 @@ export default function PlannerCalendarSurface({
     const isOverdue = isCalendarEventOverdue(event);
     const isToday = isCalendarEventToday(event);
     const isRecurring = isCalendarEventRecurring(event);
-    const showEventActions = variant === "wide" || variant === "month";
+    const canShowHabitQuickAction = event.kind === "habit" ? canToggleHabitCalendarEvent(event, "quick") : true;
+    const showEventActions = (variant === "wide" || variant === "month") && canShowHabitQuickAction;
     const previewRange = resizePreview?.eventId === event.id ? resizePreview : null;
+    const habitStateClass = event.kind === "habit" ? `is-habit-${event.dayState}` : "";
 
     return (
       <article
@@ -1670,13 +2072,28 @@ export default function PlannerCalendarSurface({
           isCompleted ? "is-completed" : ""
         } ${isOverdue ? "is-overdue" : ""} ${isToday ? "is-today" : ""} ${isRecurring ? "is-recurring" : ""} ${
           event.taskId && event.taskId === selectedTaskId ? "is-selected" : ""
-        }`}
+        } ${manualEventDragId === event.id ? "is-pointer-dragging" : ""} ${habitStateClass}`}
         style={{ "--planner-calendar-event-color": event.color } as CSSProperties}
         role="button"
         tabIndex={0}
-        draggable={!isMobile && event.kind !== "habit"}
-        onDragStart={(eventObject) => handleEventDragStart(eventObject, event)}
+        data-manual-event-dragging={manualEventDragId === event.id ? "true" : undefined}
+        onPointerDown={(eventObject) => handleEventPointerDragStart(eventObject, event)}
+        onPointerMove={handleEventPointerDragMove}
+        onPointerCancel={handleEventPointerDragCancel}
+        onPointerUp={(eventObject) => void handleEventPointerDragEnd(eventObject)}
         onClick={(eventObject) => {
+          const suppressedEventId = suppressNextCalendarEventClickRef.current;
+
+          if (suppressedEventId) {
+            suppressNextCalendarEventClickRef.current = null;
+
+            if (suppressedEventId === event.id) {
+              eventObject.preventDefault();
+              eventObject.stopPropagation();
+              return;
+            }
+          }
+
           eventObject.stopPropagation();
           openEventInspector(event, eventObject.currentTarget);
         }}
@@ -1773,11 +2190,22 @@ export default function PlannerCalendarSurface({
   const renderDayAgenda = (day: CalendarDay, dayEvents: CalendarEvent[]) => {
     const allDayEvents = getAllDayEvents(dayEvents);
     const timedEvents = getTimedEvents(dayEvents);
+    const isSelectedDay = selectedDayAt >= day.startAt && selectedDayAt <= day.endAt;
+    const allDayDropKey = getCalendarDropKey(day.startAt, null);
 
     return (
       <div className="planner-calendar-day-agenda">
         <section
-          className={`planner-calendar-all-day-slot ${allDayEvents.length > 0 ? "has-events" : ""}`}
+          ref={(node) => {
+            if (node) {
+              timeSlotElementRefs.current.set(allDayDropKey, node);
+            } else {
+              timeSlotElementRefs.current.delete(allDayDropKey);
+            }
+          }}
+          className={`planner-calendar-all-day-slot ${allDayEvents.length > 0 ? "has-events" : ""} ${
+            isSelectedDay && selectedSlotHour === null ? "is-selected-slot" : ""
+          } ${manualEventDropKey === allDayDropKey ? "is-drop-target" : ""}`}
           data-planner-calendar-drop="true"
           data-planner-calendar-day={day.startAt}
           onDragOver={handleTaskDragOver}
@@ -1804,11 +2232,21 @@ export default function PlannerCalendarSurface({
         </section>
         {hours.map((hour) => {
           const slotEvents = timedEvents.filter((event) => getEventSlotHour(event, day, startHour) === hour);
+          const slotDropKey = getCalendarDropKey(day.startAt, hour);
 
           return (
             <section
               key={hour}
-              className={`planner-calendar-time-slot ${slotEvents.length > 0 ? "has-events" : ""}`}
+              ref={(node) => {
+                if (node) {
+                  timeSlotElementRefs.current.set(slotDropKey, node);
+                } else {
+                  timeSlotElementRefs.current.delete(slotDropKey);
+                }
+              }}
+              className={`planner-calendar-time-slot ${slotEvents.length > 0 ? "has-events" : ""} ${
+                isSelectedDay && selectedSlotHour === hour ? "is-selected-slot" : ""
+              } ${manualEventDropKey === slotDropKey ? "is-drop-target" : ""}`}
               data-planner-calendar-drop="true"
               data-planner-calendar-day={day.startAt}
               data-planner-calendar-hour={hour}
@@ -1847,15 +2285,25 @@ export default function PlannerCalendarSurface({
         const visibleEvents = dayEvents.slice(0, mode === "month" ? 3 : 6);
         const hiddenCount = Math.max(0, dayEvents.length - visibleEvents.length);
         const eventVariant: CalendarEventVariant = mode === "week" ? "wide" : "month";
+        const dayDropKey = getCalendarDropKey(day.startAt, null);
 
         return (
           <section
             key={day.key}
+            ref={(node) => {
+              if (node) {
+                dayElementRefs.current.set(day.startAt, node);
+              } else {
+                dayElementRefs.current.delete(day.startAt);
+              }
+            }}
             className={`planner-calendar-day-cell ${day.isToday ? "is-today" : ""} ${
               day.isOutsideMonth ? "is-outside-month" : ""
             } ${
               selectedDayAt >= day.startAt && selectedDayAt <= day.endAt ? "is-selected" : ""
-            }`}
+            } ${
+              day.isToday && selectedDayAt >= day.startAt && selectedDayAt <= day.endAt ? "is-selected-today" : ""
+            } ${manualEventDropKey === dayDropKey ? "is-drop-target" : ""}`}
             data-planner-calendar-drop="true"
             data-planner-calendar-day={day.startAt}
             onDragOver={handleTaskDragOver}
@@ -2159,7 +2607,46 @@ export default function PlannerCalendarSurface({
     if (calendarEvent.kind === "habit") {
       const isPaused = calendarEvent.habit.status === "paused";
       const isArchived = calendarEvent.habit.status === "archived";
-      const canToggleHabit = !isArchived && !isPaused;
+      const isFutureHabit = calendarEvent.dayState === "future";
+      const isPastMissedHabit = calendarEvent.dayState === "past-missed";
+      const canToggleHabit = canToggleHabitCalendarEvent(calendarEvent, "inspector");
+      const habitStatusLabel =
+        calendarEvent.dayState === "future"
+          ? language === "ru"
+            ? "будущий ритм"
+            : "future rhythm"
+          : calendarEvent.dayState === "past-missed"
+            ? language === "ru"
+              ? "пропущено"
+              : "missed"
+            : calendarEvent.completed
+              ? language === "ru"
+                ? "отмечено"
+                : "done"
+              : language === "ru"
+                ? "ожидает отметки"
+                : "waiting";
+      const habitButtonLabel = calendarEvent.completed
+        ? language === "ru"
+          ? "Убрать отметку"
+          : "Undo check-in"
+        : isPastMissedHabit
+          ? language === "ru"
+            ? "Отметить прошедший день"
+            : "Backfill this day"
+          : language === "ru"
+            ? "Отметить сегодня"
+            : "Check in today";
+      const toggleHabitFromInspector = async () => {
+        if (!canToggleHabit) {
+          return;
+        }
+
+        await onToggleHabitLog(calendarEvent.habit.id, calendarEvent.startAt);
+        showUndoToast(language === "ru" ? "Отметка привычки изменена" : "Habit check changed", async () => {
+          await onToggleHabitLog(calendarEvent.habit.id, calendarEvent.startAt);
+        });
+      };
 
       return (
         <>
@@ -2181,26 +2668,14 @@ export default function PlannerCalendarSurface({
               <strong>
                 {formatPlannerDate(calendarEvent.startAt, language)}
                 {" · "}
-                {calendarEvent.completed
-                  ? language === "ru"
-                    ? "отмечено"
-                    : "done"
-                  : language === "ru"
-                    ? "ожидает отметки"
-                    : "waiting"}
+                {habitStatusLabel}
               </strong>
               <button
                 type="button"
                 disabled={!canToggleHabit}
-                onClick={() => void toggleCalendarEventDone(calendarEvent)}
+                onClick={() => void toggleHabitFromInspector()}
               >
-                {calendarEvent.completed
-                  ? language === "ru"
-                    ? "Убрать отметку"
-                    : "Undo check-in"
-                  : language === "ru"
-                    ? "Отметить этот день"
-                    : "Check in this day"}
+                {habitButtonLabel}
               </button>
               {!canToggleHabit ? (
                 <small>
@@ -2208,9 +2683,24 @@ export default function PlannerCalendarSurface({
                     ? language === "ru"
                       ? "Архивная привычка недоступна для отметок."
                       : "Archived habit cannot be checked in."
-                    : language === "ru"
-                      ? "Пауза сохраняет streak и блокирует отметки."
-                      : "Paused habits keep the streak and block check-ins."}
+                    : isPaused
+                      ? language === "ru"
+                        ? "Пауза сохраняет streak и блокирует отметки."
+                        : "Paused habits keep the streak and block check-ins."
+                      : isFutureHabit
+                        ? language === "ru"
+                          ? "Будущие привычки нельзя отмечать заранее."
+                          : "Future habits cannot be checked in ahead of time."
+                        : language === "ru"
+                          ? "Для этого дня отметка недоступна."
+                          : "This day cannot be checked in."}
+                </small>
+              ) : null}
+              {isPastMissedHabit && canToggleHabit ? (
+                <small>
+                  {language === "ru"
+                    ? "Это осознанное восстановление пропущенного дня, а не быстрая отметка из календаря."
+                    : "This is a deliberate backfill, not a quick calendar check-in."}
                 </small>
               ) : null}
             </section>
@@ -2244,9 +2734,7 @@ export default function PlannerCalendarSurface({
       );
     }
 
-    const shiftDate = (days: number) => {
-      const nextStartAt = addDays(calendarEvent.startAt, days);
-      const nextEndAt = calendarEvent.isAllDay ? null : addDays(calendarEvent.endAt, days);
+    const requestInspectorReschedule = (nextStartAt: number, nextEndAt: number | null) => {
       if (calendarEvent.kind === "occurrence" && isRecurringPlannerRule(calendarEvent.occurrence.task.recurrenceRule)) {
         setScopedAction({
           kind: "reschedule",
@@ -2259,7 +2747,13 @@ export default function PlannerCalendarSurface({
 
       void applyEventReschedule(calendarEvent, nextStartAt, nextEndAt);
     };
-    const convertDateMode = () => {
+
+    const shiftDate = (days: number) => {
+      const nextStartAt = addDays(calendarEvent.startAt, days);
+      const nextEndAt = calendarEvent.isAllDay ? null : addDays(calendarEvent.endAt, days);
+      requestInspectorReschedule(nextStartAt, nextEndAt);
+    };
+    const makeEventAllDay = () => {
       if (calendarEvent.kind === "timeBlock") {
         void convertTimeBlockTaskToAllDay(calendarEvent.timeBlock, calendarEvent.startAt);
         return;
@@ -2269,14 +2763,53 @@ export default function PlannerCalendarSurface({
         return;
       }
 
-      if (calendarEvent.isAllDay) {
-        const rangeForBlock = getDefaultTimeBlockRange(getStartOfLocalDay(calendarEvent.startAt), 9);
-        void applyEventReschedule(calendarEvent, rangeForBlock.startAt, rangeForBlock.endAt);
-        return;
-      }
-
-      void applyEventReschedule(calendarEvent, getStartOfLocalDay(calendarEvent.startAt), null);
+      requestInspectorReschedule(getStartOfLocalDay(calendarEvent.startAt), null);
     };
+    const openTimeEditor = () => {
+      setTimeEditorEventId(calendarEvent.id);
+      setTimeEditorDraft(getTimeEditorDraftForEvent(calendarEvent));
+    };
+    const closeTimeEditor = () => {
+      setTimeEditorEventId(null);
+      setTimeEditorDraft(null);
+    };
+    const changeTimeEditorStart = (deltaMinutes: number) => {
+      setTimeEditorDraft((current) => {
+        const draft = current ?? getTimeEditorDraftForEvent(calendarEvent);
+        const nextStartMinutes = clampNumber(draft.startMinutes + deltaMinutes, 0, 23 * 60 + 45);
+
+        return {
+          ...draft,
+          startMinutes: nextStartMinutes,
+          durationMinutes: clampNumber(draft.durationMinutes, SNAP_MINUTES, getTimeEditorMaxDuration(nextStartMinutes))
+        };
+      });
+    };
+    const changeTimeEditorDuration = (deltaMinutes: number) => {
+      setTimeEditorDraft((current) => {
+        const draft = current ?? getTimeEditorDraftForEvent(calendarEvent);
+
+        return {
+          ...draft,
+          durationMinutes: clampNumber(draft.durationMinutes + deltaMinutes, SNAP_MINUTES, getTimeEditorMaxDuration(draft.startMinutes))
+        };
+      });
+    };
+    const applyTimeEditor = () => {
+      const draft = timeEditorEventId === calendarEvent.id && timeEditorDraft ? timeEditorDraft : getTimeEditorDraftForEvent(calendarEvent);
+      const dayStartAt = getStartOfLocalDay(calendarEvent.startAt);
+      const nextStartAt = getTimestampOnDay(dayStartAt, draft.startMinutes);
+      const nextDurationMinutes = clampNumber(draft.durationMinutes, SNAP_MINUTES, getTimeEditorMaxDuration(draft.startMinutes));
+      const nextEndAt = nextStartAt + nextDurationMinutes * MINUTE_MS;
+      requestInspectorReschedule(nextStartAt, nextEndAt);
+      closeTimeEditor();
+    };
+    const isTimeEditorOpen = timeEditorEventId === calendarEvent.id;
+    const activeTimeEditorDraft = isTimeEditorOpen && timeEditorDraft ? timeEditorDraft : getTimeEditorDraftForEvent(calendarEvent);
+    const canMakeAllDay = calendarEvent.kind === "occurrence" || (calendarEvent.kind === "timeBlock" && Boolean(calendarEvent.timeBlock.taskId));
+    const canEditTime = calendarEvent.kind === "occurrence" || calendarEvent.kind === "timeBlock";
+    const timeEditorStartLabel = formatTimeEditorMinutes(activeTimeEditorDraft.startMinutes);
+    const timeEditorEndLabel = formatTimeEditorMinutes(activeTimeEditorDraft.startMinutes + activeTimeEditorDraft.durationMinutes);
     const commitTitle = async () => {
       const normalizedTitle = inspectorTitleDraft.trim();
 
@@ -2408,16 +2941,71 @@ export default function PlannerCalendarSurface({
               <button type="button" onClick={() => shiftDate(-1)}>{language === "ru" ? "− день" : "- day"}</button>
               <button type="button" onClick={() => shiftDate(1)}>{language === "ru" ? "+ день" : "+ day"}</button>
             </div>
-            {isMobile && (calendarEvent.kind === "occurrence" || (calendarEvent.kind === "timeBlock" && calendarEvent.timeBlock.taskId)) ? (
-              <button type="button" className="planner-calendar-date-mode-button" onClick={convertDateMode}>
-                {calendarEvent.kind === "occurrence" && calendarEvent.isAllDay
-                  ? language === "ru"
-                    ? "Назначить время 09:00"
-                    : "Set time 09:00"
-                  : language === "ru"
-                    ? "Сделать на весь день"
-                    : "Make all-day"}
-              </button>
+            {canEditTime ? (
+              <div className="planner-calendar-time-control">
+                <button type="button" className="planner-calendar-date-mode-button" onClick={isTimeEditorOpen ? closeTimeEditor : openTimeEditor}>
+                  <span className="planner-calendar-time-icon" aria-hidden="true" />
+                  <span>
+                    <small>
+                      {calendarEvent.isAllDay
+                        ? language === "ru"
+                          ? "без времени"
+                          : "all-day"
+                        : language === "ru"
+                          ? "интервал"
+                          : "time"}
+                    </small>
+                    <strong>
+                      {calendarEvent.isAllDay
+                        ? language === "ru"
+                          ? "Назначить время"
+                          : "Set time"
+                        : `${formatPlannerTime(calendarEvent.startAt, language)} - ${formatPlannerTime(calendarEvent.endAt, language)}`}
+                    </strong>
+                  </span>
+                </button>
+                {!calendarEvent.isAllDay && canMakeAllDay ? (
+                  <button type="button" className="planner-calendar-date-mode-button is-secondary" onClick={makeEventAllDay}>
+                    {language === "ru" ? "Весь день" : "All day"}
+                  </button>
+                ) : null}
+                {isTimeEditorOpen ? (
+                  <div className="planner-calendar-time-editor">
+                    <div className="planner-calendar-time-editor-row">
+                      <span>{language === "ru" ? "Начало" : "Start"}</span>
+                      <div>
+                        <button type="button" onClick={() => changeTimeEditorStart(-SNAP_MINUTES)} aria-label={language === "ru" ? "Раньше" : "Earlier"}>
+                          −
+                        </button>
+                        <strong>{timeEditorStartLabel}</strong>
+                        <button type="button" onClick={() => changeTimeEditorStart(SNAP_MINUTES)} aria-label={language === "ru" ? "Позже" : "Later"}>
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div className="planner-calendar-time-editor-row">
+                      <span>{language === "ru" ? "Длительность" : "Duration"}</span>
+                      <div>
+                        <button type="button" onClick={() => changeTimeEditorDuration(-SNAP_MINUTES)} aria-label={language === "ru" ? "Короче" : "Shorter"}>
+                          −
+                        </button>
+                        <strong>{formatDurationMinutes(activeTimeEditorDraft.durationMinutes, language)}</strong>
+                        <button type="button" onClick={() => changeTimeEditorDuration(SNAP_MINUTES)} aria-label={language === "ru" ? "Дольше" : "Longer"}>
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div className="planner-calendar-time-editor-summary">
+                      <span>
+                        {timeEditorStartLabel} - {timeEditorEndLabel}
+                      </span>
+                      <button type="button" onClick={applyTimeEditor}>
+                        {language === "ru" ? "Применить" : "Apply"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </section>
 
@@ -2729,12 +3317,13 @@ export default function PlannerCalendarSurface({
               <h3>
                 {isAgendaPanel
                   ? language === "ru"
-                    ? "Повестка дня"
-                    : "Day agenda"
+                    ? "Повестка"
+                    : "Agenda"
                   : language === "ru"
                     ? "Без даты"
                     : "No date"}
               </h3>
+              {isAgendaPanel ? <p>{selectedDayAgendaLabel}</p> : null}
             </div>
             <small>{isAgendaPanel ? selectedDayEvents.length : unscheduledTasks.length}</small>
             <button
@@ -2837,8 +3426,61 @@ export default function PlannerCalendarSurface({
     );
   };
 
+  const renderCalendarFilters = () => {
+    const filters: Array<{ id: CalendarFilterId; label: string; hint: string }> = [
+      {
+        id: "tasks",
+        label: language === "ru" ? "Задачи" : "Tasks",
+        hint: language === "ru" ? "Показать задачи и блоки времени" : "Show tasks and time blocks"
+      },
+      {
+        id: "habits",
+        label: language === "ru" ? "Привычки" : "Habits",
+        hint: language === "ru" ? "Показать привычки прошлого и сегодняшнего дня" : "Show past and today habits"
+      },
+      {
+        id: "futureHabits",
+        label: language === "ru" ? "Будущие" : "Future",
+        hint: language === "ru" ? "Показать будущие привычки тихим слоем" : "Show future habits as a quiet layer"
+      },
+      {
+        id: "completed",
+        label: language === "ru" ? "Завершенные" : "Done",
+        hint: language === "ru" ? "Показать завершенные задачи и отмеченные привычки" : "Show completed tasks and checked habits"
+      }
+    ];
+
+    return (
+      <div className="planner-calendar-filter-row" role="toolbar" aria-label={language === "ru" ? "Фильтры календаря" : "Calendar filters"}>
+        {filters.map((filter) => {
+          const isActive = calendarFilters[filter.id];
+
+          return (
+            <button
+              key={filter.id}
+              type="button"
+              className={`is-${filter.id} ${isActive ? "is-active" : ""}`}
+              aria-pressed={isActive}
+              title={filter.hint}
+              onClick={() => toggleCalendarFilter(filter.id)}
+            >
+              <span aria-hidden="true" />
+              <strong>{filter.label}</strong>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   const calendarSurface = (
-    <section className={`planner-calendar-layer ${isMobile ? "is-mobile" : "is-desktop"}`} role="dialog" aria-modal="true">
+    <section
+      className={`planner-calendar-layer ${isMobile ? "is-mobile" : "is-desktop"} ${
+        manualEventDragId ? "is-event-dragging" : ""
+      }`}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="planner-calendar-shell">
         <header className="planner-calendar-head">
           <div className="planner-calendar-title">
@@ -2849,6 +3491,7 @@ export default function PlannerCalendarSurface({
                 ? "Планируй задачи как блоки времени: сроки остаются сроками, расписание становится видимым."
                 : "Plan tasks as time blocks: due dates stay due dates, scheduled work becomes visible."}
             </p>
+            {renderCalendarFilters()}
           </div>
 
           <div className="planner-calendar-head-actions">
@@ -2887,6 +3530,7 @@ export default function PlannerCalendarSurface({
                   const today = getStartOfLocalDay();
                   setCursorAt(today);
                   setSelectedDayAt(today);
+                  setSelectedSlotHour(null);
                 }}
               >
                 {language === "ru" ? "Сегодня" : "Today"}
@@ -2899,7 +3543,7 @@ export default function PlannerCalendarSurface({
             <button
               type="button"
               className="planner-calendar-create-button"
-              onClick={() => openQuickCreate(selectedDay?.startAt ?? cursorAt, mode === "day" ? 9 : null)}
+              onClick={() => openQuickCreate(selectedQuickCreateDayAt, mode === "day" ? selectedQuickCreateHour ?? 9 : null)}
             >
               <span aria-hidden="true">+</span>
               {language === "ru" ? "Новая" : "New"}
@@ -2912,14 +3556,21 @@ export default function PlannerCalendarSurface({
         </header>
 
         <div className="planner-calendar-workspace">
-          <main className="planner-calendar-board" aria-label={language === "ru" ? "Рабочая область календаря" : "Calendar workspace"}>
+          <main
+            ref={calendarBoardRef}
+            className="planner-calendar-board"
+            aria-label={language === "ru" ? "Рабочая область календаря" : "Calendar workspace"}
+          >
             {mode === "day" ? renderDayAgenda(range.days[0], dayModeEvents) : renderCalendarGrid()}
           </main>
 
           <aside className="planner-calendar-side">
             <section className="planner-calendar-side-card is-agenda">
               <div className="planner-calendar-side-title">
-                <span>{language === "ru" ? "Повестка дня" : "Day agenda"}</span>
+                <div>
+                  <span>{language === "ru" ? "Повестка" : "Agenda"}</span>
+                  <em>{selectedDayAgendaLabel}</em>
+                </div>
                 <small>{selectedDayEvents.length}</small>
               </div>
               {renderAgendaList()}
@@ -2951,7 +3602,7 @@ export default function PlannerCalendarSurface({
                 <small>{unscheduledTasks.length}</small>
               </span>
             </button>
-            <button type="button" onClick={() => openQuickCreate(selectedDay?.startAt ?? cursorAt, null)}>
+            <button type="button" onClick={() => openQuickCreate(selectedQuickCreateDayAt, selectedQuickCreateHour)}>
               <span className="planner-calendar-mobile-dock-icon is-create" aria-hidden="true" />
               <span>
                 <strong>{language === "ru" ? "Новая" : "New"}</strong>
