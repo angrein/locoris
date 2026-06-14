@@ -380,6 +380,40 @@ function sortByKey<T extends { key: string }>(records: readonly T[]) {
   return [...records].sort((left, right) => left.key.localeCompare(right.key));
 }
 
+const PLANNER_SYNC_ENTITY_KINDS = new Set<SyncEntityKind>([
+  "task",
+  "habit",
+  "habitLog",
+  "goal",
+  "timeBlock"
+]);
+
+function hasPlannerBackupCollections(backup: DesktopLocalVaultBackup) {
+  const candidate = backup as Partial<DesktopLocalVaultBackup>;
+
+  return (
+    Array.isArray(candidate.tasks) &&
+    Array.isArray(candidate.habits) &&
+    Array.isArray(candidate.habitLogs) &&
+    Array.isArray(candidate.goals) &&
+    Array.isArray(candidate.timeBlocks)
+  );
+}
+
+function isPlannerSyncRecord(record: { entityType: SyncEntityKind }) {
+  return PLANNER_SYNC_ENTITY_KINDS.has(record.entityType);
+}
+
+function mergeSyncRecordsByKey<T extends { key: string }>(records: readonly T[]) {
+  const map = new Map<string, T>();
+
+  records.forEach((record) => {
+    map.set(record.key, record);
+  });
+
+  return sortByKey([...map.values()]);
+}
+
 async function blobToBase64(blob: Blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const chunkSize = 0x8000;
@@ -1302,22 +1336,43 @@ export async function exportLocalVaultDesktopBackup(
 
 export async function restoreLocalVaultDesktopBackup(
   localVaultId: string,
-  backup: DesktopLocalVaultBackup
+  backup: DesktopLocalVaultBackup,
+  options?: {
+    preserveMissingPlannerCollections?: boolean;
+  }
 ) {
   return withLocalVaultDatabase(localVaultId, async (database) => {
+    const hasPlannerCollections = hasPlannerBackupCollections(backup);
+    const shouldPreserveMissingPlannerCollections = Boolean(options?.preserveMissingPlannerCollections);
+    const isLegacyNativePlannerSnapshot = !hasPlannerCollections && shouldPreserveMissingPlannerCollections;
+    const shouldRestorePlannerCollections = hasPlannerCollections || !shouldPreserveMissingPlannerCollections;
     const folders = sortById(backup.folders).map((folder) => hydrateFolderRecord(folder));
     const notes = sortById(backup.notes).map((note) => hydrateDesktopBackupNote(note));
     const assets = sortById(backup.assets).map((asset) => hydrateDesktopBackupAsset(asset));
-    const tasks = sortById(backup.tasks ?? []).map((task) => hydrateTaskRecord(task));
-    const habits = sortById(backup.habits ?? []).map((habit) => hydrateHabitRecord(habit));
-    const habitLogs = sortById(backup.habitLogs ?? []).map((habitLog) => hydrateHabitLogRecord(habitLog));
-    const goals = sortById(backup.goals ?? []).map((goal) => hydrateGoalRecord(goal));
-    const timeBlocks = sortById(backup.timeBlocks ?? []).map((timeBlock) => hydrateTimeBlockRecord(timeBlock));
+    const tasks = shouldRestorePlannerCollections
+      ? sortById(backup.tasks ?? []).map((task) => hydrateTaskRecord(task))
+      : [];
+    const habits = shouldRestorePlannerCollections
+      ? sortById(backup.habits ?? []).map((habit) => hydrateHabitRecord(habit))
+      : [];
+    const habitLogs = shouldRestorePlannerCollections
+      ? sortById(backup.habitLogs ?? []).map((habitLog) => hydrateHabitLogRecord(habitLog))
+      : [];
+    const goals = shouldRestorePlannerCollections
+      ? sortById(backup.goals ?? []).map((goal) => hydrateGoalRecord(goal))
+      : [];
+    const timeBlocks = shouldRestorePlannerCollections
+      ? sortById(backup.timeBlocks ?? []).map((timeBlock) => hydrateTimeBlockRecord(timeBlock))
+      : [];
+    const backupSyncDirtyEntries = sortByKey(backup.syncDirtyEntries ?? []);
+    const backupSyncShadows = sortByKey(backup.syncShadows ?? []);
+    const backupSyncTombstones = sortByKey(backup.syncTombstones ?? []);
     const backupSettings = stripAppSettingsSecrets(backup.settings);
     const settings =
       backupSettings
         ? {
             ...backupSettings,
+            syncCursor: isLegacyNativePlannerSnapshot ? null : backupSettings.syncCursor,
             lastOpenedNoteId:
               backupSettings.lastOpenedNoteId && notes.some((note) => note.id === backupSettings.lastOpenedNoteId)
                 ? backupSettings.lastOpenedNoteId
@@ -1346,16 +1401,45 @@ export async function restoreLocalVaultDesktopBackup(
         database.syncTombstones
       ],
       async () => {
+        let preservedPlannerDirtyEntries: SyncDirtyEntry[] = [];
+        let preservedPlannerShadows: SyncShadow[] = [];
+        let preservedPlannerTombstones: SyncTombstone[] = [];
+
+        if (isLegacyNativePlannerSnapshot) {
+          const currentPlannerEntityCounts = await Promise.all([
+            database.tasks.count(),
+            database.habits.count(),
+            database.habitLogs.count(),
+            database.goals.count(),
+            database.timeBlocks.count()
+          ]);
+          const hasCurrentPlannerData = currentPlannerEntityCounts.some((count) => count > 0);
+
+          if (!hasCurrentPlannerData) {
+            preservedPlannerDirtyEntries = [];
+            preservedPlannerShadows = [];
+            preservedPlannerTombstones = [];
+          } else {
+            [preservedPlannerDirtyEntries, preservedPlannerShadows, preservedPlannerTombstones] = await Promise.all([
+              database.syncDirtyEntries.filter((entry) => isPlannerSyncRecord(entry)).toArray(),
+              database.syncShadows.filter((entry) => isPlannerSyncRecord(entry)).toArray(),
+              database.syncTombstones.filter((entry) => isPlannerSyncRecord(entry)).toArray()
+            ]);
+          }
+        }
+
         await database.projects.clear();
         await database.folders.clear();
         await database.tags.clear();
         await database.notes.clear();
         await database.assets.clear();
-        await database.tasks.clear();
-        await database.habits.clear();
-        await database.habitLogs.clear();
-        await database.goals.clear();
-        await database.timeBlocks.clear();
+        if (shouldRestorePlannerCollections) {
+          await database.tasks.clear();
+          await database.habits.clear();
+          await database.habitLogs.clear();
+          await database.goals.clear();
+          await database.timeBlocks.clear();
+        }
         await database.settings.clear();
         await database.syncDirtyEntries.clear();
         await database.syncShadows.clear();
@@ -1381,41 +1465,58 @@ export async function restoreLocalVaultDesktopBackup(
           await database.assets.bulkAdd(assets);
         }
 
-        if (tasks.length > 0) {
+        if (shouldRestorePlannerCollections && tasks.length > 0) {
           await database.tasks.bulkAdd(tasks);
         }
 
-        if (habits.length > 0) {
+        if (shouldRestorePlannerCollections && habits.length > 0) {
           await database.habits.bulkAdd(habits);
         }
 
-        if (habitLogs.length > 0) {
+        if (shouldRestorePlannerCollections && habitLogs.length > 0) {
           await database.habitLogs.bulkAdd(habitLogs);
         }
 
-        if (goals.length > 0) {
+        if (shouldRestorePlannerCollections && goals.length > 0) {
           await database.goals.bulkAdd(goals);
         }
 
-        if (timeBlocks.length > 0) {
+        if (shouldRestorePlannerCollections && timeBlocks.length > 0) {
           await database.timeBlocks.bulkAdd(timeBlocks);
         }
 
         await database.settings.add(settings);
 
-        if (backup.syncDirtyEntries.length > 0) {
-          await database.syncDirtyEntries.bulkAdd(sortByKey(backup.syncDirtyEntries));
+        const restoredSyncDirtyEntries = mergeSyncRecordsByKey([
+          ...backupSyncDirtyEntries.filter((entry) => hasPlannerCollections || !isPlannerSyncRecord(entry)),
+          ...preservedPlannerDirtyEntries
+        ]);
+        const restoredSyncShadows = mergeSyncRecordsByKey([
+          ...backupSyncShadows.filter((entry) => hasPlannerCollections || !isPlannerSyncRecord(entry)),
+          ...preservedPlannerShadows
+        ]);
+        const restoredSyncTombstones = mergeSyncRecordsByKey([
+          ...backupSyncTombstones.filter((entry) => hasPlannerCollections || !isPlannerSyncRecord(entry)),
+          ...preservedPlannerTombstones
+        ]);
+
+        if (restoredSyncDirtyEntries.length > 0) {
+          await database.syncDirtyEntries.bulkAdd(restoredSyncDirtyEntries);
         }
 
-        if (backup.syncShadows.length > 0) {
-          await database.syncShadows.bulkAdd(sortByKey(backup.syncShadows));
+        if (restoredSyncShadows.length > 0) {
+          await database.syncShadows.bulkAdd(restoredSyncShadows);
         }
 
-        if (backup.syncTombstones.length > 0) {
-          await database.syncTombstones.bulkAdd(sortByKey(backup.syncTombstones));
+        if (restoredSyncTombstones.length > 0) {
+          await database.syncTombstones.bulkAdd(restoredSyncTombstones);
         }
       }
     );
+
+    if (isLegacyNativePlannerSnapshot) {
+      scheduleLocalVaultDesktopBackup(localVaultId);
+    }
   });
 }
 
@@ -1447,7 +1548,9 @@ export async function restoreLocalVaultNativeSnapshot(localVaultId: string) {
     return false;
   }
 
-  await restoreLocalVaultDesktopBackup(localVaultId, snapshot);
+  await restoreLocalVaultDesktopBackup(localVaultId, snapshot, {
+    preserveMissingPlannerCollections: true
+  });
   return true;
 }
 

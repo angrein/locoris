@@ -59,11 +59,13 @@ class InstallApkUpdateArgs {
   lateinit var url: String
   var fileName: String? = null
   var expectedPackageName: String? = null
+  var expectedSizeBytes: Long? = null
 }
 
 @TauriPlugin
 class LocorisAndroidPlugin(private val activity: Activity) : Plugin(activity) {
   private var googleDriveAuthorizationInFlight = false
+  @Volatile private var updateDownloadProgressPercent: Int? = null
   private val securePreferences: SharedPreferences by lazy {
     val masterKey = MasterKey.Builder(activity.applicationContext)
       .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -278,7 +280,7 @@ class LocorisAndroidPlugin(private val activity: Activity) : Plugin(activity) {
 
     Thread {
       try {
-        val apkFile = downloadApk(updateUrl, args.fileName)
+        val apkFile = downloadApk(updateUrl, args.fileName, args.expectedSizeBytes)
         validateDownloadedApk(apkFile, expectedPackageName)
 
         activity.runOnUiThread {
@@ -290,11 +292,20 @@ class LocorisAndroidPlugin(private val activity: Activity) : Plugin(activity) {
           }
         }
       } catch (error: IllegalArgumentException) {
+        updateDownloadProgressPercent = null
         activity.runOnUiThread { invoke.reject(error.message ?: "ANDROID_UPDATE_INVALID_APK") }
       } catch (_: Exception) {
+        updateDownloadProgressPercent = null
         activity.runOnUiThread { invoke.reject("ANDROID_UPDATE_DOWNLOAD_FAILED") }
       }
     }.start()
+  }
+
+  @Command
+  fun getApkUpdateProgress(invoke: Invoke) {
+    val result = JSObject()
+    result.put("progress", updateDownloadProgressPercent ?: -1)
+    invoke.resolve(result)
   }
 
   @Command
@@ -447,7 +458,7 @@ class LocorisAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     return normalized
   }
 
-  private fun downloadApk(updateUrl: String, requestedFileName: String?): File {
+  private fun downloadApk(updateUrl: String, requestedFileName: String?, expectedSizeBytes: Long?): File {
     val updatesDirectory = File(activity.cacheDir, "locoris-updates")
 
     if (!updatesDirectory.exists() && !updatesDirectory.mkdirs()) {
@@ -470,11 +481,40 @@ class LocorisAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         throw IllegalStateException("ANDROID_UPDATE_DOWNLOAD_FAILED")
       }
 
+      val expectedSize = expectedSizeBytes?.takeIf { it > 0L } ?: -1L
+      val contentSize = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) connection.contentLengthLong else connection.contentLength.toLong()
+      val totalBytes = if (contentSize > 0L) contentSize else expectedSize
+      updateDownloadProgressPercent = if (totalBytes > 0L) 0 else null
+
       connection.inputStream.use { input ->
         apkFile.outputStream().use { output ->
-          input.copyTo(output)
+          val buffer = ByteArray(64 * 1024)
+          var downloadedBytes = 0L
+          var lastProgress = -1
+
+          while (true) {
+            val bytesRead = input.read(buffer)
+
+            if (bytesRead <= 0) {
+              break
+            }
+
+            output.write(buffer, 0, bytesRead)
+            downloadedBytes += bytesRead.toLong()
+
+            if (totalBytes > 0L) {
+              val nextProgress = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 99)
+
+              if (nextProgress != lastProgress) {
+                updateDownloadProgressPercent = nextProgress
+                lastProgress = nextProgress
+              }
+            }
+          }
         }
       }
+
+      updateDownloadProgressPercent = 100
     } finally {
       connection.disconnect()
     }

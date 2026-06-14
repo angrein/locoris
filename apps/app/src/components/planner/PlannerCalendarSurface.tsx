@@ -30,6 +30,8 @@ import {
   isPlannerHabitCompletedOnDay,
   isPlannerHabitDueOnDay
 } from "../../lib/plannerHabits";
+import TagInputField from "../TagInputField";
+import PlannerUndoSnackbar, { type PlannerUndoSnackbarAction } from "./PlannerUndoSnackbar";
 import "./PlannerCalendarSurface.css";
 
 type CalendarMode = "day" | "week" | "month";
@@ -125,11 +127,6 @@ type CalendarScopedAction = {
 type CalendarEventInspectorState = {
   eventId: string;
   anchor: { x: number; y: number; width: number; height: number } | null;
-};
-type CalendarUndoToast = {
-  id: number;
-  label: string;
-  undo: () => Promise<void> | void;
 };
 type CalendarResizeState = {
   eventId: string;
@@ -378,10 +375,6 @@ function getTaskUndoPatch(task: Task): PlannerTaskUpdateInput {
     spentMinutes: task.spentMinutes,
     sortOrder: task.sortOrder
   };
-}
-
-function getTagKey(value: string) {
-  return value.trim().toLowerCase();
 }
 
 function getTimeBlockUndoPatch(timeBlock: TimeBlock): PlannerTimeBlockUpdateInput {
@@ -752,15 +745,11 @@ export default function PlannerCalendarSurface({
   const [quickCreateDraft, setQuickCreateDraft] = useState<QuickCreateDraft | null>(null);
   const [eventInspector, setEventInspector] = useState<CalendarEventInspectorState | null>(null);
   const [scopedAction, setScopedAction] = useState<CalendarScopedAction | null>(null);
-  const [undoToast, setUndoToast] = useState<CalendarUndoToast | null>(null);
+  const [undoToast, setUndoToast] = useState<PlannerUndoSnackbarAction | null>(null);
   const [resizePreview, setResizePreview] = useState<CalendarResizePreview | null>(null);
   const [inspectorTitleDraft, setInspectorTitleDraft] = useState("");
   const [inspectorDescriptionDraft, setInspectorDescriptionDraft] = useState("");
   const [isReminderPickerOpen, setIsReminderPickerOpen] = useState(false);
-  const [areTagsExpanded, setAreTagsExpanded] = useState(false);
-  const [isTagCreatorOpen, setIsTagCreatorOpen] = useState(false);
-  const [tagDraft, setTagDraft] = useState("");
-  const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [timeEditorEventId, setTimeEditorEventId] = useState<string | null>(null);
   const [timeEditorDraft, setTimeEditorDraft] = useState<CalendarTimeEditorDraft | null>(null);
   const [manualDragTaskId, setManualDragTaskId] = useState<string | null>(null);
@@ -779,12 +768,14 @@ export default function PlannerCalendarSurface({
     startX: number;
     startY: number;
     dragging: boolean;
+    isTouch: boolean;
+    armed: boolean;
+    longPressTimer: number | null;
   } | null>(null);
   const suppressNextUnscheduledClickRef = useRef<string | null>(null);
   const suppressNextCalendarEventClickRef = useRef<string | null>(null);
   const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const noteMap = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes]);
-  const tagMap = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const todayStartAt = getStartOfLocalDay();
   const range = useMemo(() => {
     if (mode === "month") {
@@ -911,35 +902,6 @@ export default function PlannerCalendarSurface({
   );
   const inspectedTask = inspectedEvent?.kind === "occurrence" ? inspectedEvent.occurrence.task : null;
   const inspectedTimeBlock = inspectedEvent?.kind === "timeBlock" ? inspectedEvent.timeBlock : null;
-  const selectedTagKeys = useMemo(() => {
-    const keys = new Set<string>();
-    inspectedTask?.tagIds.forEach((tagId) => {
-      const tag = tagMap.get(tagId);
-      if (tag) {
-        keys.add(getTagKey(tag.name));
-      }
-    });
-    return keys;
-  }, [inspectedTask?.tagIds, tagMap]);
-  const uniqueTags = useMemo(() => {
-    const uniqueTagMap = new Map<string, Tag>();
-    tags.forEach((tag) => {
-      const key = getTagKey(tag.name);
-      if (key && !uniqueTagMap.has(key)) {
-        uniqueTagMap.set(key, tag);
-      }
-    });
-    return Array.from(uniqueTagMap.values()).sort((left, right) => {
-      const leftSelected = selectedTagKeys.has(getTagKey(left.name));
-      const rightSelected = selectedTagKeys.has(getTagKey(right.name));
-      if (leftSelected !== rightSelected) {
-        return leftSelected ? -1 : 1;
-      }
-      return left.name.localeCompare(right.name, language === "ru" ? "ru" : "en", { sensitivity: "base" });
-    });
-  }, [language, selectedTagKeys, tags]);
-  const visibleInspectorTags = areTagsExpanded ? uniqueTags : uniqueTags.slice(0, isMobile ? 5 : 7);
-  const hiddenInspectorTagCount = Math.max(0, uniqueTags.length - visibleInspectorTags.length);
   const scopedEvent = useMemo(
     () => (scopedAction ? events.find((event) => event.id === scopedAction.eventId) ?? null : null),
     [events, scopedAction]
@@ -1062,10 +1024,6 @@ export default function PlannerCalendarSurface({
       setInspectorTitleDraft("");
       setInspectorDescriptionDraft("");
       setIsReminderPickerOpen(false);
-      setAreTagsExpanded(false);
-      setIsTagCreatorOpen(false);
-      setTagDraft("");
-      setIsCreatingTag(false);
       setTimeEditorEventId(null);
       setTimeEditorDraft(null);
       return;
@@ -1080,10 +1038,6 @@ export default function PlannerCalendarSurface({
           : inspectedEvent.habit.description
     );
     setIsReminderPickerOpen(false);
-    setAreTagsExpanded(false);
-    setIsTagCreatorOpen(false);
-    setTagDraft("");
-    setIsCreatingTag(false);
     setTimeEditorEventId(null);
     setTimeEditorDraft(null);
   }, [inspectedEvent?.id]);
@@ -1453,18 +1407,47 @@ export default function PlannerCalendarSurface({
   };
 
   const handleManualDragStart = (event: PointerEvent<HTMLElement>, taskId: string) => {
-    if (isMobile || event.pointerType === "touch" || event.button !== 0) {
+    const isTouchPointer = event.pointerType === "touch";
+    const interactiveTarget = (event.target as HTMLElement | null)?.closest(
+      "input, textarea, select, a, [data-planner-calendar-drag-block='true']"
+    );
+
+    if ((!isTouchPointer && event.button !== 0) || (interactiveTarget && interactiveTarget !== event.currentTarget)) {
       return;
     }
+
+    const currentTarget = event.currentTarget;
+    const longPressTimer =
+      isTouchPointer && typeof window !== "undefined"
+        ? window.setTimeout(() => {
+            const dragState = manualDragRef.current;
+
+            if (!dragState || dragState.pointerId !== event.pointerId) {
+              return;
+            }
+
+            dragState.armed = true;
+            dragState.dragging = true;
+            setManualDragTaskId(taskId);
+            setManualEventDropKey(null);
+            currentTarget.setPointerCapture?.(event.pointerId);
+          }, TOUCH_LONG_PRESS_DRAG_MS)
+        : null;
 
     manualDragRef.current = {
       taskId,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      dragging: false
+      dragging: false,
+      isTouch: isTouchPointer,
+      armed: !isTouchPointer,
+      longPressTimer
     };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+
+    if (!isTouchPointer) {
+      currentTarget.setPointerCapture?.(event.pointerId);
+    }
   };
 
   const handleManualDragMove = (event: PointerEvent<HTMLElement>) => {
@@ -1476,6 +1459,19 @@ export default function PlannerCalendarSurface({
 
     const distance = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
 
+    if (dragState.isTouch && !dragState.armed) {
+      if (distance > TOUCH_DRAG_CANCEL_PX) {
+        if (dragState.longPressTimer !== null) {
+          window.clearTimeout(dragState.longPressTimer);
+        }
+
+        manualDragRef.current = null;
+        setManualDragTaskId(null);
+      }
+
+      return;
+    }
+
     if (distance < MANUAL_DRAG_THRESHOLD_PX) {
       return;
     }
@@ -1484,6 +1480,11 @@ export default function PlannerCalendarSurface({
       dragState.dragging = true;
       setManualDragTaskId(dragState.taskId);
     }
+
+    const dropInfo = getCalendarDropInfoFromPoint(event.clientX, event.clientY);
+    setManualEventDropKey(dropInfo ? getCalendarDropKey(dropInfo.dayStartAt, dropInfo.hour) : null);
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   const handleManualDragEnd = async (event: PointerEvent<HTMLElement>) => {
@@ -1495,7 +1496,15 @@ export default function PlannerCalendarSurface({
 
     manualDragRef.current = null;
     setManualDragTaskId(null);
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    setManualEventDropKey(null);
+
+    if (dragState.longPressTimer !== null) {
+      window.clearTimeout(dragState.longPressTimer);
+    }
+
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
 
     if (!dragState.dragging) {
       return;
@@ -1522,6 +1531,26 @@ export default function PlannerCalendarSurface({
     }
 
     await scheduleTask(task, dayStartAt, typeof hour === "number" && Number.isFinite(hour) ? hour : null);
+  };
+
+  const handleManualDragCancel = (event: PointerEvent<HTMLElement>) => {
+    const dragState = manualDragRef.current;
+
+    if (dragState?.pointerId !== event.pointerId) {
+      return;
+    }
+
+    manualDragRef.current = null;
+    setManualDragTaskId(null);
+    setManualEventDropKey(null);
+
+    if (dragState.longPressTimer !== null) {
+      window.clearTimeout(dragState.longPressTimer);
+    }
+
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
 
   const openQuickCreate = (dayStartAt = selectedDay?.startAt ?? getStartOfLocalDay(), hour: number | null = null) => {
@@ -1607,7 +1636,7 @@ export default function PlannerCalendarSurface({
     }
   };
 
-  const showUndoToast = (label: string, undo: CalendarUndoToast["undo"]) => {
+  const showUndoToast = (label: string, undo: PlannerUndoSnackbarAction["undo"]) => {
     if (undoTimerRef.current) {
       window.clearTimeout(undoTimerRef.current);
     }
@@ -2356,8 +2385,8 @@ export default function PlannerCalendarSurface({
       <p>
         {isMobile
           ? language === "ru"
-            ? "Выбери задачу, затем тапни день или слот."
-            : "Select a task, then tap a day or slot."
+            ? "Тапни задачу для выбора или удержи, чтобы перенести в календарь."
+            : "Tap a task to select it, or hold to move it into the calendar."
           : language === "ru"
             ? "Перетащи задачу на день или час."
             : "Drag a task onto a day or hour."}
@@ -2377,10 +2406,7 @@ export default function PlannerCalendarSurface({
             }}
             onPointerDown={(event) => handleManualDragStart(event, task.id)}
             onPointerMove={handleManualDragMove}
-            onPointerCancel={() => {
-              manualDragRef.current = null;
-              setManualDragTaskId(null);
-            }}
+            onPointerCancel={handleManualDragCancel}
             onPointerUp={(event) => void handleManualDragEnd(event)}
             onClick={() => {
               if (suppressNextUnscheduledClickRef.current === task.id) {
@@ -2855,51 +2881,6 @@ export default function PlannerCalendarSurface({
         );
       }
     };
-    const toggleTag = (tag: Tag) => {
-      if (!task) {
-        return;
-      }
-
-      const tagKey = getTagKey(tag.name);
-      const nextTagIds = selectedTagKeys.has(tagKey)
-        ? task.tagIds.filter((tagId) => getTagKey(tagMap.get(tagId)?.name ?? "") !== tagKey)
-        : [...task.tagIds, tag.id];
-      void updateTaskWithUndo(
-        task,
-        { tagIds: Array.from(new Set(nextTagIds)) },
-        language === "ru" ? "Теги изменены" : "Tags updated"
-      );
-    };
-    const createAndAttachTag = async () => {
-      if (!task || !onCreateTag || isCreatingTag) {
-        return;
-      }
-
-      const normalizedName = tagDraft.trim();
-      if (!normalizedName) {
-        setIsTagCreatorOpen(false);
-        setTagDraft("");
-        return;
-      }
-
-      setIsCreatingTag(true);
-      try {
-        const tag = await onCreateTag(normalizedName);
-        const tagKey = getTagKey(tag.name);
-        const nextTagIds = task.tagIds.filter((tagId) => getTagKey(tagMap.get(tagId)?.name ?? "") !== tagKey);
-        await updateTaskWithUndo(
-          task,
-          { tagIds: Array.from(new Set([...nextTagIds, tag.id])) },
-          language === "ru" ? "Тег добавлен" : "Tag added"
-        );
-        setTagDraft("");
-        setIsTagCreatorOpen(false);
-        setAreTagsExpanded(false);
-      } finally {
-        setIsCreatingTag(false);
-      }
-    };
-
     return (
       <>
         <header className="planner-calendar-inspector-head">
@@ -3060,112 +3041,26 @@ export default function PlannerCalendarSurface({
           {task ? (
             <section className="planner-calendar-inspector-section">
               <span className="planner-calendar-inspector-label">{language === "ru" ? "Теги" : "Tags"}</span>
-              {uniqueTags.length > 0 ? (
-                <div className="planner-calendar-tag-row">
-                  {visibleInspectorTags.map((tag) => (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      className={selectedTagKeys.has(getTagKey(tag.name)) ? "is-active" : ""}
-                      onClick={() => toggleTag(tag)}
-                      style={{ "--planner-calendar-tag-color": tag.color } as CSSProperties}
-                    >
-                      <span />
-                      <strong>{tag.name}</strong>
-                    </button>
-                  ))}
-                  {hiddenInspectorTagCount > 0 || areTagsExpanded ? (
-                    <button type="button" className="is-more" onClick={() => setAreTagsExpanded((current) => !current)}>
-                      {areTagsExpanded ? (language === "ru" ? "Свернуть" : "Less") : `+${hiddenInspectorTagCount}`}
-                    </button>
-                  ) : null}
-                  {onCreateTag ? (
-                    isTagCreatorOpen ? (
-                      <span className="planner-calendar-tag-create">
-                        <input
-                          value={tagDraft}
-                          autoFocus
-                          disabled={isCreatingTag}
-                          onChange={(event) => setTagDraft(event.target.value)}
-                          onBlur={() => {
-                            if (!tagDraft.trim()) {
-                              setIsTagCreatorOpen(false);
-                            }
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void createAndAttachTag();
-                            }
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              setTagDraft("");
-                              setIsTagCreatorOpen(false);
-                            }
-                          }}
-                          placeholder={language === "ru" ? "Новый тег" : "New tag"}
-                        />
-                        <button
-                          type="button"
-                          className="is-create-confirm"
-                          disabled={isCreatingTag}
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => void createAndAttachTag()}
-                        >
-                          +
-                        </button>
-                      </span>
-                    ) : (
-                      <button type="button" className="is-create" onClick={() => setIsTagCreatorOpen(true)}>
-                        + {language === "ru" ? "тег" : "tag"}
-                      </button>
+              {onCreateTag ? (
+                <TagInputField
+                  tags={tags}
+                  selectedTagIds={task.tagIds}
+                  language={language}
+                  onCreateTag={onCreateTag}
+                  dropdownWithinPortal
+                  variant="planner"
+                  onChangeTagIds={(tagIds) =>
+                    updateTaskWithUndo(
+                      task,
+                      { tagIds },
+                      language === "ru" ? "Теги изменены" : "Tags updated"
                     )
-                  ) : null}
-                </div>
+                  }
+                />
               ) : (
-                <div className="planner-calendar-tag-row">
-                  {onCreateTag ? (
-                    isTagCreatorOpen ? (
-                      <span className="planner-calendar-tag-create">
-                        <input
-                          value={tagDraft}
-                          autoFocus
-                          disabled={isCreatingTag}
-                          onChange={(event) => setTagDraft(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void createAndAttachTag();
-                            }
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              setTagDraft("");
-                              setIsTagCreatorOpen(false);
-                            }
-                          }}
-                          placeholder={language === "ru" ? "Новый тег" : "New tag"}
-                        />
-                        <button
-                          type="button"
-                          className="is-create-confirm"
-                          disabled={isCreatingTag}
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => void createAndAttachTag()}
-                        >
-                          +
-                        </button>
-                      </span>
-                    ) : (
-                      <button type="button" className="is-create" onClick={() => setIsTagCreatorOpen(true)}>
-                        + {language === "ru" ? "создать тег" : "create tag"}
-                      </button>
-                    )
-                  ) : (
-                    <p className="planner-calendar-inspector-muted">
-                      {language === "ru" ? "Теги можно добавить в документах." : "Tags can be added in documents."}
-                    </p>
-                  )}
-                </div>
+                <p className="planner-calendar-inspector-muted">
+                  {language === "ru" ? "Теги можно добавить в документах." : "Tags can be added in documents."}
+                </p>
               )}
             </section>
           ) : null}
@@ -3260,30 +3155,12 @@ export default function PlannerCalendarSurface({
     );
   };
 
-  const renderUndoToast = () => {
-    if (!undoToast) {
-      return null;
+  const dismissUndoToast = () => {
+    setUndoToast(null);
+    if (undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
     }
-
-    return (
-      <div className="planner-calendar-undo-toast" role="status">
-        <span>{undoToast.label}</span>
-        <button
-          type="button"
-          onClick={() => {
-            const currentToast = undoToast;
-            setUndoToast(null);
-            if (undoTimerRef.current) {
-              window.clearTimeout(undoTimerRef.current);
-              undoTimerRef.current = null;
-            }
-            void currentToast.undo();
-          }}
-        >
-          {language === "ru" ? "Отменить" : "Undo"}
-        </button>
-      </div>
-    );
   };
 
   const renderMobilePanel = () => {
@@ -3617,7 +3494,7 @@ export default function PlannerCalendarSurface({
       </div>
       {renderEventInspector()}
       {renderScopedActionDialog()}
-      {renderUndoToast()}
+      <PlannerUndoSnackbar action={undoToast} language={language} onDismiss={dismissUndoToast} />
     </section>
   );
 

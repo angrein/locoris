@@ -7,7 +7,6 @@ import {
   getPlannerPriorityLabel,
   getPlannerStatusLabel
 } from "../../lib/planner";
-import { normalizePlannerQuickAddTagName } from "../../lib/plannerQuickAdd";
 import {
   buildRescheduleOccurrencePatch,
   buildRescheduleRecurringSeriesPatch,
@@ -20,6 +19,7 @@ import {
   getPlannerTaskScheduleSummary,
   type PlannerTaskDateDraft
 } from "../../lib/plannerTaskSchedule";
+import TagInputField from "../TagInputField";
 import PlannerDateDialog from "./PlannerDateDialog";
 import "./PlannerTaskInspector.css";
 
@@ -86,10 +86,6 @@ function getBacklinkKindLabel(kind: PlannerBacklink["kind"], language: AppLangua
         };
 
   return labels[kind];
-}
-
-function getTagKey(name: string) {
-  return normalizePlannerQuickAddTagName(name).toLowerCase();
 }
 
 function getShortId(value: string | null | undefined) {
@@ -345,10 +341,6 @@ export default function PlannerTaskInspectorView({
   const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false);
   const [isReminderPickerOpen, setIsReminderPickerOpen] = useState(false);
   const [scopedDateAction, setScopedDateAction] = useState<PlannerTaskScopedDateAction | null>(null);
-  const [areTagsExpanded, setAreTagsExpanded] = useState(false);
-  const [isTagCreatorOpen, setIsTagCreatorOpen] = useState(false);
-  const [tagDraft, setTagDraft] = useState("");
-  const [isCreatingTag, setIsCreatingTag] = useState(false);
 
   useEffect(() => {
     setTitleDraft(task?.title ?? "");
@@ -357,43 +349,10 @@ export default function PlannerTaskInspectorView({
     setIsDateSelectorOpen(false);
     setIsReminderPickerOpen(false);
     setScopedDateAction(null);
-    setIsTagCreatorOpen(false);
-    setTagDraft("");
-    setIsCreatingTag(false);
   }, [task?.description, task?.id, task?.title]);
 
   const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const selectedProject = task?.projectId ? projectMap.get(task.projectId) ?? null : null;
-  const tagById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
-  const selectedTagKeys = useMemo(() => {
-    const keys = new Set<string>();
-    task?.tagIds.forEach((tagId) => {
-      const tag = tagById.get(tagId);
-      if (tag) {
-        keys.add(getTagKey(tag.name));
-      }
-    });
-    return keys;
-  }, [tagById, task?.tagIds]);
-  const uniqueTags = useMemo(() => {
-    const uniqueTagMap = new Map<string, Tag>();
-    tags.forEach((tag) => {
-      const key = getTagKey(tag.name);
-      if (key && !uniqueTagMap.has(key)) {
-        uniqueTagMap.set(key, tag);
-      }
-    });
-    return Array.from(uniqueTagMap.values()).sort((left, right) => {
-      const leftSelected = selectedTagKeys.has(getTagKey(left.name));
-      const rightSelected = selectedTagKeys.has(getTagKey(right.name));
-      if (leftSelected !== rightSelected) {
-        return leftSelected ? -1 : 1;
-      }
-      return left.name.localeCompare(right.name, language === "ru" ? "ru" : "en", { sensitivity: "base" });
-    });
-  }, [language, selectedTagKeys, tags]);
-  const visibleTags = areTagsExpanded ? uniqueTags : uniqueTags.slice(0, isMobile ? 5 : 7);
-  const hiddenTagCount = Math.max(0, uniqueTags.length - visibleTags.length);
   const backlinks = useMemo(
     () => (task ? buildPlannerBacklinks({ task, projects, folders, notes, language }) : []),
     [folders, language, notes, projects, task]
@@ -435,47 +394,6 @@ export default function PlannerTaskInspectorView({
     const nextDescription = descriptionDraft.trim();
     if (nextDescription !== task.description) {
       void onUpdate(task.id, { description: nextDescription });
-    }
-  };
-
-  const toggleTag = (tag: Tag) => {
-    const tagKey = getTagKey(tag.name);
-    const isSelected = selectedTagKeys.has(tagKey);
-    const nextTagIds = isSelected
-      ? task.tagIds.filter((tagId) => {
-          const currentTag = tagById.get(tagId);
-          return currentTag ? getTagKey(currentTag.name) !== tagKey : true;
-        })
-      : [...task.tagIds, tag.id];
-    void onUpdate(task.id, { tagIds: Array.from(new Set(nextTagIds)) });
-  };
-
-  const createAndAttachTag = async () => {
-    if (!onCreateTag || isCreatingTag) {
-      return;
-    }
-
-    const normalizedName = tagDraft.trim();
-    if (!normalizedName) {
-      setIsTagCreatorOpen(false);
-      setTagDraft("");
-      return;
-    }
-
-    setIsCreatingTag(true);
-    try {
-      const tag = await onCreateTag(normalizedName);
-      const tagKey = getTagKey(tag.name);
-      const nextTagIds = task.tagIds.filter((tagId) => {
-        const currentTag = tagById.get(tagId);
-        return currentTag ? getTagKey(currentTag.name) !== tagKey : true;
-      });
-      await onUpdate(task.id, { tagIds: Array.from(new Set([...nextTagIds, tag.id])) });
-      setTagDraft("");
-      setIsTagCreatorOpen(false);
-      setAreTagsExpanded(false);
-    } finally {
-      setIsCreatingTag(false);
     }
   };
 
@@ -733,100 +651,20 @@ export default function PlannerTaskInspectorView({
       <section className="planner-task-choice-section">
         <div className="planner-task-section-title">
           <span>{language === "ru" ? "Теги" : "Tags"}</span>
-          <small>{uniqueTags.length}</small>
+          <small>{task.tagIds.length}</small>
         </div>
-        {uniqueTags.length > 0 ? (
-          <div className="planner-task-tag-row">
-            {visibleTags.map((tag) => (
-              <button
-                key={tag.id}
-                type="button"
-                className={selectedTagKeys.has(getTagKey(tag.name)) ? "is-active" : ""}
-                onClick={() => toggleTag(tag)}
-                style={{ "--planner-task-tag-color": tag.color } as CSSProperties}
-              >
-                <span />
-                <strong>{tag.name}</strong>
-              </button>
-            ))}
-            {hiddenTagCount > 0 || areTagsExpanded ? (
-              <button type="button" className="is-more" onClick={() => setAreTagsExpanded((current) => !current)}>
-                {areTagsExpanded ? (language === "ru" ? "Свернуть" : "Less") : `+${hiddenTagCount}`}
-              </button>
-            ) : null}
-            {onCreateTag ? (
-              isTagCreatorOpen ? (
-                <span className="planner-task-tag-create">
-                  <input
-                    value={tagDraft}
-                    autoFocus
-                    disabled={isCreatingTag}
-                    onChange={(event) => setTagDraft(event.target.value)}
-                    onBlur={() => {
-                      if (!tagDraft.trim()) {
-                        setIsTagCreatorOpen(false);
-                      }
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void createAndAttachTag();
-                      }
-                      if (event.key === "Escape") {
-                        event.preventDefault();
-                        setTagDraft("");
-                        setIsTagCreatorOpen(false);
-                      }
-                    }}
-                    placeholder={language === "ru" ? "Новый тег" : "New tag"}
-                  />
-                  <button type="button" className="is-create-confirm" disabled={isCreatingTag} onMouseDown={(event) => event.preventDefault()} onClick={() => void createAndAttachTag()}>
-                    +
-                  </button>
-                </span>
-              ) : (
-                <button type="button" className="is-create" onClick={() => setIsTagCreatorOpen(true)}>
-                  + {language === "ru" ? "тег" : "tag"}
-                </button>
-              )
-            ) : null}
-          </div>
+        {onCreateTag ? (
+          <TagInputField
+            tags={tags}
+            selectedTagIds={task.tagIds}
+            language={language}
+            onCreateTag={onCreateTag}
+            dropdownWithinPortal
+            variant="planner"
+            onChangeTagIds={(tagIds) => onUpdate(task.id, { tagIds })}
+          />
         ) : (
-          <div className="planner-task-tag-row">
-            {onCreateTag ? (
-              isTagCreatorOpen ? (
-                <span className="planner-task-tag-create">
-                  <input
-                    value={tagDraft}
-                    autoFocus
-                    disabled={isCreatingTag}
-                    onChange={(event) => setTagDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void createAndAttachTag();
-                      }
-                      if (event.key === "Escape") {
-                        event.preventDefault();
-                        setTagDraft("");
-                        setIsTagCreatorOpen(false);
-                      }
-                    }}
-                    placeholder={language === "ru" ? "Новый тег" : "New tag"}
-                  />
-                  <button type="button" className="is-create-confirm" disabled={isCreatingTag} onMouseDown={(event) => event.preventDefault()} onClick={() => void createAndAttachTag()}>
-                    +
-                  </button>
-                </span>
-              ) : (
-                <button type="button" className="is-create" onClick={() => setIsTagCreatorOpen(true)}>
-                  + {language === "ru" ? "создать тег" : "create tag"}
-                </button>
-              )
-            ) : (
-              <p className="planner-task-muted">{language === "ru" ? "Теги можно добавить в документах." : "Tags can be added in documents."}</p>
-            )}
-          </div>
+          <p className="planner-task-muted">{language === "ru" ? "Теги можно добавить в документах." : "Tags can be added in documents."}</p>
         )}
       </section>
 

@@ -832,6 +832,13 @@ fn native_vault_store_read<R: Runtime>(
     "assets".into(),
     parse_collection_value(&connection, "assets", Value::Array(Vec::new()))?,
   );
+  for name in ["tasks", "habits", "habitLogs", "goals", "timeBlocks"] {
+    if let Some(payload) = read_collection_value(&connection, name)? {
+      let collection = serde_json::from_str(&payload)
+        .map_err(|error| format!("failed to decode native vault collection `{name}`: {error}"))?;
+      snapshot.insert(name.into(), collection);
+    }
+  }
   snapshot.insert(
     "settings".into(),
     parse_collection_value(&connection, "settings", Value::Null)?,
@@ -914,6 +921,26 @@ fn native_vault_store_write<R: Runtime>(
     .get("assets")
     .cloned()
     .unwrap_or(Value::Array(Vec::new()));
+  let tasks = snapshot_object
+    .get("tasks")
+    .cloned()
+    .unwrap_or(Value::Array(Vec::new()));
+  let habits = snapshot_object
+    .get("habits")
+    .cloned()
+    .unwrap_or(Value::Array(Vec::new()));
+  let habit_logs = snapshot_object
+    .get("habitLogs")
+    .cloned()
+    .unwrap_or(Value::Array(Vec::new()));
+  let goals = snapshot_object
+    .get("goals")
+    .cloned()
+    .unwrap_or(Value::Array(Vec::new()));
+  let time_blocks = snapshot_object
+    .get("timeBlocks")
+    .cloned()
+    .unwrap_or(Value::Array(Vec::new()));
   let settings = snapshot_object.get("settings").cloned().unwrap_or(Value::Null);
   let sync_dirty_entries = snapshot_object
     .get("syncDirtyEntries")
@@ -936,6 +963,11 @@ fn native_vault_store_write<R: Runtime>(
   write_collection_value(&transaction, "tags", &tags)?;
   write_collection_value(&transaction, "notes", &notes)?;
   write_collection_value(&transaction, "assets", &assets)?;
+  write_collection_value(&transaction, "tasks", &tasks)?;
+  write_collection_value(&transaction, "habits", &habits)?;
+  write_collection_value(&transaction, "habitLogs", &habit_logs)?;
+  write_collection_value(&transaction, "goals", &goals)?;
+  write_collection_value(&transaction, "timeBlocks", &time_blocks)?;
   write_collection_value(&transaction, "settings", &settings)?;
   write_collection_value(&transaction, "syncDirtyEntries", &sync_dirty_entries)?;
   write_collection_value(&transaction, "syncShadows", &sync_shadows)?;
@@ -1041,6 +1073,7 @@ fn android_install_apk_update<R: Runtime>(
   url: String,
   file_name: String,
   expected_package_name: String,
+  expected_size_bytes: Option<i64>,
 ) -> Result<Value, String> {
   android_bridge::run(
     &app,
@@ -1048,7 +1081,8 @@ fn android_install_apk_update<R: Runtime>(
     serde_json::json!({
       "url": url,
       "fileName": file_name,
-      "expectedPackageName": expected_package_name
+      "expectedPackageName": expected_package_name,
+      "expectedSizeBytes": expected_size_bytes
     }),
   )
 }
@@ -1059,7 +1093,20 @@ fn android_install_apk_update(
   _url: String,
   _file_name: String,
   _expected_package_name: String,
+  _expected_size_bytes: Option<i64>,
 ) -> Result<Value, String> {
+  Err("ANDROID_UPDATE_UNAVAILABLE".into())
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn android_get_apk_update_progress<R: Runtime>(app: AppHandle<R>) -> Result<Value, String> {
+  android_bridge::run(&app, "getApkUpdateProgress", serde_json::json!({}))
+}
+
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+fn android_get_apk_update_progress() -> Result<Value, String> {
   Err("ANDROID_UPDATE_UNAVAILABLE".into())
 }
 
@@ -1266,6 +1313,7 @@ pub fn run() {
       android_google_drive_authorize,
       android_google_drive_clear_token,
       android_install_apk_update,
+      android_get_apk_update_progress,
       android_open_install_permission_settings,
       android_get_package_name,
       native_vault_store_read,

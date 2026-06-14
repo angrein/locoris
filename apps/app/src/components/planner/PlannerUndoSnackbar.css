@@ -1,0 +1,63 @@
+.planner-undo-snackbar {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right, 0px));
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  z-index: 2147483600;
+  display: inline-flex;
+  max-width: min(440px, calc(100vw - 32px));
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--planner-accent, #f48fc3) 34%, rgba(255, 255, 255, 0.12));
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--planner-accent, #f48fc3) 16%, transparent), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.044)),
+    color-mix(in srgb, #07101d 86%, var(--planner-accent, #f48fc3) 8%);
+  box-shadow:
+    0 20px 56px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(22px) saturate(145%);
+}
+
+.planner-undo-snackbar span {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(245, 249, 255, 0.88);
+  font-size: 0.82rem;
+  font-weight: 820;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-undo-snackbar button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--planner-accent, #f48fc3) 34%, rgba(255, 255, 255, 0.12));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--planner-accent, #f48fc3) 18%, rgba(255, 255, 255, 0.07));
+  color: color-mix(in srgb, var(--planner-accent, #f48fc3) 72%, white);
+  font-size: 0.76rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.planner-undo-snackbar button:hover {
+  border-color: color-mix(in srgb, var(--planner-accent, #f48fc3) 52%, rgba(255, 255, 255, 0.18));
+  background: color-mix(in srgb, var(--planner-accent, #f48fc3) 24%, rgba(255, 255, 255, 0.08));
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .planner-undo-snackbar {
+    right: max(12px, env(safe-area-inset-right, 0px));
+    bottom: calc(max(86px, env(safe-area-inset-bottom, 0px) + 72px));
+    left: max(12px, env(safe-area-inset-left, 0px));
+    max-width: none;
+    justify-content: space-between;
+    padding: 11px 12px 11px 14px;
+    border-radius: 18px;
+  }
+}

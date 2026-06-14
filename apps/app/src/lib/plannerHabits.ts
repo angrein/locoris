@@ -237,20 +237,6 @@ export function getPlannerHabitWeekStats(habit: Habit, habitLogs: HabitLog[], no
   };
 }
 
-function getLatestPastDueDay(habit: Habit, now: number) {
-  const todayStart = getStartOfLocalDay(now);
-
-  for (let index = 1; index <= 90; index += 1) {
-    const dayAt = todayStart - index * DAY_MS;
-
-    if (isPlannerHabitDueOnDay(habit, dayAt)) {
-      return dayAt;
-    }
-  }
-
-  return null;
-}
-
 export function getPlannerHabitLastLogAt(habitLogs: HabitLog[], habitId: string) {
   return habitLogs
     .filter((log) => log.habitId === habitId)
@@ -271,11 +257,8 @@ export function buildPlannerHabitSummaries(input: {
     .map((habit) => {
       const weekStats = getPlannerHabitWeekStats(habit, input.habitLogs, now);
       const dueToday = isPlannerHabitDueOnDay(habit, now);
-      const completedToday = isPlannerHabitCompletedOnDay(habit, input.habitLogs, now);
-      const latestPastDueDay = getLatestPastDueDay(habit, now);
-      const missed = Boolean(
-        latestPastDueDay && !isPlannerHabitCompletedOnDay(habit, input.habitLogs, latestPastDueDay)
-      );
+      const completedToday = dueToday && isPlannerHabitCompletedOnDay(habit, input.habitLogs, now);
+      const missed = weekStats.days.some((day) => day.missed);
 
       return {
         habit,

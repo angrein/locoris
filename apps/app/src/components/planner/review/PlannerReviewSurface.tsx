@@ -14,7 +14,7 @@ interface PlannerReviewSurfaceProps {
   timeBlocks: TimeBlock[];
   language: AppLanguage;
   isMobile: boolean;
-  onToggleTaskDone: (taskId: string, done: boolean) => Promise<Task | null>;
+  onToggleTaskDone: (taskId: string, done: boolean) => Promise<void> | void;
   onToggleHabitLog: (habitId: string, dayAt?: number) => Promise<HabitLog | null>;
 }
 

@@ -105,7 +105,9 @@ async function hydrateDexieCachesFromNativeStore() {
       continue;
     }
 
-    await restoreLocalVaultDesktopBackup(vault.id, snapshot);
+    await restoreLocalVaultDesktopBackup(vault.id, snapshot, {
+      preserveMissingPlannerCollections: true
+    });
   }
 }
 

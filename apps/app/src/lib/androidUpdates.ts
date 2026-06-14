@@ -47,6 +47,10 @@ type ValidatedAndroidUpdate = {
   apkSize: number | null;
 };
 
+type AndroidUpdateProgressResponse = {
+  progress?: unknown;
+};
+
 export type AndroidUpdateIssueCode =
   | "unsupported"
   | "check-failed"
@@ -218,6 +222,21 @@ function getAndroidRuntimePackageName() {
   }
 
   return androidRuntimePackageNamePromise;
+}
+
+async function readAndroidUpdateDownloadProgress() {
+  try {
+    const response = await invoke<AndroidUpdateProgressResponse>("android_get_apk_update_progress");
+    const progress = typeof response.progress === "number" ? response.progress : null;
+
+    if (progress === null || progress < 0) {
+      return null;
+    }
+
+    return Math.round(Math.min(100, Math.max(0, progress)));
+  } catch {
+    return null;
+  }
 }
 
 function setAndroidUpdateSnapshot(
@@ -658,18 +677,47 @@ export async function installAvailableAndroidUpdate() {
 
     setAndroidUpdateSnapshot({
       phase: "downloading",
-      progress: null,
+      progress: update.apkSize && update.apkSize > 0 ? 0 : null,
       issueCode: null,
       issueDetail: null,
       canRetryInstall: false,
       canOpenReleasePage: true
     });
 
+    let progressPollTimer: number | null = null;
+    const stopProgressPolling = () => {
+      if (progressPollTimer !== null) {
+        window.clearInterval(progressPollTimer);
+        progressPollTimer = null;
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      progressPollTimer = window.setInterval(() => {
+        void readAndroidUpdateDownloadProgress().then((progress) => {
+          if (progress === null) {
+            return;
+          }
+
+          setAndroidUpdateSnapshot((current) => {
+            if (current.phase !== "downloading") {
+              return {};
+            }
+
+            return {
+              progress: Math.max(current.progress ?? 0, progress)
+            };
+          });
+        });
+      }, 300);
+    }
+
     try {
       await invoke("android_install_apk_update", {
         url: update.apkUrl,
         fileName: update.apkName,
-        expectedPackageName: ANDROID_PACKAGE_NAME
+        expectedPackageName: ANDROID_PACKAGE_NAME,
+        expectedSizeBytes: update.apkSize
       });
 
       setAndroidUpdateSnapshot({
@@ -700,6 +748,7 @@ export async function installAvailableAndroidUpdate() {
         canRetryInstall: !permissionRequired
       });
     } finally {
+      stopProgressPolling();
       androidUpdateInstallPromise = null;
     }
   })();

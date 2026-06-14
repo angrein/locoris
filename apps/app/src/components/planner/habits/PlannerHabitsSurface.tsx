@@ -10,6 +10,7 @@ import {
 } from "../../../lib/plannerHabits";
 import type { PlannerHabitCreateInput, PlannerHabitUpdateInput } from "../../../lib/planner";
 import { useVisualKeyboardInset } from "../../../lib/useVisualKeyboardInset";
+import type { PlannerUndoSnackbarAction } from "../PlannerUndoSnackbar";
 import "./PlannerHabitsSurface.css";
 
 interface PlannerHabitsSurfaceProps {
@@ -19,42 +20,44 @@ interface PlannerHabitsSurfaceProps {
   language: AppLanguage;
   isMobile: boolean;
   isTouchLayout: boolean;
+  selectedHabitId: string | null;
+  isComposerOpen: boolean;
+  hideDesktopInspector?: boolean;
+  onSelectHabit: (habitId: string | null) => void;
+  onComposerOpenChange: (open: boolean) => void;
   onCreateHabit: (input: PlannerHabitCreateInput) => Promise<Habit>;
   onUpdateHabit: (habitId: string, patch: PlannerHabitUpdateInput) => Promise<Habit | null>;
   onDeleteHabit: (habitId: string) => Promise<void>;
   onToggleHabitLog: (habitId: string, dayAt?: number) => Promise<HabitLog | null>;
+  onShowUndo?: (label: string, undo: PlannerUndoSnackbarAction["undo"]) => void;
 }
 
-type HabitFilterId = "today" | "active" | "paused" | "missed";
+type HabitFilterId = "today" | "all";
 
-const HABIT_FILTERS: HabitFilterId[] = ["today", "active", "paused", "missed"];
+const HABIT_FILTERS: HabitFilterId[] = ["today", "all"];
 const CADENCE_PRESETS: PlannerHabitCadencePreset[] = ["daily", "weekdays", "weekly", "customDaily"];
 
 function getHabitFilterLabel(filterId: HabitFilterId, language: AppLanguage) {
   if (language === "ru") {
     return {
       today: "Сегодня",
-      active: "Активные",
-      paused: "Пауза",
-      missed: "Пропущенные"
+      all: "Все"
     }[filterId];
   }
 
   return {
     today: "Today",
-    active: "Active",
-    paused: "Paused",
-    missed: "Missed"
+    all: "All"
   }[filterId];
 }
 
-function getCadencePresetLabel(preset: PlannerHabitCadencePreset, intervalDays: number, language: AppLanguage) {
+function getCadencePresetLabel(preset: PlannerHabitCadencePreset, _intervalDays: number, language: AppLanguage) {
   if (language === "ru") {
     return {
       daily: "Каждый день",
       weekdays: "Будни",
       weekly: "Раз в неделю",
-      customDaily: `Каждые ${intervalDays} дн.`
+      customDaily: "Каждые n дней"
     }[preset];
   }
 
@@ -62,7 +65,7 @@ function getCadencePresetLabel(preset: PlannerHabitCadencePreset, intervalDays: 
     daily: "Daily",
     weekdays: "Weekdays",
     weekly: "Weekly",
-    customDaily: `Every ${intervalDays} days`
+    customDaily: "Every n days"
   }[preset];
 }
 
@@ -108,13 +111,11 @@ function getHabitActionLabel(summary: PlannerHabitSummary, language: AppLanguage
     return language === "ru" ? "Убрать отметку" : "Undo check-in";
   }
 
-  return summary.dueToday
-    ? language === "ru"
-      ? "Отметить сегодня"
-      : "Check in today"
-    : language === "ru"
-      ? "Отметить вне плана"
-      : "Check in anyway";
+  if (!summary.dueToday) {
+    return language === "ru" ? "Не по плану" : "Not scheduled";
+  }
+
+  return language === "ru" ? "Отметить сегодня" : "Check in today";
 }
 
 function HabitWeekStrip({ summary, language }: { summary: PlannerHabitSummary; language: AppLanguage }) {
@@ -133,6 +134,181 @@ function HabitWeekStrip({ summary, language }: { summary: PlannerHabitSummary; l
   );
 }
 
+function HabitLegend({ language }: { language: AppLanguage }) {
+  const items = language === "ru"
+    ? [
+        ["is-complete", "Сделано"],
+        ["is-missed", "Пропущено"],
+        ["is-today", "Сегодня"],
+        ["is-paused", "Пауза"]
+      ]
+    : [
+        ["is-complete", "Done"],
+        ["is-missed", "Missed"],
+        ["is-today", "Today"],
+        ["is-paused", "Paused"]
+      ];
+
+  return (
+    <div className="planner-habit-legend" aria-label={language === "ru" ? "Легенда привычек" : "Habit legend"}>
+      {items.map(([className, label]) => (
+        <span key={className}>
+          <i className={className} aria-hidden="true" />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function getHabitRestoreInput(habit: Habit): PlannerHabitCreateInput {
+  return {
+    title: habit.title,
+    description: habit.description,
+    status: habit.status,
+    projectId: habit.projectId,
+    noteId: habit.noteId,
+    color: habit.color,
+    icon: habit.icon,
+    frequencyRule: habit.frequencyRule,
+    frequencyTimezone: habit.frequencyTimezone,
+    targetCount: habit.targetCount,
+    targetUnit: habit.targetUnit,
+    targetPeriod: habit.targetPeriod,
+    reminders: habit.reminders.map((reminder) => ({ ...reminder })),
+    sortOrder: habit.sortOrder
+  };
+}
+
+interface PlannerHabitInspectorPanelProps {
+  summary: PlannerHabitSummary | null;
+  language: AppLanguage;
+  variant?: "aside" | "sheet";
+  onClose?: () => void;
+  onToggleToday: (habitId: string) => void;
+  onTogglePaused: (summary: PlannerHabitSummary) => void;
+  onArchive: (summary: PlannerHabitSummary) => void;
+  onDelete: (summary: PlannerHabitSummary) => void;
+}
+
+export function PlannerHabitInspectorPanel({
+  summary,
+  language,
+  variant = "aside",
+  onClose,
+  onToggleToday,
+  onTogglePaused,
+  onArchive,
+  onDelete
+}: PlannerHabitInspectorPanelProps) {
+  const content = summary ? (
+    <>
+      {variant === "sheet" ? <div className="planner-habit-mobile-sheet-handle" aria-hidden="true" /> : null}
+      <div className={`planner-habit-detail-content is-${variant}`}>
+        <div className="planner-habit-detail-head" style={{ "--planner-habit-color": summary.habit.color } as CSSProperties}>
+          <span />
+          <div>
+            <strong>{summary.habit.title}</strong>
+            <em>{getPlannerHabitCadenceLabel(summary.habit.frequencyRule, language)}</em>
+          </div>
+          {variant === "sheet" ? (
+            <button
+              type="button"
+              className="planner-habit-sheet-close"
+              onClick={onClose}
+              aria-label={language === "ru" ? "Закрыть" : "Close"}
+            />
+          ) : null}
+        </div>
+
+        <div className={`planner-habit-today-card ${summary.completedToday ? "is-complete" : ""}`}>
+          <div>
+            <span>{language === "ru" ? "Сегодня" : "Today"}</span>
+            <strong>{getTodayState(summary, language)}</strong>
+          </div>
+          <button
+            type="button"
+            disabled={summary.habit.status !== "active" || !summary.dueToday}
+            onClick={() => onToggleToday(summary.habit.id)}
+          >
+            {getHabitActionLabel(summary, language)}
+          </button>
+        </div>
+
+        <div className="planner-habit-detail-grid">
+          <div>
+            <span>{language === "ru" ? "Streak" : "Streak"}</span>
+            <strong>{summary.streak}</strong>
+          </div>
+          <div>
+            <span>{language === "ru" ? "За неделю" : "This week"}</span>
+            <strong>
+              {summary.weekCompletedCount}/{summary.weekDueCount}
+            </strong>
+          </div>
+          <div>
+            <span>{language === "ru" ? "Последняя" : "Last"}</span>
+            <strong>{getLastLogLabel(summary.lastLogAt, language)}</strong>
+          </div>
+        </div>
+
+        <div className="planner-habit-detail-week">
+          <div>
+            <span>{language === "ru" ? "Неделя" : "Week"}</span>
+            <strong>{language === "ru" ? "План и отметки" : "Schedule and check-ins"}</strong>
+          </div>
+          <HabitWeekStrip summary={summary} language={language} />
+        </div>
+
+        <div className="planner-habit-detail-actions">
+          <button type="button" className="is-secondary" onClick={() => onTogglePaused(summary)}>
+            <span className="planner-habit-action-icon is-pause" />
+            {summary.habit.status === "paused"
+              ? language === "ru"
+                ? "Возобновить"
+                : "Resume"
+              : language === "ru"
+                ? "Пауза"
+                : "Pause"}
+          </button>
+          <button type="button" className="is-secondary" onClick={() => onArchive(summary)}>
+            <span className="planner-habit-action-icon is-archive" />
+            {language === "ru" ? "В архив" : "Archive"}
+          </button>
+          <button type="button" className="is-danger" onClick={() => onDelete(summary)}>
+            <span className="planner-habit-action-icon is-delete" />
+            {language === "ru" ? "Удалить" : "Delete"}
+          </button>
+        </div>
+        <div className="planner-habit-detail-note">
+          {summary.habit.status === "paused"
+            ? language === "ru"
+              ? "Пауза не ломает streak: дни паузы пропускаются в расчете."
+              : "Pause keeps the streak intact: paused days are skipped."
+            : language === "ru"
+              ? "Отметка хранится как событие конкретного дня. Завтра привычка снова появится в расписании, а сегодняшняя отметка останется в истории."
+              : "Each check-in is stored for a specific day. Tomorrow the habit appears again, while today's log stays in history."}
+        </div>
+      </div>
+    </>
+  ) : (
+    <div className="planner-habit-empty is-detail">
+      <strong>{language === "ru" ? "Выбери привычку" : "Select a habit"}</strong>
+      <span>{language === "ru" ? "Здесь появятся ритм, streak, неделя и действия." : "Cadence, streak, week, and actions will appear here."}</span>
+    </div>
+  );
+
+  if (variant === "sheet") {
+    return <>{content}</>;
+  }
+
+  return (
+    <aside className={`planner-habit-detail ${summary ? "" : "is-empty"}`}>
+      {content}
+    </aside>
+  );
+}
+
 function HabitCard({
   summary,
   language,
@@ -147,7 +323,7 @@ function HabitCard({
   onToggleToday: () => void;
 }) {
   const { habit } = summary;
-  const checkDisabled = habit.status === "paused" || habit.status === "archived";
+  const checkDisabled = habit.status === "paused" || habit.status === "archived" || !summary.dueToday;
 
   return (
     <article
@@ -179,9 +355,12 @@ function HabitCard({
         </div>
         <div className="planner-habit-card-meta">
           <span>{getPlannerHabitCadenceLabel(habit.frequencyRule, language)}</span>
-          <span>{getTodayState(summary, language)}</span>
+          <span className="is-progress">
+            {language === "ru" ? "Неделя" : "Week"} {summary.weekCompletedCount}/{summary.weekDueCount}
+          </span>
           {summary.streak > 0 ? <span>{language === "ru" ? `${summary.streak} дн. streak` : `${summary.streak} day streak`}</span> : null}
-          {summary.missed ? <span className="is-warning">{language === "ru" ? "Есть пропуск" : "Missed"}</span> : null}
+          {summary.missed ? <span className="is-warning">{language === "ru" ? "Пропущено" : "Missed"}</span> : null}
+          {!summary.missed && summary.dueToday ? <span>{getTodayState(summary, language)}</span> : null}
         </div>
         <HabitWeekStrip summary={summary} language={language} />
       </div>
@@ -196,14 +375,18 @@ export default function PlannerHabitsSurface({
   language,
   isMobile,
   isTouchLayout,
+  selectedHabitId,
+  isComposerOpen,
+  hideDesktopInspector = false,
+  onSelectHabit,
+  onComposerOpenChange,
   onCreateHabit,
   onUpdateHabit,
   onDeleteHabit,
-  onToggleHabitLog
+  onToggleHabitLog,
+  onShowUndo
 }: PlannerHabitsSurfaceProps) {
   const [filterId, setFilterId] = useState<HabitFilterId>("today");
-  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [projectDraft, setProjectDraft] = useState("");
   const [cadenceDraft, setCadenceDraft] = useState<PlannerHabitCadencePreset>("daily");
@@ -226,15 +409,7 @@ export default function PlannerHabitsSurface({
           return summary.habit.status !== "archived" && summary.dueToday;
         }
 
-        if (filterId === "paused") {
-          return summary.habit.status === "paused";
-        }
-
-        if (filterId === "missed") {
-          return summary.habit.status !== "archived" && summary.missed;
-        }
-
-        return summary.habit.status === "active";
+        return summary.habit.status !== "archived";
       }),
     [filterId, summaries]
   );
@@ -254,7 +429,7 @@ export default function PlannerHabitsSurface({
   };
 
   const closeComposer = () => {
-    setIsComposerOpen(false);
+    onComposerOpenChange(false);
     resetComposer();
   };
 
@@ -264,9 +439,9 @@ export default function PlannerHabitsSurface({
     }
 
     if (!visibleSummaries.some((summary) => summary.habit.id === selectedHabitId)) {
-      setSelectedHabitId(null);
+      onSelectHabit(null);
     }
-  }, [selectedHabitId, visibleSummaries]);
+  }, [onSelectHabit, selectedHabitId, visibleSummaries]);
 
   useEffect(() => {
     if (!isComposerOpen) {
@@ -294,7 +469,7 @@ export default function PlannerHabitsSurface({
       return;
     }
 
-    setSelectedHabitId(null);
+    onSelectHabit(null);
 
     if (isComposerOpen && !isTouchLayout) {
       closeComposer();
@@ -303,7 +478,7 @@ export default function PlannerHabitsSurface({
 
   const handleFilterChange = (nextFilterId: HabitFilterId) => {
     setFilterId(nextFilterId);
-    setSelectedHabitId(null);
+    onSelectHabit(null);
 
     if (isComposerOpen) {
       closeComposer();
@@ -329,11 +504,83 @@ export default function PlannerHabitsSurface({
         targetUnit: "count",
         targetPeriod: "day"
       });
-      setSelectedHabitId(habit.id);
+      onSelectHabit(habit.id);
       closeComposer();
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const handleToggleHabitToday = async (habitId: string) => {
+    const summary = summaries.find((item) => item.habit.id === habitId);
+
+    if (!summary?.dueToday) {
+      return;
+    }
+
+    await onToggleHabitLog(habitId);
+    onShowUndo?.(language === "ru" ? "Отметка привычки изменена" : "Habit check changed", () => onToggleHabitLog(habitId));
+  };
+
+  const handleUpdateHabitWithUndo = async (habit: Habit, patch: PlannerHabitUpdateInput, label: string) => {
+    const undoPatch: PlannerHabitUpdateInput = {
+      title: habit.title,
+      description: habit.description,
+      status: habit.status,
+      projectId: habit.projectId,
+      noteId: habit.noteId,
+      color: habit.color,
+      icon: habit.icon,
+      frequencyRule: habit.frequencyRule,
+      frequencyTimezone: habit.frequencyTimezone,
+      targetCount: habit.targetCount,
+      targetUnit: habit.targetUnit,
+      targetPeriod: habit.targetPeriod,
+      reminders: habit.reminders.map((reminder) => ({ ...reminder })),
+      sortOrder: habit.sortOrder,
+      pausedAt: habit.pausedAt,
+      archivedAt: habit.archivedAt,
+      pauseRanges: habit.pauseRanges.map((range) => ({ ...range }))
+    };
+
+    await onUpdateHabit(habit.id, patch);
+    onShowUndo?.(label, () => onUpdateHabit(habit.id, undoPatch));
+  };
+
+  const handleDeleteHabitWithUndo = async (habit: Habit) => {
+    await onDeleteHabit(habit.id);
+    onSelectHabit(null);
+    onShowUndo?.(language === "ru" ? "Привычка удалена" : "Habit deleted", () => onCreateHabit(getHabitRestoreInput(habit)));
+  };
+
+  const handleToggleHabitPaused = (summary: PlannerHabitSummary) => {
+    void handleUpdateHabitWithUndo(
+      summary.habit,
+      {
+        status: summary.habit.status === "paused" ? "active" : "paused"
+      },
+      summary.habit.status === "paused"
+        ? language === "ru"
+          ? "Привычка возобновлена"
+          : "Habit resumed"
+        : language === "ru"
+          ? "Привычка поставлена на паузу"
+          : "Habit paused"
+    );
+  };
+
+  const handleArchiveHabit = (summary: PlannerHabitSummary) => {
+    void handleUpdateHabitWithUndo(
+      summary.habit,
+      {
+        status: "archived"
+      },
+      language === "ru" ? "Привычка отправлена в архив" : "Habit archived"
+    );
+  };
+
+  const handleDeleteHabitSummary = (summary: PlannerHabitSummary) => {
+    void handleDeleteHabitWithUndo(summary.habit);
   };
 
   const renderComposer = (variant: "inline" | "sheet") => (
@@ -351,7 +598,14 @@ export default function PlannerHabitsSurface({
             <strong>{language === "ru" ? "Настрой ритм и привязку" : "Set rhythm and context"}</strong>
           ) : null}
         </div>
-        <button type="button" onClick={closeComposer} aria-label={language === "ru" ? "Закрыть" : "Close"} />
+        <button
+          type="button"
+          className="planner-icon-button"
+          onClick={closeComposer}
+          aria-label={language === "ru" ? "Закрыть" : "Close"}
+        >
+          ×
+        </button>
       </div>
       <div className="planner-habit-composer-body">
         <label className="planner-habit-title-field">
@@ -418,122 +672,16 @@ export default function PlannerHabitsSurface({
     </form>
   );
 
-  const renderDetailContent = (summary: PlannerHabitSummary, variant: "aside" | "sheet") => (
-    <>
-      {variant === "sheet" ? <div className="planner-habit-mobile-sheet-handle" aria-hidden="true" /> : null}
-      <div className={`planner-habit-detail-content is-${variant}`}>
-        <div className="planner-habit-detail-head" style={{ "--planner-habit-color": summary.habit.color } as CSSProperties}>
-          <span />
-          <div>
-            <strong>{summary.habit.title}</strong>
-            <em>{getPlannerHabitCadenceLabel(summary.habit.frequencyRule, language)}</em>
-          </div>
-          {variant === "sheet" ? (
-            <button
-              type="button"
-              className="planner-habit-sheet-close"
-              onClick={() => setSelectedHabitId(null)}
-              aria-label={language === "ru" ? "Закрыть" : "Close"}
-            />
-          ) : null}
-        </div>
-
-        <div className={`planner-habit-today-card ${summary.completedToday ? "is-complete" : ""}`}>
-          <div>
-            <span>{language === "ru" ? "Сегодня" : "Today"}</span>
-            <strong>{getTodayState(summary, language)}</strong>
-          </div>
-          <button
-            type="button"
-            disabled={summary.habit.status !== "active"}
-            onClick={() => void onToggleHabitLog(summary.habit.id)}
-          >
-            {getHabitActionLabel(summary, language)}
-          </button>
-        </div>
-
-        <div className="planner-habit-detail-grid">
-          <div>
-            <span>{language === "ru" ? "Streak" : "Streak"}</span>
-            <strong>{summary.streak}</strong>
-          </div>
-          <div>
-            <span>{language === "ru" ? "За неделю" : "This week"}</span>
-            <strong>
-              {summary.weekCompletedCount}/{summary.weekDueCount}
-            </strong>
-          </div>
-          <div>
-            <span>{language === "ru" ? "Последняя" : "Last"}</span>
-            <strong>{getLastLogLabel(summary.lastLogAt, language)}</strong>
-          </div>
-        </div>
-
-        <div className="planner-habit-detail-week">
-          <div>
-            <span>{language === "ru" ? "Неделя" : "Week"}</span>
-            <strong>{language === "ru" ? "План и отметки" : "Schedule and check-ins"}</strong>
-          </div>
-          <HabitWeekStrip summary={summary} language={language} />
-        </div>
-
-        <div className="planner-habit-detail-actions">
-          <button
-            type="button"
-            className="is-secondary"
-            onClick={() =>
-              void onUpdateHabit(summary.habit.id, {
-                status: summary.habit.status === "paused" ? "active" : "paused"
-              })
-            }
-          >
-            <span className="planner-habit-action-icon is-pause" />
-            {summary.habit.status === "paused"
-              ? language === "ru"
-                ? "Возобновить"
-                : "Resume"
-              : language === "ru"
-                ? "Пауза"
-                : "Pause"}
-          </button>
-          <button
-            type="button"
-            className="is-secondary"
-            onClick={() =>
-              void onUpdateHabit(summary.habit.id, {
-                status: "archived"
-              })
-            }
-          >
-            <span className="planner-habit-action-icon is-archive" />
-            {language === "ru" ? "В архив" : "Archive"}
-          </button>
-          <button type="button" className="is-danger" onClick={() => void onDeleteHabit(summary.habit.id)}>
-            <span className="planner-habit-action-icon is-delete" />
-            {language === "ru" ? "Удалить" : "Delete"}
-          </button>
-        </div>
-        <div className="planner-habit-detail-note">
-          {summary.habit.status === "paused"
-            ? language === "ru"
-              ? "Пауза не ломает streak: дни паузы пропускаются в расчете."
-              : "Pause keeps the streak intact: paused days are skipped."
-            : language === "ru"
-              ? "Отметка хранится как событие конкретного дня. Завтра привычка снова появится в расписании, а сегодняшняя отметка останется в истории."
-              : "Each check-in is stored for a specific day. Tomorrow the habit appears again, while today's log stays in history."}
-        </div>
-      </div>
-    </>
-  );
-
   return (
     <section
       className={`planner-habits-surface ${isMobile ? "is-mobile" : "is-desktop"} ${
         selectedSummary ? "has-selection" : "has-no-selection"
-      }`}
+      } ${hideDesktopInspector ? "is-main-only" : ""}`}
       onPointerDown={handleBlankPointerDown}
     >
       <div className="planner-habits-board">
+        {isComposerOpen && !isMobile ? renderComposer("inline") : null}
+
         <div className="planner-habits-stats">
           <div>
             <span>{language === "ru" ? "Сегодня" : "Today"}</span>
@@ -564,24 +712,9 @@ export default function PlannerHabitsSurface({
               </button>
             ))}
           </nav>
-          <button
-            type="button"
-            className="planner-habit-new-button"
-            onClick={() => {
-              if (isComposerOpen) {
-                closeComposer();
-              } else {
-                setSelectedHabitId(null);
-                setIsComposerOpen(true);
-              }
-            }}
-          >
-            <span />
-            {language === "ru" ? "Новая" : "New"}
-          </button>
         </div>
 
-        {isComposerOpen && !isMobile ? renderComposer("inline") : null}
+        <HabitLegend language={language} />
 
         <div className="planner-habit-list">
           {visibleSummaries.length > 0 ? (
@@ -592,12 +725,12 @@ export default function PlannerHabitsSurface({
                 language={language}
                 selected={selectedSummary?.habit.id === summary.habit.id}
                 onSelect={() => {
-                  setSelectedHabitId(summary.habit.id);
+                  onSelectHabit(summary.habit.id);
                   if (isComposerOpen) {
                     closeComposer();
                   }
                 }}
-                onToggleToday={() => void onToggleHabitLog(summary.habit.id)}
+                onToggleToday={() => void handleToggleHabitToday(summary.habit.id)}
               />
             ))
           ) : (
@@ -609,17 +742,15 @@ export default function PlannerHabitsSurface({
         </div>
       </div>
 
-      {!isMobile ? (
-        <aside className={`planner-habit-detail ${selectedSummary ? "" : "is-empty"}`}>
-          {selectedSummary ? (
-            renderDetailContent(selectedSummary, "aside")
-          ) : (
-            <div className="planner-habit-empty is-detail">
-              <strong>{language === "ru" ? "Выбери привычку" : "Select a habit"}</strong>
-              <span>{language === "ru" ? "Здесь появятся ритм, streak, неделя и действия." : "Cadence, streak, week, and actions will appear here."}</span>
-            </div>
-          )}
-        </aside>
+      {!isMobile && !hideDesktopInspector ? (
+        <PlannerHabitInspectorPanel
+          summary={selectedSummary}
+          language={language}
+          onToggleToday={(habitId) => void handleToggleHabitToday(habitId)}
+          onTogglePaused={handleToggleHabitPaused}
+          onArchive={handleArchiveHabit}
+          onDelete={handleDeleteHabitSummary}
+        />
       ) : null}
 
       {isMobile && isComposerOpen ? (
@@ -647,11 +778,20 @@ export default function PlannerHabitsSurface({
           <button
             type="button"
             className="planner-habit-mobile-sheet-backdrop"
-            onClick={() => setSelectedHabitId(null)}
+            onClick={() => onSelectHabit(null)}
             aria-label={language === "ru" ? "Закрыть" : "Close"}
           />
           <section key={selectedSummary.habit.id} className="planner-habit-mobile-detail-sheet">
-            {renderDetailContent(selectedSummary, "sheet")}
+            <PlannerHabitInspectorPanel
+              summary={selectedSummary}
+              language={language}
+              variant="sheet"
+              onClose={() => onSelectHabit(null)}
+              onToggleToday={(habitId) => void handleToggleHabitToday(habitId)}
+              onTogglePaused={handleToggleHabitPaused}
+              onArchive={handleArchiveHabit}
+              onDelete={handleDeleteHabitSummary}
+            />
           </section>
         </div>
       ) : null}

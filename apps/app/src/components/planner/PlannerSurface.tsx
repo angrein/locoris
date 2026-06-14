@@ -37,15 +37,16 @@ import {
   getPlannerTaskDateDraftSummary,
   type PlannerTaskDateDraft
 } from "../../lib/plannerTaskSchedule";
-import { buildPlannerHabitSummaries } from "../../lib/plannerHabits";
+import { buildPlannerHabitSummaries, type PlannerHabitSummary } from "../../lib/plannerHabits";
 import { buildPlannerReview } from "../../lib/plannerReview";
 import { useVisualKeyboardInset } from "../../lib/useVisualKeyboardInset";
 import PlannerRail from "./PlannerRail";
 import PlannerCalendarSurface from "./PlannerCalendarSurface";
 import PlannerDateDialog from "./PlannerDateDialog";
 import PlannerTaskInspector from "./PlannerTaskInspector";
-import PlannerHabitsSurface from "./habits/PlannerHabitsSurface";
+import PlannerHabitsSurface, { PlannerHabitInspectorPanel } from "./habits/PlannerHabitsSurface";
 import PlannerReviewSurface from "./review/PlannerReviewSurface";
+import PlannerUndoSnackbar, { type PlannerUndoSnackbarAction } from "./PlannerUndoSnackbar";
 import "./PlannerSurface.css";
 
 interface PlannerSurfaceProps {
@@ -144,6 +145,114 @@ function getUniqueTagNames(tagIds: string[], tagMap: Map<string, Tag>) {
   return Array.from(namesByKey.values());
 }
 
+function getTaskUndoPatch(task: Task): PlannerTaskUpdateInput {
+  return {
+    title: task.title,
+    description: task.description,
+    kind: task.kind,
+    status: task.status,
+    priority: task.priority,
+    projectId: task.projectId,
+    folderId: task.folderId,
+    noteId: task.noteId,
+    canvasId: task.canvasId,
+    sourceBlockId: task.sourceBlockId,
+    canvasElementId: task.canvasElementId,
+    tagIds: [...task.tagIds],
+    links: task.links.map((link) => ({ ...link })),
+    reminders: task.reminders.map((reminder) => ({ ...reminder })),
+    startAt: task.startAt,
+    dueAt: task.dueAt,
+    scheduledStartAt: task.scheduledStartAt,
+    scheduledEndAt: task.scheduledEndAt,
+    completedAt: task.completedAt,
+    canceledAt: task.canceledAt,
+    recurrenceRule: task.recurrenceRule,
+    recurrenceTimezone: task.recurrenceTimezone,
+    recurrenceAnchorAt: task.recurrenceAnchorAt,
+    recurrenceUntilAt: task.recurrenceUntilAt,
+    recurrenceExceptionDates: [...task.recurrenceExceptionDates],
+    recurrenceCompletedDates: [...task.recurrenceCompletedDates],
+    recurrenceOverrides: task.recurrenceOverrides.map((override) => ({ ...override })),
+    estimateMinutes: task.estimateMinutes,
+    spentMinutes: task.spentMinutes,
+    sortOrder: task.sortOrder
+  };
+}
+
+function getTaskRestoreInput(task: Task): PlannerTaskCreateInput {
+  return {
+    title: task.title,
+    description: task.description,
+    kind: task.kind,
+    status: task.status,
+    priority: task.priority,
+    projectId: task.projectId,
+    folderId: task.folderId,
+    noteId: task.noteId,
+    canvasId: task.canvasId,
+    sourceBlockId: task.sourceBlockId,
+    canvasElementId: task.canvasElementId,
+    tagIds: [...task.tagIds],
+    links: task.links.map((link) => ({ ...link })),
+    reminders: task.reminders.map((reminder) => ({ ...reminder })),
+    startAt: task.startAt,
+    dueAt: task.dueAt,
+    scheduledStartAt: task.scheduledStartAt,
+    scheduledEndAt: task.scheduledEndAt,
+    recurrenceRule: task.recurrenceRule,
+    recurrenceTimezone: task.recurrenceTimezone,
+    recurrenceAnchorAt: task.recurrenceAnchorAt,
+    recurrenceUntilAt: task.recurrenceUntilAt,
+    recurrenceExceptionDates: [...task.recurrenceExceptionDates],
+    recurrenceCompletedDates: [...task.recurrenceCompletedDates],
+    recurrenceOverrides: task.recurrenceOverrides.map((override) => ({ ...override })),
+    estimateMinutes: task.estimateMinutes,
+    sortOrder: task.sortOrder
+  };
+}
+
+function getHabitUndoPatch(habit: Habit): PlannerHabitUpdateInput {
+  return {
+    title: habit.title,
+    description: habit.description,
+    status: habit.status,
+    projectId: habit.projectId,
+    noteId: habit.noteId,
+    color: habit.color,
+    icon: habit.icon,
+    frequencyRule: habit.frequencyRule,
+    frequencyTimezone: habit.frequencyTimezone,
+    targetCount: habit.targetCount,
+    targetUnit: habit.targetUnit,
+    targetPeriod: habit.targetPeriod,
+    reminders: habit.reminders.map((reminder) => ({ ...reminder })),
+    sortOrder: habit.sortOrder,
+    pausedAt: habit.pausedAt,
+    archivedAt: habit.archivedAt,
+    pauseRanges: habit.pauseRanges.map((range) => ({ ...range }))
+  };
+}
+
+function getHabitRestoreInput(habit: Habit): PlannerHabitCreateInput {
+  return {
+    title: habit.title,
+    description: habit.description,
+    status: habit.status,
+    projectId: habit.projectId,
+    noteId: habit.noteId,
+    color: habit.color,
+    icon: habit.icon,
+    frequencyRule: habit.frequencyRule,
+    frequencyTimezone: habit.frequencyTimezone,
+    targetCount: habit.targetCount,
+    targetUnit: habit.targetUnit,
+    targetPeriod: habit.targetPeriod,
+    reminders: habit.reminders.map((reminder) => ({ ...reminder })),
+    sortOrder: habit.sortOrder
+  };
+}
+
 function TaskCard({
   task,
   selected,
@@ -197,7 +306,9 @@ function TaskCard({
     }
   };
 
-  const visibleTagNames = tagNames.slice(0, isMobile ? 1 : 2);
+  const hasNoteSource = Boolean(task.noteId || task.links.some((link) => link.noteId));
+  const hasCanvasSource = Boolean(task.canvasId || task.links.some((link) => link.canvasId));
+  const visibleTagNames = tagNames.slice(0, 1);
   const hiddenTagCount = Math.max(0, tagNames.length - visibleTagNames.length);
 
   return (
@@ -242,23 +353,31 @@ function TaskCard({
       <div className="planner-task-content">
         <div className="planner-task-topline">
           <strong className="planner-task-title">{task.title}</strong>
-          {task.priority !== "none" ? (
-            <span className={`planner-task-chip planner-priority-chip is-${task.priority}`}>
-              {getPlannerPriorityLabel(task.priority, language)}
-            </span>
-          ) : null}
+          <div className="planner-task-badges" aria-hidden={!(hasNoteSource || hasCanvasSource || task.priority !== "none")}>
+            {hasNoteSource ? (
+              <span className="planner-task-source-icon is-note" title={language === "ru" ? "Связана с заметкой" : "Linked note"} />
+            ) : null}
+            {hasCanvasSource ? (
+              <span className="planner-task-source-icon is-canvas" title={language === "ru" ? "Связана с холстом" : "Linked canvas"} />
+            ) : null}
+            {task.priority !== "none" ? (
+              <span className={`planner-task-chip planner-priority-chip is-${task.priority}`}>
+                {getPlannerPriorityLabel(task.priority, language)}
+              </span>
+            ) : null}
+          </div>
         </div>
         {task.description ? <p className="planner-task-description">{task.description}</p> : null}
         <div className="planner-task-meta">
-          {displayDateAt ? (
-            <span className={`planner-task-chip is-date ${overdue ? "is-overdue" : ""}`}>
-              {formatPlannerDate(displayDateAt, language)}
-            </span>
-          ) : null}
           {overdue ? (
             <span className="planner-task-chip is-overdue-status">{language === "ru" ? "Просрочено" : "Overdue"}</span>
           ) : dueToday ? (
             <span className="planner-task-chip is-today-status">{language === "ru" ? "Сегодня" : "Today"}</span>
+          ) : null}
+          {displayDateAt ? (
+            <span className={`planner-task-chip is-date ${overdue ? "is-overdue" : ""}`}>
+              {formatPlannerDate(displayDateAt, language)}
+            </span>
           ) : null}
           {recurring ? (
             <span className="planner-task-chip is-recurring-status">{language === "ru" ? "Повтор" : "Repeats"}</span>
@@ -311,7 +430,9 @@ export default function PlannerSurface({
   const [projectFilterId, setProjectFilterId] = useState<PlannerProjectFilterId>(PROJECT_FILTER_ALL);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [isHabitComposerOpen, setIsHabitComposerOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [projectDraft, setProjectDraft] = useState("");
@@ -319,9 +440,13 @@ export default function PlannerSurface({
   const [priorityDraft, setPriorityDraft] = useState<PlannerTaskPriority>("none");
   const [isComposerDateOpen, setIsComposerDateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [undoAction, setUndoAction] = useState<PlannerUndoSnackbarAction | null>(null);
   const composerTitleInputRef = useRef<HTMLInputElement | null>(null);
   const composerRef = useRef<HTMLFormElement | null>(null);
-  const isTaskView = activeViewId !== "habits" && activeViewId !== "review";
+  const undoTimerRef = useRef<number | null>(null);
+  const isHabitView = activeViewId === "habits";
+  const isReviewView = activeViewId === "review";
+  const isTaskView = !isHabitView && !isReviewView;
 
   const labels = getPlannerViewLabels(language);
   const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
@@ -421,12 +546,25 @@ export default function PlannerSurface({
     () => tasks.find((task) => task.id === selectedTaskId) ?? null,
     [selectedTaskId, tasks]
   );
+  const selectedHabitSummary = useMemo(
+    () =>
+      selectedHabitId
+        ? habitSummariesForStats.find((summary) => summary.habit.id === selectedHabitId) ?? null
+        : null,
+    [habitSummariesForStats, selectedHabitId]
+  );
 
   useEffect(() => {
     if (selectedTaskId && !tasks.some((task) => task.id === selectedTaskId)) {
       setSelectedTaskId(null);
     }
   }, [selectedTaskId, tasks]);
+
+  useEffect(() => {
+    if (selectedHabitId && !habits.some((habit) => habit.id === selectedHabitId)) {
+      setSelectedHabitId(null);
+    }
+  }, [habits, selectedHabitId]);
 
   useEffect(() => {
     if (!focusProjectId || !projectMap.has(focusProjectId)) {
@@ -500,6 +638,33 @@ export default function PlannerSurface({
     return () => window.removeEventListener("pointerdown", handleOutsidePointerDown, true);
   }, [isComposerOpen, isMobile, isTouchLayout]);
 
+  useEffect(
+    () => () => {
+      if (undoTimerRef.current) {
+        window.clearTimeout(undoTimerRef.current);
+      }
+    },
+    []
+  );
+
+  const dismissUndoAction = () => {
+    setUndoAction(null);
+    if (undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+  };
+
+  const showUndoAction = (label: string, undo: PlannerUndoSnackbarAction["undo"]) => {
+    dismissUndoAction();
+    setUndoAction({
+      id: Date.now(),
+      label,
+      undo
+    });
+    undoTimerRef.current = window.setTimeout(() => setUndoAction(null), 6400);
+  };
+
   const resetComposer = () => {
     setTitleDraft("");
     setProjectDraft("");
@@ -513,6 +678,10 @@ export default function PlannerSurface({
     setIsComposerDateOpen(false);
   };
 
+  const closeHabitComposer = () => {
+    setIsHabitComposerOpen(false);
+  };
+
   const getCompletedOccurrenceMarker = (task: Task) => {
     const todayEndAt = getEndOfLocalDay();
     const markers = (task.recurrenceCompletedDates ?? [])
@@ -524,19 +693,35 @@ export default function PlannerSurface({
 
   const handleToggleTaskDone = async (taskId: string, done: boolean, occurrenceStartAt?: number) => {
     const task = tasks.find((candidate) => candidate.id === taskId);
+    const undoPatch = task ? getTaskUndoPatch(task) : null;
+    const undoLabel = done
+      ? language === "ru"
+        ? "Задача отмечена выполненной"
+        : "Task completed"
+      : language === "ru"
+        ? "Отметка снята"
+        : "Task reopened";
 
     if (!task || !isRecurringPlannerRule(task.recurrenceRule)) {
-      return onToggleTaskDone(taskId, done);
+      await onToggleTaskDone(taskId, done);
+      if (task && undoPatch) {
+        showUndoAction(undoLabel, () => onUpdateTask(task.id, undoPatch));
+      }
+      return;
     }
 
     if (!done) {
       const marker = occurrenceStartAt ? normalizePlannerOccurrenceMarker(occurrenceStartAt) : getCompletedOccurrenceMarker(task);
 
       if (!marker) {
-        return onToggleTaskDone(taskId, false);
+        await onToggleTaskDone(taskId, false);
+        showUndoAction(undoLabel, () => onUpdateTask(task.id, undoPatch ?? getTaskUndoPatch(task)));
+        return;
       }
 
-      return onUpdateTask(taskId, buildUncompleteRecurringOccurrencePatch(task, marker));
+      await onUpdateTask(taskId, buildUncompleteRecurringOccurrencePatch(task, marker));
+      showUndoAction(undoLabel, () => onUpdateTask(task.id, undoPatch ?? getTaskUndoPatch(task)));
+      return;
     }
 
     const occurrence = occurrenceStartAt
@@ -544,25 +729,104 @@ export default function PlannerSurface({
       : getPlannerTaskActionOccurrence(task);
 
     if (!occurrence) {
-      return onToggleTaskDone(taskId, true);
+      await onToggleTaskDone(taskId, true);
+      showUndoAction(undoLabel, () => onUpdateTask(task.id, undoPatch ?? getTaskUndoPatch(task)));
+      return;
     }
 
-    return onUpdateTask(taskId, buildRecurringTaskPatch(task, "completeOccurrence", occurrence.originalStartAt));
+    await onUpdateTask(taskId, buildRecurringTaskPatch(task, "completeOccurrence", occurrence.originalStartAt));
+    showUndoAction(undoLabel, () => onUpdateTask(task.id, undoPatch ?? getTaskUndoPatch(task)));
+  };
+
+  const handleDeleteTaskWithUndo = async (taskId: string) => {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    await onDeleteTask(taskId);
+    setSelectedTaskId(null);
+
+    if (!task) {
+      return;
+    }
+
+    showUndoAction(language === "ru" ? "Задача удалена" : "Task deleted", async () => {
+      const restoredTask = await onCreateTask(getTaskRestoreInput(task));
+      setSelectedTaskId(restoredTask.id);
+    });
+  };
+
+  const handleToggleHabitToday = async (habitId: string) => {
+    const summary = habitSummariesForStats.find((item) => item.habit.id === habitId);
+
+    if (!summary?.dueToday) {
+      return;
+    }
+
+    await onToggleHabitLog(habitId);
+    showUndoAction(language === "ru" ? "Отметка привычки изменена" : "Habit check changed", () => onToggleHabitLog(habitId));
+  };
+
+  const handleUpdateHabitWithUndo = async (
+    summary: PlannerHabitSummary,
+    patch: PlannerHabitUpdateInput,
+    label: string
+  ) => {
+    const undoPatch = getHabitUndoPatch(summary.habit);
+    await onUpdateHabit(summary.habit.id, patch);
+    showUndoAction(label, () => onUpdateHabit(summary.habit.id, undoPatch));
+  };
+
+  const handleToggleHabitPaused = (summary: PlannerHabitSummary) => {
+    void handleUpdateHabitWithUndo(
+      summary,
+      {
+        status: summary.habit.status === "paused" ? "active" : "paused"
+      },
+      summary.habit.status === "paused"
+        ? language === "ru"
+          ? "Привычка возобновлена"
+          : "Habit resumed"
+        : language === "ru"
+          ? "Привычка поставлена на паузу"
+          : "Habit paused"
+    );
+  };
+
+  const handleArchiveHabit = (summary: PlannerHabitSummary) => {
+    void handleUpdateHabitWithUndo(
+      summary,
+      {
+        status: "archived"
+      },
+      language === "ru" ? "Привычка отправлена в архив" : "Habit archived"
+    );
+  };
+
+  const handleDeleteHabitWithUndo = async (summary: PlannerHabitSummary) => {
+    await onDeleteHabit(summary.habit.id);
+    setSelectedHabitId(null);
+    showUndoAction(language === "ru" ? "Привычка удалена" : "Habit deleted", async () => {
+      const restoredHabit = await onCreateHabit(getHabitRestoreInput(summary.habit));
+      setSelectedHabitId(restoredHabit.id);
+    });
   };
 
   const handleViewChange = (viewId: PlannerViewId) => {
     setActiveViewId(viewId);
     setSelectedTaskId(null);
+    setSelectedHabitId(null);
     closeComposer();
+    closeHabitComposer();
   };
 
   const openCalendar = () => {
     closeComposer();
+    closeHabitComposer();
     setIsCalendarOpen(true);
   };
 
   const openComposer = () => {
     setSelectedTaskId(null);
+    setSelectedHabitId(null);
+    closeHabitComposer();
 
     if (isComposerOpen) {
       composerTitleInputRef.current?.focus();
@@ -571,6 +835,13 @@ export default function PlannerSurface({
 
     setIsComposerOpen(true);
     setDateDraft(getDefaultComposerDateDraft(activeViewId));
+  };
+
+  const openHabitComposer = () => {
+    closeComposer();
+    setSelectedTaskId(null);
+    setSelectedHabitId(null);
+    setIsHabitComposerOpen(true);
   };
 
   const handleCreateTask = async () => {
@@ -821,7 +1092,7 @@ export default function PlannerSurface({
     <section
       className={`planner-surface ${isMobile ? "is-mobile" : "is-desktop"} ${
         isTouchLayout ? "is-touch-layout" : ""
-      } ${adaptiveLayout.isTabletLandscape ? "is-tablet-landscape" : ""} ${!isTaskView ? "is-wide-mode" : ""}`}
+      } ${adaptiveLayout.isTabletLandscape ? "is-tablet-landscape" : ""} ${isReviewView ? "is-wide-mode" : ""}`}
     >
       {!isMobile ? (
         <PlannerRail
@@ -848,7 +1119,7 @@ export default function PlannerSurface({
                     : "Capture inbox items, set dates, and keep project focus clear."}
               </p>
             </div>
-            {isTaskView ? (
+            {isTaskView || isHabitView ? (
               <div className="planner-main-actions">
                 <button
                   type="button"
@@ -861,8 +1132,8 @@ export default function PlannerSurface({
                 <button
                   type="button"
                   className="planner-primary-action"
-                  onClick={openComposer}
-                  data-planner-composer-trigger="true"
+                  onClick={isHabitView ? openHabitComposer : openComposer}
+                  data-planner-composer-trigger={isHabitView ? undefined : "true"}
                 >
                   <span className="planner-action-glyph is-plus" aria-hidden="true" />
                   <span>{language === "ru" ? "Новая" : "New"}</span>
@@ -927,10 +1198,16 @@ export default function PlannerSurface({
             language={language}
             isMobile={isMobile}
             isTouchLayout={isTouchLayout}
+            selectedHabitId={selectedHabitId}
+            isComposerOpen={isHabitComposerOpen}
+            hideDesktopInspector
+            onSelectHabit={setSelectedHabitId}
+            onComposerOpenChange={setIsHabitComposerOpen}
             onCreateHabit={onCreateHabit}
             onUpdateHabit={onUpdateHabit}
             onDeleteHabit={onDeleteHabit}
             onToggleHabitLog={onToggleHabitLog}
+            onShowUndo={showUndoAction}
           />
         ) : activeViewId === "review" ? (
           <PlannerReviewSurface
@@ -996,6 +1273,17 @@ export default function PlannerSurface({
         )}
       </main>
 
+      {!isMobile && isHabitView ? (
+        <PlannerHabitInspectorPanel
+          summary={selectedHabitSummary}
+          language={language}
+          onToggleToday={(habitId) => void handleToggleHabitToday(habitId)}
+          onTogglePaused={handleToggleHabitPaused}
+          onArchive={handleArchiveHabit}
+          onDelete={(summary) => void handleDeleteHabitWithUndo(summary)}
+        />
+      ) : null}
+
       {!isMobile && isTaskView ? (
         <PlannerTaskInspector
           task={selectedTask}
@@ -1009,22 +1297,27 @@ export default function PlannerSurface({
           onCreateTag={onCreateTag}
           onUpdate={(taskId, patch) => void onUpdateTask(taskId, patch)}
           onToggleDone={(taskId, done, occurrenceStartAt) => void handleToggleTaskDone(taskId, done, occurrenceStartAt)}
-          onDelete={async (taskId) => {
-            await onDeleteTask(taskId);
-            setSelectedTaskId(null);
-          }}
+          onDelete={(taskId) => void handleDeleteTaskWithUndo(taskId)}
         />
       ) : null}
 
-      {isMobile && isTaskView ? (
+      {isMobile && (isTaskView || isHabitView) ? (
         <button
           type="button"
           className="planner-mobile-create-fab"
-          onClick={openComposer}
-          data-planner-composer-trigger="true"
+          onClick={isHabitView ? openHabitComposer : openComposer}
+          data-planner-composer-trigger={isHabitView ? undefined : "true"}
         >
           <span className="planner-action-glyph is-plus" aria-hidden="true" />
-          <span>{language === "ru" ? "Задача" : "Task"}</span>
+          <span>
+            {isHabitView
+              ? language === "ru"
+                ? "Привычка"
+                : "Habit"
+              : language === "ru"
+                ? "Задача"
+                : "Task"}
+          </span>
         </button>
       ) : null}
 
@@ -1072,10 +1365,7 @@ export default function PlannerSurface({
             onCreateTag={onCreateTag}
             onUpdate={(taskId, patch) => void onUpdateTask(taskId, patch)}
             onToggleDone={(taskId, done, occurrenceStartAt) => void handleToggleTaskDone(taskId, done, occurrenceStartAt)}
-            onDelete={async (taskId) => {
-              await onDeleteTask(taskId);
-              setSelectedTaskId(null);
-            }}
+            onDelete={(taskId) => void handleDeleteTaskWithUndo(taskId)}
           />
         </div>
       ) : null}
@@ -1106,6 +1396,7 @@ export default function PlannerSurface({
           onDeleteTimeBlock={onDeleteTimeBlock}
         />
       ) : null}
+      <PlannerUndoSnackbar action={undoAction} language={language} onDismiss={dismissUndoAction} />
     </section>
   );
 }

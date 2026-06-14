@@ -18,6 +18,8 @@ interface TagInputFieldProps {
   language: AppLanguage;
   onChangeTagIds: (tagIds: string[]) => Promise<void> | void;
   onCreateTag: (name: string) => Promise<Tag>;
+  dropdownWithinPortal?: boolean;
+  variant?: "default" | "planner";
 }
 
 function areStringArraysEqual(left: string[], right: string[]) {
@@ -33,9 +35,12 @@ export default function TagInputField({
   selectedTagIds,
   language,
   onChangeTagIds,
-  onCreateTag
+  onCreateTag,
+  dropdownWithinPortal = false,
+  variant = "default"
 }: TagInputFieldProps) {
   const { t } = useTranslation();
+  const variantClass = variant === "planner" ? "is-planner" : "is-default";
   const commitVersionRef = useRef(0);
   const [searchValue, setSearchValue] = useState("");
   const [isCommitting, setIsCommitting] = useState(false);
@@ -123,16 +128,16 @@ export default function TagInputField({
   };
 
   return (
-    <div className="tag-input-shell">
+    <div className={`tag-input-shell ${variantClass}`}>
       <TagsInput
-        className="tag-input-control"
+        className={`tag-input-control ${variantClass}`}
         classNames={{
-          input: "tag-input-input",
-          pillsList: "tag-input-pills",
-          pill: "tag-input-pill",
-          inputField: "tag-input-field",
-          dropdown: "tag-input-dropdown",
-          option: "tag-input-option"
+          input: `tag-input-input ${variantClass}`,
+          pillsList: `tag-input-pills ${variantClass}`,
+          pill: `tag-input-pill ${variantClass}`,
+          inputField: `tag-input-field ${variantClass}`,
+          dropdown: `tag-input-dropdown ${variantClass}`,
+          option: `tag-input-option ${variantClass}`
         }}
         value={draftNames}
         data={suggestions}
@@ -147,9 +152,10 @@ export default function TagInputField({
         openOnFocus
         limit={12}
         comboboxProps={{
-          withinPortal: false,
+          withinPortal: dropdownWithinPortal,
           position: "bottom-start",
-          offset: 6
+          offset: 6,
+          zIndex: dropdownWithinPortal ? 2147483400 : undefined
         }}
         isDuplicate={(value, currentValues) =>
           currentValues.some((currentValue) => {
@@ -165,7 +171,7 @@ export default function TagInputField({
         aria-label={t("note.tags")}
       />
 
-      <p className={`tag-input-hint ${isCommitting ? "is-busy" : ""}`}>{helperText}</p>
+      <p className={`tag-input-hint ${variantClass} ${isCommitting ? "is-busy" : ""}`}>{helperText}</p>
     </div>
   );
 }

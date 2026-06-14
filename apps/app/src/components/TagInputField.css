@@ -4,6 +4,12 @@
   min-width: 0;
 }
 
+.tag-input-shell.is-planner {
+  --tag-input-accent: var(--planner-task-accent, var(--planner-calendar-accent, var(--accent-theme-primary, #8edcff)));
+  --tag-input-accent-2: var(--planner-calendar-accent-2, var(--accent-theme-secondary, #b896ff));
+  gap: 7px;
+}
+
 .tag-input-control {
   min-width: 0;
 }
@@ -20,6 +26,20 @@
   transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
+.tag-input-input.is-planner {
+  min-height: 46px;
+  padding: 7px 8px;
+  border-radius: 17px;
+  border-color: color-mix(in srgb, var(--tag-input-accent) 26%, rgba(255, 255, 255, 0.12));
+  background:
+    radial-gradient(circle at 4% 0%, color-mix(in srgb, var(--tag-input-accent) 18%, transparent), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.032)),
+    rgba(8, 13, 25, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
 .tag-input-input:focus-within {
   border-color: rgb(var(--cyan-rgb) / 0.26);
   background:
@@ -28,6 +48,19 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.03),
     0 0 0 1px rgb(var(--cyan-rgb) / 0.08);
+}
+
+.tag-input-input.is-planner:focus-within {
+  border-color: color-mix(in srgb, var(--tag-input-accent) 58%, rgba(255, 255, 255, 0.2));
+  background:
+    radial-gradient(circle at 4% 0%, color-mix(in srgb, var(--tag-input-accent) 24%, transparent), transparent 50%),
+    radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--tag-input-accent-2) 12%, transparent), transparent 54%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.088), rgba(255, 255, 255, 0.04)),
+    rgba(8, 13, 25, 0.84);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    0 0 0 1px color-mix(in srgb, var(--tag-input-accent) 16%, transparent),
+    0 16px 36px rgba(0, 0, 0, 0.2);
 }
 
 .tag-input-pills {
@@ -48,6 +81,19 @@
   line-height: 1;
 }
 
+.tag-input-pill.is-planner {
+  min-height: 30px;
+  padding-inline: 11px;
+  border-color: color-mix(in srgb, var(--tag-input-accent) 34%, rgba(255, 255, 255, 0.14));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--tag-input-accent) 18%, rgba(255, 255, 255, 0.06)), rgba(255, 255, 255, 0.04));
+  color: rgba(247, 250, 255, 0.94);
+  font-family: var(--font-ui, inherit);
+  font-size: 0.74rem;
+  font-weight: 850;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 .tag-input-field {
   min-width: 96px;
   padding: 0 2px;
@@ -56,11 +102,23 @@
   font-size: 0.78rem;
 }
 
+.tag-input-field.is-planner {
+  min-width: 118px;
+  color: rgba(247, 250, 255, 0.94);
+  font-size: 0.82rem;
+  font-weight: 780;
+}
+
 .tag-input-field::placeholder {
   color: color-mix(in srgb, var(--text-dim) 88%, transparent);
 }
 
+.tag-input-field.is-planner::placeholder {
+  color: rgba(224, 234, 247, 0.5);
+}
+
 .tag-input-dropdown {
+  z-index: 2147483400;
   border-radius: 18px;
   border: 1px solid rgb(var(--line-rgb) / 0.12);
   background: rgba(10, 12, 26, 0.94);
@@ -71,15 +129,38 @@
   overflow: hidden;
 }
 
+.tag-input-dropdown.is-planner {
+  border-radius: 18px;
+  border-color: color-mix(in srgb, var(--accent-theme-primary, #8edcff) 24%, rgba(255, 255, 255, 0.12));
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--accent-theme-primary, #8edcff) 14%, transparent), transparent 42%),
+    linear-gradient(180deg, rgba(25, 31, 48, 0.98), rgba(10, 13, 24, 0.98));
+  box-shadow:
+    0 22px 58px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 .tag-input-option {
   min-height: 38px;
   padding: 8px 10px;
   color: var(--text);
 }
 
+.tag-input-option.is-planner {
+  min-height: 42px;
+  padding: 9px 11px;
+  color: rgba(247, 250, 255, 0.92);
+}
+
 .tag-input-option:hover,
 .tag-input-option[data-combobox-selected="true"] {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.tag-input-option.is-planner:hover,
+.tag-input-option.is-planner[data-combobox-selected="true"] {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-theme-primary, #8edcff) 18%, rgba(255, 255, 255, 0.055)), rgba(255, 255, 255, 0.05));
 }
 
 .tag-input-option-row {
@@ -96,6 +177,12 @@
   line-height: 1.45;
 }
 
+.tag-input-option.is-planner .tag-input-option-text {
+  color: rgba(247, 250, 255, 0.94);
+  font-size: 0.82rem;
+  font-weight: 820;
+}
+
 .tag-input-option-meta {
   flex: 0 0 auto;
   color: var(--text-dim);
@@ -103,6 +190,11 @@
   line-height: 1.2;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.tag-input-option.is-planner .tag-input-option-meta {
+  color: rgba(224, 234, 247, 0.5);
+  font-weight: 840;
 }
 
 .tag-input-hint {
@@ -113,8 +205,19 @@
   line-height: 1.45;
 }
 
+.tag-input-hint.is-planner {
+  padding-inline: 3px;
+  color: rgba(224, 234, 247, 0.54);
+  font-size: 0.68rem;
+  font-weight: 720;
+}
+
 .tag-input-hint.is-busy {
   color: color-mix(in srgb, var(--text) 80%, #73f7ff 20%);
+}
+
+.tag-input-hint.is-planner.is-busy {
+  color: color-mix(in srgb, var(--tag-input-accent) 72%, white);
 }
 
 @media (max-width: 720px) {
@@ -124,14 +227,30 @@
     border-radius: 14px;
   }
 
+  .tag-input-input.is-planner {
+    min-height: 44px;
+    border-radius: 15px;
+  }
+
   .tag-input-pill {
     min-height: 26px;
     padding-inline: 9px;
     font-size: 0.68rem;
   }
 
+  .tag-input-pill.is-planner {
+    min-height: 28px;
+    padding-inline: 10px;
+    font-size: 0.7rem;
+  }
+
   .tag-input-field {
     min-width: 72px;
     font-size: 0.76rem;
+  }
+
+  .tag-input-field.is-planner {
+    min-width: 88px;
+    font-size: 0.78rem;
   }
 }

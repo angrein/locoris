@@ -1252,8 +1252,7 @@
 .planner-calendar-time-editor button,
 .planner-calendar-reminder-card,
 .planner-calendar-tag-row button,
-.planner-calendar-link-list button,
-.planner-calendar-undo-toast button {
+.planner-calendar-link-list button {
   font: inherit;
   color: inherit;
   border: 0;
@@ -1971,46 +1970,6 @@
   color: rgba(224, 234, 247, 0.58);
   font-size: 0.74rem;
   line-height: 1.3;
-}
-
-.planner-calendar-undo-toast {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  z-index: 24;
-  display: inline-flex;
-  max-width: min(420px, calc(100% - 40px));
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--planner-calendar-accent) 30%, rgba(255, 255, 255, 0.12));
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.045)),
-    color-mix(in srgb, #08111f 86%, var(--planner-calendar-accent) 8%);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(20px) saturate(140%);
-}
-
-.planner-calendar-undo-toast span {
-  min-width: 0;
-  color: rgba(245, 249, 255, 0.86);
-  font-size: 0.82rem;
-  font-weight: 820;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.planner-calendar-undo-toast button {
-  flex: 0 0 auto;
-  min-height: 32px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--planner-calendar-accent) 18%, rgba(255, 255, 255, 0.07));
-  color: color-mix(in srgb, var(--planner-calendar-accent) 70%, white);
-  font-size: 0.76rem;
-  font-weight: 900;
 }
 
 .planner-calendar-layer.is-mobile {
