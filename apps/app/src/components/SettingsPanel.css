@@ -348,6 +348,11 @@ button.settings-row:focus-visible {
   --settings-row-tint: color-mix(in srgb, var(--settings-accent) 13%, transparent);
 }
 
+.settings-row.is-planner {
+  --settings-row-accent: #8df0cf;
+  --settings-row-tint: rgba(141, 240, 207, 0.11);
+}
+
 .settings-row.is-ai {
   --settings-row-accent: #d59cff;
   --settings-row-tint: rgba(213, 156, 255, 0.12);
@@ -995,6 +1000,44 @@ button.settings-row:focus-visible {
   color: rgba(194, 203, 232, 0.73);
   font-size: 0.72rem;
   line-height: 1.48;
+}
+
+.settings-panel-shell.is-planner-settings {
+  --settings-accent: #8df0cf;
+  --settings-accent-secondary: #b99cff;
+}
+
+.settings-planner-panel-grid {
+  display: grid;
+}
+
+.settings-planner-block {
+  gap: 14px;
+}
+
+.settings-planner-hero {
+  margin-bottom: 2px;
+}
+
+.settings-planner-choice-group {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.settings-planner-choice-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-planner-choice-grid.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-planner-choice {
+  min-height: 104px;
 }
 
 .settings-panel-shell.is-ai-settings .settings-panel-grid {
@@ -1740,6 +1783,7 @@ button.settings-row:focus-visible {
   .settings-accent-grid,
   .settings-accent-grid-panel,
   .settings-interface-motion-grid,
+  .settings-planner-choice-grid,
   .settings-ai-format-grid,
   .settings-ai-key-row,
   .settings-ai-model-advanced-actions {

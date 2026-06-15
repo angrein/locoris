@@ -46,6 +46,9 @@ import {
 import type {
   AppLanguage,
   AppSettings,
+  PlannerCalendarDefaultView,
+  PlannerDefaultSurface,
+  PlannerWeekStartsOn,
   RemoteVaultImportResult,
   SyncConnection,
   SyncVaultBinding,
@@ -82,6 +85,14 @@ interface SettingsPanelProps {
   onAccentThemeChange: (themeId: AppAccentThemeId) => void;
   onOrbitalAnimationModeChange: (mode: OrbitalAnimationMode) => void;
   onOrbitalTemporalSignalsModeChange: (mode: OrbitalTemporalSignalsMode) => void;
+  onPlannerSettingsChange: (
+    patch: Partial<
+      Pick<
+        AppSettings,
+        "plannerDefaultSurface" | "plannerWeekStartsOn" | "plannerDefaultCalendarView"
+      >
+    >
+  ) => void | Promise<void>;
   onLanguageChange: (language: AppLanguage) => void;
   onSelectLocalVault: (localVaultId: string) => void;
   onCreateLocalVault: (input: {
@@ -188,6 +199,17 @@ function AccentGlyph() {
   );
 }
 
+function PlannerGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M5.3 4.2h9.4a1.7 1.7 0 0 1 1.7 1.7v8.8a1.7 1.7 0 0 1-1.7 1.7H5.3a1.7 1.7 0 0 1-1.7-1.7V5.9a1.7 1.7 0 0 1 1.7-1.7Z" />
+      <path d="M3.7 7.4h12.6" className="settings-row-icon-accent" />
+      <path d="M7 3.2v2.1M13 3.2v2.1" className="settings-row-icon-accent" />
+      <path d="m7.1 12.3 1.6 1.6 4-4.2" className="settings-row-icon-accent" />
+    </svg>
+  );
+}
+
 function AiGlyph() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -230,7 +252,7 @@ function ChevronGlyph({ expanded = false }: { expanded?: boolean }) {
   );
 }
 
-type SettingsView = "root" | "sync" | "accent" | "ai" | "backup";
+type SettingsView = "root" | "sync" | "accent" | "planner" | "ai" | "backup";
 
 const LANGUAGE_OPTIONS: Array<{
   value: AppLanguage;
@@ -249,6 +271,81 @@ const LANGUAGE_OPTIONS: Array<{
     code: "RU",
     labelKey: "settings.languageRussian",
     nativeLabel: "Русский"
+  }
+];
+
+const PLANNER_DEFAULT_SURFACE_OPTIONS: Array<{
+  value: PlannerDefaultSurface;
+  titleKey: "settings.plannerOpenPlannerTitle" | "settings.plannerOpenCalendarTitle";
+  chipKey: "settings.plannerOpenPlannerChip" | "settings.plannerOpenCalendarChip";
+  descriptionKey: "settings.plannerOpenPlannerDescription" | "settings.plannerOpenCalendarDescription";
+}> = [
+  {
+    value: "planner",
+    titleKey: "settings.plannerOpenPlannerTitle",
+    chipKey: "settings.plannerOpenPlannerChip",
+    descriptionKey: "settings.plannerOpenPlannerDescription"
+  },
+  {
+    value: "calendar",
+    titleKey: "settings.plannerOpenCalendarTitle",
+    chipKey: "settings.plannerOpenCalendarChip",
+    descriptionKey: "settings.plannerOpenCalendarDescription"
+  }
+];
+
+const PLANNER_WEEK_START_OPTIONS: Array<{
+  value: PlannerWeekStartsOn;
+  titleKey: "settings.plannerWeekMondayTitle" | "settings.plannerWeekSundayTitle";
+  chipKey: "settings.plannerWeekMondayChip" | "settings.plannerWeekSundayChip";
+  descriptionKey: "settings.plannerWeekMondayDescription" | "settings.plannerWeekSundayDescription";
+}> = [
+  {
+    value: "monday",
+    titleKey: "settings.plannerWeekMondayTitle",
+    chipKey: "settings.plannerWeekMondayChip",
+    descriptionKey: "settings.plannerWeekMondayDescription"
+  },
+  {
+    value: "sunday",
+    titleKey: "settings.plannerWeekSundayTitle",
+    chipKey: "settings.plannerWeekSundayChip",
+    descriptionKey: "settings.plannerWeekSundayDescription"
+  }
+];
+
+const PLANNER_CALENDAR_VIEW_OPTIONS: Array<{
+  value: PlannerCalendarDefaultView;
+  titleKey:
+    | "settings.plannerCalendarViewDayTitle"
+    | "settings.plannerCalendarViewWeekTitle"
+    | "settings.plannerCalendarViewMonthTitle";
+  chipKey:
+    | "settings.plannerCalendarViewDayChip"
+    | "settings.plannerCalendarViewWeekChip"
+    | "settings.plannerCalendarViewMonthChip";
+  descriptionKey:
+    | "settings.plannerCalendarViewDayDescription"
+    | "settings.plannerCalendarViewWeekDescription"
+    | "settings.plannerCalendarViewMonthDescription";
+}> = [
+  {
+    value: "day",
+    titleKey: "settings.plannerCalendarViewDayTitle",
+    chipKey: "settings.plannerCalendarViewDayChip",
+    descriptionKey: "settings.plannerCalendarViewDayDescription"
+  },
+  {
+    value: "week",
+    titleKey: "settings.plannerCalendarViewWeekTitle",
+    chipKey: "settings.plannerCalendarViewWeekChip",
+    descriptionKey: "settings.plannerCalendarViewWeekDescription"
+  },
+  {
+    value: "month",
+    titleKey: "settings.plannerCalendarViewMonthTitle",
+    chipKey: "settings.plannerCalendarViewMonthChip",
+    descriptionKey: "settings.plannerCalendarViewMonthDescription"
   }
 ];
 
@@ -279,6 +376,7 @@ export default function SettingsPanel({
   onAccentThemeChange,
   onOrbitalAnimationModeChange,
   onOrbitalTemporalSignalsModeChange,
+  onPlannerSettingsChange,
   onLanguageChange,
   onSelectLocalVault,
   onCreateLocalVault,
@@ -526,6 +624,15 @@ export default function SettingsPanel({
     (appUpdateState.phase === "available" || appUpdateState.phase === "failed");
   const selectedLanguageOption =
     LANGUAGE_OPTIONS.find((option) => option.value === settings.language) ?? LANGUAGE_OPTIONS[0];
+  const plannerDefaultSurface = settings.plannerDefaultSurface ?? "planner";
+  const plannerWeekStartsOn = settings.plannerWeekStartsOn ?? "monday";
+  const plannerDefaultCalendarView = settings.plannerDefaultCalendarView ?? "week";
+  const plannerDefaultSurfaceOption =
+    PLANNER_DEFAULT_SURFACE_OPTIONS.find((option) => option.value === plannerDefaultSurface) ??
+    PLANNER_DEFAULT_SURFACE_OPTIONS[0];
+  const plannerDefaultCalendarViewOption =
+    PLANNER_CALENDAR_VIEW_OPTIONS.find((option) => option.value === plannerDefaultCalendarView) ??
+    PLANNER_CALENDAR_VIEW_OPTIONS[1];
   const currentAccentThemeId = resolveAppAccentThemeId(accentThemeId);
   const currentAccentTheme = getAppAccentTheme(currentAccentThemeId);
   const hasGeminiKey = aiKeyDraft.trim().length > 0;
@@ -948,6 +1055,54 @@ export default function SettingsPanel({
     );
   };
 
+  const renderPlannerChoiceGroup = <T extends string>(
+    label: string,
+    ariaLabel: string,
+    options: Array<{
+      value: T;
+      titleKey: string;
+      chipKey: string;
+      descriptionKey: string;
+    }>,
+    selectedValue: T,
+    onSelect: (value: T) => void
+  ) => (
+    <section className="settings-planner-choice-group" aria-label={label}>
+      <div className="settings-panel-block-head">
+        <div>
+          <p className="panel-kicker settings-panel-block-kicker">{label}</p>
+        </div>
+      </div>
+
+      <div
+        className={`settings-planner-choice-grid ${options.length === 2 ? "is-two" : "is-three"}`}
+        role="radiogroup"
+        aria-label={ariaLabel}
+      >
+        {options.map((option) => {
+          const active = option.value === selectedValue;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={`settings-interface-motion-option settings-planner-choice ${active ? "is-active" : ""}`}
+              onClick={() => onSelect(option.value)}
+              role="radio"
+              aria-checked={active}
+            >
+              <span className="settings-interface-motion-option-head">
+                <strong>{t(option.titleKey)}</strong>
+                <span>{t(option.chipKey)}</span>
+              </span>
+              <p>{t(option.descriptionKey)}</p>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+
   const renderSettingsHeader = (
     title: string,
     caption: string,
@@ -1023,6 +1178,60 @@ export default function SettingsPanel({
         onDisableVaultEncryption={onDisableVaultEncryption}
         onLockVaultEncryption={onLockVaultEncryption}
       />
+    );
+  }
+
+  if (view === "planner") {
+    return (
+      <section className="settings-panel-shell is-planner-settings">
+        {renderSettingsHeader(t("settings.plannerTitle"), t("settings.plannerPanelCaption"), {
+          back: true
+        })}
+
+        <div className="settings-panel-grid settings-planner-panel-grid">
+          <section className="settings-panel-block settings-panel-block-primary settings-planner-block">
+            <div className="settings-ai-hero settings-planner-hero">
+              <div className="settings-ai-orb" aria-hidden="true">
+                <PlannerGlyph />
+              </div>
+              <div className="settings-ai-hero-copy">
+                <p className="panel-kicker settings-panel-block-kicker">
+                  {t("settings.plannerKicker")}
+                </p>
+                <h3>{t("settings.plannerHeroTitle")}</h3>
+                <p>{t("settings.plannerHeroDescription")}</p>
+              </div>
+              <span className="settings-ai-status is-connected">
+                {t(plannerDefaultSurfaceOption.chipKey)}
+              </span>
+            </div>
+
+            {renderPlannerChoiceGroup(
+              t("settings.plannerDefaultSurfaceLabel"),
+              t("settings.plannerDefaultSurfaceLabel"),
+              PLANNER_DEFAULT_SURFACE_OPTIONS,
+              plannerDefaultSurface,
+              (value) => void onPlannerSettingsChange({ plannerDefaultSurface: value })
+            )}
+
+            {renderPlannerChoiceGroup(
+              t("settings.plannerWeekStartsOnLabel"),
+              t("settings.plannerWeekStartsOnLabel"),
+              PLANNER_WEEK_START_OPTIONS,
+              plannerWeekStartsOn,
+              (value) => void onPlannerSettingsChange({ plannerWeekStartsOn: value })
+            )}
+
+            {renderPlannerChoiceGroup(
+              t("settings.plannerDefaultCalendarViewLabel"),
+              t("settings.plannerDefaultCalendarViewLabel"),
+              PLANNER_CALENDAR_VIEW_OPTIONS,
+              plannerDefaultCalendarView,
+              (value) => void onPlannerSettingsChange({ plannerDefaultCalendarView: value })
+            )}
+          </section>
+        </div>
+      </section>
     );
   }
 
@@ -1609,6 +1818,28 @@ export default function SettingsPanel({
               </div>
               <span className="settings-row-side">
                 <span className="settings-row-count">{t(currentAccentTheme.labelKey)}</span>
+                <span className="settings-row-action-icon" aria-hidden="true">
+                  <ChevronGlyph />
+                </span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="settings-row settings-row-destination is-planner"
+              onClick={() => setView("planner")}
+            >
+              <span className="settings-row-icon settings-destination-icon" aria-hidden="true">
+                <PlannerGlyph />
+              </span>
+              <div className="settings-row-copy">
+                <strong>{t("settings.plannerTitle")}</strong>
+                <span>{t("settings.plannerDescription")}</span>
+              </div>
+              <span className="settings-row-side">
+                <span className="settings-row-count">
+                  {t(plannerDefaultCalendarViewOption.titleKey)}
+                </span>
                 <span className="settings-row-action-icon" aria-hidden="true">
                   <ChevronGlyph />
                 </span>

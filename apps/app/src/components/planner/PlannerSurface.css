@@ -803,7 +803,7 @@
     radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--planner-accent) 9%, transparent), transparent 36%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.028)),
     rgba(255, 255, 255, 0.032);
-  overflow: hidden;
+  overflow: clip;
   text-align: left;
   cursor: pointer;
   transition: border-color 150ms ease, background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
@@ -878,7 +878,7 @@
 .planner-task-topline {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   align-items: start;
   gap: 8px;
 }
@@ -933,9 +933,9 @@
   max-width: 100%;
   min-width: 0;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 6px;
-  overflow: hidden;
+  overflow: visible;
   min-height: 22px;
 }
 
@@ -945,7 +945,7 @@
   justify-content: flex-end;
   gap: 5px;
   min-width: 0;
-  max-width: 42%;
+  max-width: 74px;
 }
 
 .planner-task-source-icon {
@@ -1003,7 +1003,7 @@
 .planner-priority-chip {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: min(100%, 136px);
+  max-width: min(100%, 150px);
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -1020,8 +1020,8 @@
 }
 
 .planner-priority-chip {
-  flex: 0 0 auto;
-  max-width: min(100%, 116px);
+  flex: 0 1 auto;
+  max-width: min(100%, 130px);
 }
 
 .planner-task-chip.is-project {
@@ -1153,7 +1153,7 @@
 }
 
 .planner-surface.is-mobile .planner-task-badges {
-  max-width: 38%;
+  max-width: 52px;
 }
 
 .planner-surface.is-mobile .planner-task-source-icon {

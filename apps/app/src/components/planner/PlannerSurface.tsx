@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
 import type { AppRuntimeLayoutSnapshot } from "../../lib/runtime";
-import type { AppLanguage, Folder, Habit, HabitLog, Note, PlannerTaskPriority, Project, Tag, Task, TimeBlock } from "../../types";
+import type {
+  AppLanguage,
+  Folder,
+  Habit,
+  HabitLog,
+  Note,
+  PlannerCalendarDefaultView,
+  PlannerDefaultSurface,
+  PlannerTaskPriority,
+  PlannerWeekStartsOn,
+  Project,
+  Tag,
+  Task,
+  TimeBlock
+} from "../../types";
 import {
   formatPlannerDate,
   getEndOfLocalDay,
@@ -60,6 +74,9 @@ interface PlannerSurfaceProps {
   tags: Tag[];
   language: AppLanguage;
   adaptiveLayout: AppRuntimeLayoutSnapshot;
+  defaultSurface: PlannerDefaultSurface;
+  defaultCalendarView: PlannerCalendarDefaultView;
+  weekStartsOn: PlannerWeekStartsOn;
   focusProjectId?: string | null;
   onCreateTask: (input: PlannerTaskCreateInput) => Promise<Task>;
   onUpdateTask: (taskId: string, patch: PlannerTaskUpdateInput) => Promise<Task | null>;
@@ -308,6 +325,7 @@ function TaskCard({
 
   const hasNoteSource = Boolean(task.noteId || task.links.some((link) => link.noteId));
   const hasCanvasSource = Boolean(task.canvasId || task.links.some((link) => link.canvasId));
+  const hasSourceBadges = hasNoteSource || hasCanvasSource;
   const visibleTagNames = tagNames.slice(0, 1);
   const hiddenTagCount = Math.max(0, tagNames.length - visibleTagNames.length);
 
@@ -353,19 +371,16 @@ function TaskCard({
       <div className="planner-task-content">
         <div className="planner-task-topline">
           <strong className="planner-task-title">{task.title}</strong>
-          <div className="planner-task-badges" aria-hidden={!(hasNoteSource || hasCanvasSource || task.priority !== "none")}>
-            {hasNoteSource ? (
-              <span className="planner-task-source-icon is-note" title={language === "ru" ? "Связана с заметкой" : "Linked note"} />
-            ) : null}
-            {hasCanvasSource ? (
-              <span className="planner-task-source-icon is-canvas" title={language === "ru" ? "Связана с холстом" : "Linked canvas"} />
-            ) : null}
-            {task.priority !== "none" ? (
-              <span className={`planner-task-chip planner-priority-chip is-${task.priority}`}>
-                {getPlannerPriorityLabel(task.priority, language)}
-              </span>
-            ) : null}
-          </div>
+          {hasSourceBadges ? (
+            <div className="planner-task-badges" aria-hidden={!hasSourceBadges}>
+              {hasNoteSource ? (
+                <span className="planner-task-source-icon is-note" title={language === "ru" ? "Связана с заметкой" : "Linked note"} />
+              ) : null}
+              {hasCanvasSource ? (
+                <span className="planner-task-source-icon is-canvas" title={language === "ru" ? "Связана с холстом" : "Linked canvas"} />
+              ) : null}
+            </div>
+          ) : null}
         </div>
         {task.description ? <p className="planner-task-description">{task.description}</p> : null}
         <div className="planner-task-meta">
@@ -381,6 +396,11 @@ function TaskCard({
           ) : null}
           {recurring ? (
             <span className="planner-task-chip is-recurring-status">{language === "ru" ? "Повтор" : "Repeats"}</span>
+          ) : null}
+          {task.priority !== "none" ? (
+            <span className={`planner-task-chip planner-priority-chip is-${task.priority}`}>
+              {getPlannerPriorityLabel(task.priority, language)}
+            </span>
           ) : null}
           {projectName ? <span className="planner-task-chip is-project">{projectName}</span> : null}
           {visibleTagNames.map((tagName) => (
@@ -406,6 +426,9 @@ export default function PlannerSurface({
   tags,
   language,
   adaptiveLayout,
+  defaultSurface,
+  defaultCalendarView,
+  weekStartsOn,
   focusProjectId = null,
   onCreateTask,
   onUpdateTask,
@@ -433,7 +456,7 @@ export default function PlannerSurface({
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isHabitComposerOpen, setIsHabitComposerOpen] = useState(false);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(defaultSurface === "calendar");
   const [titleDraft, setTitleDraft] = useState("");
   const [projectDraft, setProjectDraft] = useState("");
   const [dateDraft, setDateDraft] = useState<PlannerTaskDateDraft>(() => getDefaultComposerDateDraft("today"));
@@ -1381,6 +1404,8 @@ export default function PlannerSurface({
           tags={tags}
           language={language}
           isMobile={isMobile}
+          defaultMode={defaultCalendarView}
+          weekStartsOn={weekStartsOn}
           selectedTaskId={selectedTaskId}
           onClose={() => setIsCalendarOpen(false)}
           onSelectTask={setSelectedTaskId}

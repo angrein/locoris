@@ -563,15 +563,10 @@
   border-color: color-mix(in srgb, var(--planner-calendar-accent) 46%, var(--planner-calendar-accent-2));
 }
 
-.planner-calendar-day-cell.is-selected-today header strong::after {
-  content: "";
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(4, 9, 18, 0.86);
+.planner-calendar-day-cell.is-selected-today header strong {
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--planner-calendar-accent-2) 22%, transparent),
+    inset 0 0 0 2px color-mix(in srgb, #ffffff 54%, transparent);
 }
 
 .planner-calendar-day-cell.is-outside-month {
@@ -654,6 +649,47 @@
   border-color: color-mix(in srgb, var(--planner-calendar-event-color, var(--planner-calendar-accent)) 62%, rgba(255, 255, 255, 0.16));
   box-shadow: 0 16px 36px color-mix(in srgb, var(--planner-calendar-event-color, var(--planner-calendar-accent)) 18%, transparent);
   touch-action: none;
+}
+
+.planner-calendar-drag-ghost {
+  position: fixed;
+  z-index: 100000;
+  left: var(--planner-calendar-ghost-x);
+  top: var(--planner-calendar-ghost-y);
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  max-width: min(340px, calc(100vw - 28px));
+  min-height: 46px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--planner-calendar-event-color, var(--planner-calendar-accent)) 56%, rgba(255, 255, 255, 0.2));
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--planner-calendar-event-color, var(--planner-calendar-accent)) 22%, transparent), transparent 58%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.046)),
+    color-mix(in srgb, #101827 82%, var(--planner-calendar-event-color, var(--planner-calendar-accent)) 10%);
+  color: rgba(247, 250, 255, 0.94);
+  box-shadow:
+    0 22px 54px rgba(0, 0, 0, 0.42),
+    0 0 42px color-mix(in srgb, var(--planner-calendar-event-color, var(--planner-calendar-accent)) 18%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  opacity: 0.9;
+  pointer-events: none;
+  transform: translate(14px, 12px) scale(0.985);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+.planner-calendar-drag-ghost .planner-calendar-event-copy strong {
+  -webkit-line-clamp: 1;
+}
+
+.planner-calendar-drag-ghost .planner-calendar-event-copy small {
+  color: rgba(225, 234, 247, 0.7);
+}
+
+.planner-calendar-drag-ghost.is-task {
+  border-style: dashed;
 }
 
 .planner-calendar-event.is-wide {

@@ -511,7 +511,19 @@ function buildDefaultAppSettings(language: AppLanguage, lastOpenedNoteId: string
     lastSyncAt: null,
     syncCursor: null,
     localDeviceId: createDeviceId(),
-    lastOpenedNoteId
+    lastOpenedNoteId,
+    plannerDefaultSurface: "planner",
+    plannerWeekStartsOn: "monday",
+    plannerDefaultCalendarView: "week"
+  };
+}
+
+function normalizeAppSettings(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    plannerDefaultSurface: settings.plannerDefaultSurface ?? "planner",
+    plannerWeekStartsOn: settings.plannerWeekStartsOn ?? "monday",
+    plannerDefaultCalendarView: settings.plannerDefaultCalendarView ?? "week"
   };
 }
 
@@ -521,7 +533,7 @@ function stripAppSettingsSecrets(settings: AppSettings | null | undefined): AppS
   }
 
   return {
-    ...settings,
+    ...normalizeAppSettings(settings),
     selfHostedToken: "",
     hostedSessionToken: "",
     hostedSyncToken: ""
@@ -1171,7 +1183,7 @@ export class ZenNotesDatabase extends Dexie {
           });
       });
 
-    this.version(16).stores({
+    const plannerSchema = {
       projects: "id,updatedAt",
       folders: "id,projectId,parentId,sortOrder,updatedAt",
       tags: "id,name,updatedAt",
@@ -1189,7 +1201,22 @@ export class ZenNotesDatabase extends Dexie {
       syncDirtyEntries: "key,entityType,entityId,updatedAt,deleted",
       syncShadows: "key,entityType,entityId",
       syncTombstones: "key,entityType,entityId,deletedAt"
-    });
+    };
+
+    this.version(16).stores(plannerSchema);
+
+    this.version(17)
+      .stores(plannerSchema)
+      .upgrade(async (transaction) => {
+        await transaction
+          .table("settings")
+          .toCollection()
+          .modify((settings) => {
+            settings.plannerDefaultSurface ??= "planner";
+            settings.plannerWeekStartsOn ??= "monday";
+            settings.plannerDefaultCalendarView ??= "week";
+          });
+      });
   }
 }
 

@@ -719,6 +719,45 @@ const en = {
     interfaceTemporalDisabledChip: "Clean map",
     interfaceTemporalDisabledDescription:
       "Tasks stay in Planner, and the orbital map shows only the knowledge structure.",
+    plannerTitle: "Planner",
+    plannerDescription: "Default entry, week start, and the calendar view used on open.",
+    plannerPanelCaption:
+      "Choose how Locoris opens Planner and how the calendar lays out weeks across every device.",
+    plannerKicker: "Time",
+    plannerHeroTitle: "Planner behavior",
+    plannerHeroDescription:
+      "These preferences belong to the current vault and keep desktop, web, and Android in the same rhythm.",
+    plannerDefaultSurfaceLabel: "When opening Planner",
+    plannerOpenPlannerTitle: "Planner",
+    plannerOpenPlannerChip: "Default",
+    plannerOpenPlannerDescription:
+      "Opens tasks, Inbox, habits, and review. Calendar remains one focused mode away.",
+    plannerOpenCalendarTitle: "Calendar",
+    plannerOpenCalendarChip: "Schedule",
+    plannerOpenCalendarDescription:
+      "Opens the calendar first when you mostly work through days, weeks, and scheduled blocks.",
+    plannerWeekStartsOnLabel: "First day of week",
+    plannerWeekMondayTitle: "Monday",
+    plannerWeekMondayChip: "ISO",
+    plannerWeekMondayDescription:
+      "Weeks start on Monday. This fits most work calendars and European/Russian defaults.",
+    plannerWeekSundayTitle: "Sunday",
+    plannerWeekSundayChip: "US",
+    plannerWeekSundayDescription:
+      "Weeks start on Sunday. Useful when your external calendar habits follow that layout.",
+    plannerDefaultCalendarViewLabel: "Default calendar view",
+    plannerCalendarViewDayTitle: "Day",
+    plannerCalendarViewDayChip: "Focus",
+    plannerCalendarViewDayDescription:
+      "Opens one day with agenda, time slots, and quick planning.",
+    plannerCalendarViewWeekTitle: "Week",
+    plannerCalendarViewWeekChip: "Balanced",
+    plannerCalendarViewWeekDescription:
+      "Shows the week and tasks by day. A strong default for planning work.",
+    plannerCalendarViewMonthTitle: "Month",
+    plannerCalendarViewMonthChip: "Overview",
+    plannerCalendarViewMonthDescription:
+      "Opens the bigger monthly picture, deadlines, and task density by date.",
     aiTitle: "AI integration",
     aiDescription: "Connect Gemini API for note rewriting, translation, and formatting.",
     aiPanelCaption:

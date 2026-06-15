@@ -305,6 +305,10 @@ export interface TimeBlock {
   updatedAt: number;
 }
 
+export type PlannerDefaultSurface = "planner" | "calendar";
+export type PlannerWeekStartsOn = "monday" | "sunday";
+export type PlannerCalendarDefaultView = "day" | "week" | "month";
+
 export interface AppSettings {
   id: "app";
   language: AppLanguage;
@@ -334,6 +338,9 @@ export interface AppSettings {
   syncCursor: string | null;
   localDeviceId: string;
   lastOpenedNoteId: string | null;
+  plannerDefaultSurface: PlannerDefaultSurface;
+  plannerWeekStartsOn: PlannerWeekStartsOn;
+  plannerDefaultCalendarView: PlannerCalendarDefaultView;
 }
 
 export interface VaultEncryptionSummary {

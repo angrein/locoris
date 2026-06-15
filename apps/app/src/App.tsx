@@ -2059,6 +2059,17 @@ export default function App() {
     });
   };
 
+  const handleChangePlannerSettings = async (
+    patch: Partial<
+      Pick<
+        AppSettings,
+        "plannerDefaultSurface" | "plannerWeekStartsOn" | "plannerDefaultCalendarView"
+      >
+    >
+  ) => {
+    await patchSettings(patch);
+  };
+
   const handleChangeAccentTheme = (themeId: AppAccentThemeId) => {
     const nextThemeId = resolveAppAccentThemeId(themeId);
     writeStoredAppAccentThemeId(nextThemeId);
@@ -3536,11 +3547,14 @@ export default function App() {
 	            projects={projects}
 	            folders={folders}
 	            notes={notes}
-	            tags={tags}
-	            language={settings.language}
-	            adaptiveLayout={adaptiveLayout}
-	            focusProjectId={plannerProjectFocusId}
-	            onCreateTask={handleCreatePlannerTask}
+		            tags={tags}
+		            language={settings.language}
+		            adaptiveLayout={adaptiveLayout}
+		            defaultSurface={settings.plannerDefaultSurface ?? "planner"}
+		            defaultCalendarView={settings.plannerDefaultCalendarView ?? "week"}
+		            weekStartsOn={settings.plannerWeekStartsOn ?? "monday"}
+		            focusProjectId={plannerProjectFocusId}
+		            onCreateTask={handleCreatePlannerTask}
 	            onUpdateTask={handleUpdatePlannerTask}
 	            onToggleTaskDone={handleTogglePlannerTaskDone}
 	            onDeleteTask={handleDeletePlannerTask}
@@ -3596,9 +3610,10 @@ export default function App() {
             vaultEncryptionById={vaultEncryptionById}
             syncFeedback={syncFeedback}
             onAccentThemeChange={handleChangeAccentTheme}
-            onOrbitalAnimationModeChange={handleChangeOrbitalAnimationMode}
-            onOrbitalTemporalSignalsModeChange={handleChangeOrbitalTemporalSignalsMode}
-            onLanguageChange={(language) => void handleChangeLanguage(language)}
+	            onOrbitalAnimationModeChange={handleChangeOrbitalAnimationMode}
+	            onOrbitalTemporalSignalsModeChange={handleChangeOrbitalTemporalSignalsMode}
+	            onPlannerSettingsChange={(patch) => void handleChangePlannerSettings(patch)}
+	            onLanguageChange={(language) => void handleChangeLanguage(language)}
             onSelectLocalVault={(localVaultId) => setSelectedSyncVaultId(localVaultId)}
             onCreateLocalVault={(input) => handleCreateLocalVault(input)}
             onRenameLocalVault={(localVaultId, name) =>

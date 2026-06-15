@@ -721,6 +721,45 @@ const ru = {
     interfaceTemporalDisabledChip: "Чистая карта",
     interfaceTemporalDisabledDescription:
       "Все задачи остаются в Planner, а орбитальная карта показывает только структуру знаний.",
+    plannerTitle: "Планер",
+    plannerDescription: "Стартовый экран, первый день недели и вид календаря по умолчанию.",
+    plannerPanelCaption:
+      "Настрой, как Locoris открывает Planner и как календарь раскладывает недели на всех устройствах.",
+    plannerKicker: "Время",
+    plannerHeroTitle: "Поведение планера",
+    plannerHeroDescription:
+      "Эти настройки применяются к текущему хранилищу и сохраняют единый ритм между desktop, web и Android.",
+    plannerDefaultSurfaceLabel: "При открытии планера",
+    plannerOpenPlannerTitle: "Планер",
+    plannerOpenPlannerChip: "По умолчанию",
+    plannerOpenPlannerDescription:
+      "Открывает список задач, Inbox, привычки и review. Календарь остается отдельным режимом.",
+    plannerOpenCalendarTitle: "Календарь",
+    plannerOpenCalendarChip: "Расписание",
+    plannerOpenCalendarDescription:
+      "Сразу показывает календарь, если ты чаще работаешь через дни, недели и расписание.",
+    plannerWeekStartsOnLabel: "Первый день недели",
+    plannerWeekMondayTitle: "Понедельник",
+    plannerWeekMondayChip: "ISO",
+    plannerWeekMondayDescription:
+      "Неделя начинается с понедельника. Это стандарт для России и большинства рабочих календарей.",
+    plannerWeekSundayTitle: "Воскресенье",
+    plannerWeekSundayChip: "US",
+    plannerWeekSundayDescription:
+      "Неделя начинается с воскресенья. Удобно, если так настроены внешние календарные привычки.",
+    plannerDefaultCalendarViewLabel: "Вид календаря по умолчанию",
+    plannerCalendarViewDayTitle: "День",
+    plannerCalendarViewDayChip: "Фокус",
+    plannerCalendarViewDayDescription:
+      "Открывает один день с повесткой, слотами времени и быстрым планированием.",
+    plannerCalendarViewWeekTitle: "Неделя",
+    plannerCalendarViewWeekChip: "Баланс",
+    plannerCalendarViewWeekDescription:
+      "Показывает рабочую неделю и задачи по дням. Хороший универсальный режим.",
+    plannerCalendarViewMonthTitle: "Месяц",
+    plannerCalendarViewMonthChip: "Обзор",
+    plannerCalendarViewMonthDescription:
+      "Открывает крупную картину месяца, дедлайны и плотность задач по датам.",
     aiTitle: "AI-интеграция",
     aiDescription: "Подключи Gemini API для улучшения, перевода и форматирования заметок.",
     aiPanelCaption:

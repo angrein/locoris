@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 
-import type { AppLanguage, Habit, HabitLog, Note, PlannerTaskPriority, Project, Tag, Task, TimeBlock } from "../../types";
+import type {
+  AppLanguage,
+  Habit,
+  HabitLog,
+  Note,
+  PlannerCalendarDefaultView,
+  PlannerTaskPriority,
+  PlannerWeekStartsOn,
+  Project,
+  Tag,
+  Task,
+  TimeBlock
+} from "../../types";
 import {
   formatPlannerDate,
   formatPlannerTime,
@@ -34,7 +46,7 @@ import TagInputField from "../TagInputField";
 import PlannerUndoSnackbar, { type PlannerUndoSnackbarAction } from "./PlannerUndoSnackbar";
 import "./PlannerCalendarSurface.css";
 
-type CalendarMode = "day" | "week" | "month";
+type CalendarMode = PlannerCalendarDefaultView;
 type CalendarEventVariant = "compact" | "wide" | "month";
 type MobileCalendarPanel = "agenda" | "unscheduled" | null;
 type CalendarFilterId = "tasks" | "habits" | "futureHabits" | "completed";
@@ -51,6 +63,8 @@ interface PlannerCalendarSurfaceProps {
   tags: Tag[];
   language: AppLanguage;
   isMobile: boolean;
+  defaultMode: PlannerCalendarDefaultView;
+  weekStartsOn: PlannerWeekStartsOn;
   selectedTaskId: string | null;
   onClose: () => void;
   onSelectTask: (taskId: string) => void;
@@ -143,11 +157,22 @@ type CalendarResizePreview = {
   startAt: number;
   endAt: number;
 };
+type CalendarDragGhost = {
+  id: string;
+  kind: "event" | "task";
+  title: string;
+  subtitle: string;
+  color: string;
+  x: number;
+  y: number;
+  width: number;
+};
 type CalendarEventPointerDragState = {
   eventId: string;
   pointerId: number;
   startX: number;
   startY: number;
+  ghostWidth: number;
   dragging: boolean;
   isTouch: boolean;
   armed: boolean;
@@ -186,11 +211,11 @@ function addMonths(value: number, months: number) {
   return date.getTime();
 }
 
-function startOfWeek(value: number) {
+function startOfWeek(value: number, weekStartsOn: PlannerWeekStartsOn) {
   const date = new Date(getStartOfLocalDay(value));
   const day = date.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + mondayOffset);
+  const offset = weekStartsOn === "monday" ? (day === 0 ? -6 : 1 - day) : -day;
+  date.setDate(date.getDate() + offset);
   return date.getTime();
 }
 
@@ -453,7 +478,12 @@ function getEventInspectorStyle(anchor: CalendarEventInspectorState["anchor"], i
   };
 }
 
-function getRangeTitle(cursorAt: number, mode: CalendarMode, language: AppLanguage) {
+function getRangeTitle(
+  cursorAt: number,
+  mode: CalendarMode,
+  language: AppLanguage,
+  weekStartsOn: PlannerWeekStartsOn
+) {
   const locale = language === "ru" ? "ru-RU" : "en-US";
 
   if (mode === "day") {
@@ -466,7 +496,7 @@ function getRangeTitle(cursorAt: number, mode: CalendarMode, language: AppLangua
   }
 
   if (mode === "week") {
-    const weekStart = startOfWeek(cursorAt);
+    const weekStart = startOfWeek(cursorAt, weekStartsOn);
     const weekEnd = addDays(weekStart, 6);
     const formatter = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
     return `${formatter.format(weekStart)} - ${formatter.format(weekEnd)}`;
@@ -482,6 +512,10 @@ function getEventProjectColor(occurrence: PlannerTaskOccurrence, projectMap: Map
   return occurrence.task.projectId
     ? projectMap.get(occurrence.task.projectId)?.color ?? PLANNER_INBOX_EVENT_COLOR
     : PLANNER_INBOX_EVENT_COLOR;
+}
+
+function getTaskProjectColor(task: Task, projectMap: Map<string, Project>) {
+  return task.projectId ? projectMap.get(task.projectId)?.color ?? PLANNER_INBOX_EVENT_COLOR : PLANNER_INBOX_EVENT_COLOR;
 }
 
 function doRangesOverlap(leftStartAt: number, leftEndAt: number, rightStartAt: number, rightEndAt: number) {
@@ -721,6 +755,8 @@ export default function PlannerCalendarSurface({
   tags,
   language,
   isMobile,
+  defaultMode,
+  weekStartsOn,
   selectedTaskId,
   onClose,
   onSelectTask,
@@ -735,7 +771,7 @@ export default function PlannerCalendarSurface({
   onUpdateTimeBlock,
   onDeleteTimeBlock
 }: PlannerCalendarSurfaceProps) {
-  const [mode, setMode] = useState<CalendarMode>(isMobile ? "day" : "week");
+  const [mode, setMode] = useState<CalendarMode>(defaultMode);
   const [cursorAt, setCursorAt] = useState(getStartOfLocalDay());
   const [selectedDayAt, setSelectedDayAt] = useState(getStartOfLocalDay());
   const [selectedSlotHour, setSelectedSlotHour] = useState<number | null>(null);
@@ -755,6 +791,7 @@ export default function PlannerCalendarSurface({
   const [manualDragTaskId, setManualDragTaskId] = useState<string | null>(null);
   const [manualEventDragId, setManualEventDragId] = useState<string | null>(null);
   const [manualEventDropKey, setManualEventDropKey] = useState<string | null>(null);
+  const [dragGhost, setDragGhost] = useState<CalendarDragGhost | null>(null);
   const undoTimerRef = useRef<number | null>(null);
   const scrollFocusTimerRef = useRef<number | null>(null);
   const calendarBoardRef = useRef<HTMLElement | null>(null);
@@ -767,6 +804,7 @@ export default function PlannerCalendarSurface({
     pointerId: number;
     startX: number;
     startY: number;
+    ghostWidth: number;
     dragging: boolean;
     isTouch: boolean;
     armed: boolean;
@@ -789,7 +827,7 @@ export default function PlannerCalendarSurface({
     }
 
     if (mode === "week") {
-      const startAt = startOfWeek(cursorAt);
+      const startAt = startOfWeek(cursorAt, weekStartsOn);
       return {
         startAt,
         endAt: addDays(startAt, 7),
@@ -803,7 +841,7 @@ export default function PlannerCalendarSurface({
       endAt: getEndOfLocalDay(cursorAt),
       days: getCalendarDays(startAt, 1, language)
     };
-  }, [cursorAt, language, mode]);
+  }, [cursorAt, language, mode, weekStartsOn]);
   const visibleTimeBlocks = useMemo(
     () => getPlannerTimeBlocksForRange(timeBlocks, range.startAt, range.endAt),
     [range.endAt, range.startAt, timeBlocks]
@@ -1196,6 +1234,8 @@ export default function PlannerCalendarSurface({
     }
 
     const target = eventObject.currentTarget;
+    const targetRect = target.getBoundingClientRect();
+    const ghostWidth = Math.min(Math.max(targetRect.width, 180), 340);
     const longPressTimer =
       isTouchPointer && typeof window !== "undefined"
         ? window.setTimeout(() => {
@@ -1210,6 +1250,16 @@ export default function PlannerCalendarSurface({
             currentDragState.longPressTimer = null;
             setManualEventDragId(currentDragState.eventId);
             setManualEventDropKey(null);
+            setDragGhost({
+              id: currentDragState.eventId,
+              kind: "event",
+              title: calendarEvent.title,
+              subtitle: getCalendarEventSubtitle(calendarEvent, language),
+              color: calendarEvent.color,
+              x: currentDragState.startX,
+              y: currentDragState.startY,
+              width: currentDragState.ghostWidth
+            });
             setEventInspector(null);
             target.setPointerCapture?.(eventObject.pointerId);
           }, TOUCH_LONG_PRESS_DRAG_MS)
@@ -1220,6 +1270,7 @@ export default function PlannerCalendarSurface({
       pointerId: eventObject.pointerId,
       startX: eventObject.clientX,
       startY: eventObject.clientY,
+      ghostWidth,
       dragging: false,
       isTouch: isTouchPointer,
       armed: !isTouchPointer,
@@ -1246,6 +1297,7 @@ export default function PlannerCalendarSurface({
           window.clearTimeout(dragState.longPressTimer);
         }
         eventPointerDragRef.current = null;
+        setDragGhost(null);
       }
 
       return;
@@ -1259,9 +1311,26 @@ export default function PlannerCalendarSurface({
       dragState.dragging = true;
       setManualEventDragId(dragState.eventId);
       setManualEventDropKey(null);
+      const calendarEvent = events.find((candidate) => candidate.id === dragState.eventId);
+
+      if (calendarEvent) {
+        setDragGhost({
+          id: dragState.eventId,
+          kind: "event",
+          title: calendarEvent.title,
+          subtitle: getCalendarEventSubtitle(calendarEvent, language),
+          color: calendarEvent.color,
+          x: eventObject.clientX,
+          y: eventObject.clientY,
+          width: dragState.ghostWidth
+        });
+      }
       setEventInspector(null);
     }
 
+    setDragGhost((current) =>
+      current?.id === dragState.eventId ? { ...current, x: eventObject.clientX, y: eventObject.clientY } : current
+    );
     const dropInfo = getCalendarDropInfoFromPoint(eventObject.clientX, eventObject.clientY);
     setManualEventDropKey(dropInfo ? getCalendarDropKey(dropInfo.dayStartAt, dropInfo.hour) : null);
     eventObject.preventDefault();
@@ -1278,6 +1347,7 @@ export default function PlannerCalendarSurface({
     eventPointerDragRef.current = null;
     setManualEventDragId(null);
     setManualEventDropKey(null);
+    setDragGhost(null);
 
     if (dragState.longPressTimer !== null) {
       window.clearTimeout(dragState.longPressTimer);
@@ -1320,6 +1390,7 @@ export default function PlannerCalendarSurface({
     eventPointerDragRef.current = null;
     setManualEventDragId(null);
     setManualEventDropKey(null);
+    setDragGhost(null);
 
     if (dragState.longPressTimer !== null) {
       window.clearTimeout(dragState.longPressTimer);
@@ -1416,7 +1487,15 @@ export default function PlannerCalendarSurface({
       return;
     }
 
+    const task = tasks.find((candidate) => candidate.id === taskId);
+
+    if (!task) {
+      return;
+    }
+
     const currentTarget = event.currentTarget;
+    const targetRect = currentTarget.getBoundingClientRect();
+    const ghostWidth = Math.min(Math.max(targetRect.width, 180), 320);
     const longPressTimer =
       isTouchPointer && typeof window !== "undefined"
         ? window.setTimeout(() => {
@@ -1430,6 +1509,16 @@ export default function PlannerCalendarSurface({
             dragState.dragging = true;
             setManualDragTaskId(taskId);
             setManualEventDropKey(null);
+            setDragGhost({
+              id: taskId,
+              kind: "task",
+              title: task.title,
+              subtitle: language === "ru" ? "без даты" : "no date",
+              color: getTaskProjectColor(task, projectMap),
+              x: dragState.startX,
+              y: dragState.startY,
+              width: dragState.ghostWidth
+            });
             currentTarget.setPointerCapture?.(event.pointerId);
           }, TOUCH_LONG_PRESS_DRAG_MS)
         : null;
@@ -1439,6 +1528,7 @@ export default function PlannerCalendarSurface({
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
+      ghostWidth,
       dragging: false,
       isTouch: isTouchPointer,
       armed: !isTouchPointer,
@@ -1467,6 +1557,7 @@ export default function PlannerCalendarSurface({
 
         manualDragRef.current = null;
         setManualDragTaskId(null);
+        setDragGhost(null);
       }
 
       return;
@@ -1479,8 +1570,25 @@ export default function PlannerCalendarSurface({
     if (!dragState.dragging) {
       dragState.dragging = true;
       setManualDragTaskId(dragState.taskId);
+      const task = tasks.find((candidate) => candidate.id === dragState.taskId);
+
+      if (task) {
+        setDragGhost({
+          id: dragState.taskId,
+          kind: "task",
+          title: task.title,
+          subtitle: language === "ru" ? "без даты" : "no date",
+          color: getTaskProjectColor(task, projectMap),
+          x: event.clientX,
+          y: event.clientY,
+          width: dragState.ghostWidth
+        });
+      }
     }
 
+    setDragGhost((current) =>
+      current?.id === dragState.taskId ? { ...current, x: event.clientX, y: event.clientY } : current
+    );
     const dropInfo = getCalendarDropInfoFromPoint(event.clientX, event.clientY);
     setManualEventDropKey(dropInfo ? getCalendarDropKey(dropInfo.dayStartAt, dropInfo.hour) : null);
     event.preventDefault();
@@ -1497,6 +1605,7 @@ export default function PlannerCalendarSurface({
     manualDragRef.current = null;
     setManualDragTaskId(null);
     setManualEventDropKey(null);
+    setDragGhost(null);
 
     if (dragState.longPressTimer !== null) {
       window.clearTimeout(dragState.longPressTimer);
@@ -1543,6 +1652,7 @@ export default function PlannerCalendarSurface({
     manualDragRef.current = null;
     setManualDragTaskId(null);
     setManualEventDropKey(null);
+    setDragGhost(null);
 
     if (dragState.longPressTimer !== null) {
       window.clearTimeout(dragState.longPressTimer);
@@ -3353,16 +3463,36 @@ export default function PlannerCalendarSurface({
   const calendarSurface = (
     <section
       className={`planner-calendar-layer ${isMobile ? "is-mobile" : "is-desktop"} ${
-        manualEventDragId ? "is-event-dragging" : ""
+        manualEventDragId || manualDragTaskId ? "is-event-dragging" : ""
       }`}
       role="dialog"
       aria-modal="true"
     >
+      {dragGhost ? (
+        <div
+          className={`planner-calendar-drag-ghost is-${dragGhost.kind}`}
+          style={
+            {
+              "--planner-calendar-event-color": dragGhost.color,
+              "--planner-calendar-ghost-x": `${dragGhost.x}px`,
+              "--planner-calendar-ghost-y": `${dragGhost.y}px`,
+              width: `${dragGhost.width}px`
+            } as CSSProperties
+          }
+          aria-hidden="true"
+        >
+          <span className="planner-calendar-event-dot" />
+          <span className="planner-calendar-event-copy">
+            <strong>{dragGhost.title}</strong>
+            <small>{dragGhost.subtitle}</small>
+          </span>
+        </div>
+      ) : null}
       <div className="planner-calendar-shell">
         <header className="planner-calendar-head">
           <div className="planner-calendar-title">
             <span className="planner-kicker">{language === "ru" ? "Календарь" : "Calendar"}</span>
-            <h2>{getRangeTitle(cursorAt, mode, language)}</h2>
+            <h2>{getRangeTitle(cursorAt, mode, language, weekStartsOn)}</h2>
             <p>
               {language === "ru"
                 ? "Планируй задачи как блоки времени: сроки остаются сроками, расписание становится видимым."
