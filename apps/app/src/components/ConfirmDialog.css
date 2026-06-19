@@ -1,6 +1,7 @@
 .confirm-dialog-layer {
   --confirm-dialog-accent: var(--accent-theme-primary, var(--gold));
-  --confirm-dialog-danger: var(--red, #ff678c);
+  --confirm-dialog-accent-secondary: var(--accent-theme-secondary, var(--cyan));
+  --confirm-dialog-danger: color-mix(in srgb, var(--red, #ff678c) 78%, var(--confirm-dialog-accent) 22%);
   --confirm-dialog-signal: var(--confirm-dialog-danger);
   position: fixed;
   inset: 0;
@@ -57,7 +58,7 @@
 .confirm-dialog-window {
   position: relative;
   z-index: 1;
-  width: min(524px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - 32px));
   min-width: 0;
   display: grid;
   gap: 16px;
@@ -67,6 +68,7 @@
   border-radius: 24px;
   background:
     radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--confirm-dialog-accent) 14%, transparent), transparent 36%),
+    radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--confirm-dialog-accent-secondary) 9%, transparent), transparent 34%),
     radial-gradient(circle at 100% 18%, color-mix(in srgb, var(--confirm-dialog-signal) 10%, transparent), transparent 34%),
     linear-gradient(135deg, color-mix(in srgb, var(--confirm-dialog-accent) 8%, transparent), transparent 48%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.014)),
@@ -179,15 +181,13 @@
 .confirm-dialog-kicker {
   min-width: 0;
   margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: color-mix(in srgb, var(--confirm-dialog-accent) 42%, rgba(207, 215, 244, 0.75));
   font-size: 0.62rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.13em;
   text-transform: uppercase;
+  overflow-wrap: anywhere;
 }
 
 .confirm-dialog-title {
@@ -237,6 +237,7 @@
   color: rgba(232, 237, 255, 0.84);
   font-size: 0.76rem;
   line-height: 1.36;
+  overflow-wrap: anywhere;
 }
 
 .confirm-dialog-detail::before {
@@ -250,9 +251,9 @@
 }
 
 .confirm-dialog-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  justify-content: stretch;
   gap: 8px;
   margin-left: 57px;
   padding-top: 2px;
@@ -272,8 +273,9 @@
   font: inherit;
   font-size: 0.78rem;
   font-weight: 740;
-  line-height: 1;
-  white-space: nowrap;
+  line-height: 1.18;
+  text-align: center;
+  overflow-wrap: anywhere;
   cursor: pointer;
   transition:
     transform 160ms ease,

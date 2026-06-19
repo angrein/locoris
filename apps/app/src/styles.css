@@ -4215,11 +4215,14 @@ button {
 }
 
 .orbital-modal-window.orbital-utility-modal-window.is-trash-mode {
-  --utility-modal-accent: var(--crimson);
-  width: min(880px, calc(100vw - 48px));
+  --utility-modal-accent: var(--accent-theme-primary, var(--gold));
+  width: min(1040px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
+  height: min(760px, calc(100dvh - 48px));
 }
 
-.orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-shell) {
+.orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-shell),
+.orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-panel-shell) {
   width: min(1240px, calc(100vw - 40px));
 }
 
@@ -4518,13 +4521,19 @@ button {
 }
 
 .orbital-utility-modal-content:has(.sync-settings-shell),
-.orbital-utility-modal-content:has(.settings-panel-shell) {
+.orbital-utility-modal-content:has(.sync-settings-panel-shell),
+.orbital-utility-modal-content:has(.settings-panel-shell),
+.orbital-utility-modal-content:has(.trash-recovery-shell) {
   padding-top: 0;
 }
 
 .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-shell)
   .orbital-utility-modal-close,
+.orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-panel-shell)
+  .orbital-utility-modal-close,
 .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.settings-panel-shell)
+  .orbital-utility-modal-close,
+.orbital-modal-window.orbital-utility-modal-window.is-trash-mode:has(.trash-recovery-shell)
   .orbital-utility-modal-close {
   display: none;
 }
@@ -4592,11 +4601,18 @@ button {
     width: min(940px, calc(100vw - 32px));
   }
 
+  .orbital-modal-window.orbital-utility-modal-window.is-trash-mode {
+    width: min(980px, calc(100vw - 32px));
+    height: min(760px, calc(100vh - 32px));
+    height: min(760px, calc(100dvh - 32px));
+  }
+
   .orbital-modal-window.orbital-utility-modal-window.is-settings-mode {
     width: min(820px, calc(100vw - 32px));
   }
 
-  .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-shell) {
+  .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-shell),
+  .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-panel-shell) {
     width: min(1140px, calc(100vw - 28px));
   }
 }
@@ -4724,6 +4740,8 @@ button {
 
   .orbital-modal-window.orbital-utility-modal-window {
     width: 100%;
+    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
     max-height: calc(100vh - 24px);
     padding-top: 0;
     border-radius: 24px;

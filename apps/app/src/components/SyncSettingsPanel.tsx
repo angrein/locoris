@@ -42,6 +42,11 @@ import type {
   VaultEncryptionSummary
 } from "../types";
 import ConfirmDialog from "./ConfirmDialog";
+import {
+  SyncSettingsDialog,
+  SyncSettingsLayout,
+  type SyncSettingsOverviewItem
+} from "./sync/SyncSettingsLayout";
 import "./SyncSettingsPanel.css";
 
 type SyncFeedbackState = {
@@ -2307,41 +2312,58 @@ export default function SyncSettingsPanel({
       .map((binding) => sortedVaults.find((vault) => vault.id === binding.localVaultId)?.name ?? binding.localVaultId)
       .slice(0, 3);
 
+  const selectedVaultOverviewCaption = selectedVaultBinding
+    ? `${selectedVaultBinding.remoteVaultName} · ${formatTime(selectedVaultBinding.lastSyncAt, i18n.language)}`
+    : t("sync.localVaultUnbound");
+  const overviewItems: SyncSettingsOverviewItem[] = [
+    {
+      id: "vaults",
+      tone: "vaults",
+      icon: <VaultGlyph />,
+      label: t("settings.vaultsTitle"),
+      value: sortedVaults.length,
+      caption: t("settings.vaultsDescription")
+    },
+    {
+      id: "connections",
+      tone: "connections",
+      icon: <LinkGlyph />,
+      label: t("settings.connectionsTitle"),
+      value: syncConnections.length,
+      caption: t("settings.linkedVaultCount", { count: syncBindings.length })
+    },
+    {
+      id: "selected",
+      tone: selectedVaultConnection ? "status" : "selected",
+      icon: selectedVaultConnection ? (
+        <SyncConnectionIcon provider={selectedVaultConnection.provider} />
+      ) : (
+        <VaultGlyph />
+      ),
+      label: selectedVaultConnection
+        ? t("settings.boundToConnection", { connection: selectedVaultConnection.label })
+        : t("sync.localVault"),
+      value: selectedVault ? getVaultLabel(selectedVault) : t("sync.localVault"),
+      caption: selectedVaultOverviewCaption
+    }
+  ];
+
   return (
-    <section className="sync-settings-shell">
-      <div className="sync-settings-controls">
-        <button
-          type="button"
-          className="sync-settings-back"
-          onClick={onBack}
-          aria-label={t("settings.back")}
-          title={t("settings.back")}
-        >
-          <span className="sync-settings-back-icon" aria-hidden="true">
-            <ChevronLeftGlyph />
-          </span>
-        </button>
-        <div className="sync-settings-controls-spacer" />
-        <button
-          type="button"
-          className="sync-settings-close"
-          onClick={onClose}
-          aria-label={t("orbit.closeModal")}
-          title={t("orbit.closeModal")}
-        >
-          <span className="sync-settings-close-icon" aria-hidden="true">×</span>
-        </button>
-      </div>
-
-      <header className="sync-settings-header">
-        <div className="sync-settings-heading">
-          <h2 className="panel-title sync-settings-title">{t("settings.syncTitle")}</h2>
-          <p className="sync-settings-caption">{t("settings.syncManagerIntro")}</p>
-        </div>
-      </header>
-
-      <div className="sync-settings-columns-shell" ref={stageRef}>
-        <svg className="sync-settings-links" aria-hidden="true">
+    <>
+      <SyncSettingsLayout
+        title={t("settings.syncTitle")}
+        kicker={online ? t("sync.statusReady") : t("settings.connectionOffline")}
+        caption={t("settings.syncManagerIntro")}
+        backLabel={t("settings.back")}
+        closeLabel={t("orbit.closeModal")}
+        backIcon={<ChevronLeftGlyph />}
+        closeIcon={<CloseGlyph />}
+        overviewItems={overviewItems}
+        stageRef={stageRef}
+        onBack={onBack}
+        onClose={onClose}
+        wires={
+          <svg className="sync-settings-links" aria-hidden="true">
           {linkMetrics.map((metric) => (
             <g key={metric.id}>
               <path
@@ -2388,8 +2410,42 @@ export default function SyncSettingsPanel({
               );
             })()
           ) : null}
-        </svg>
-
+          </svg>
+        }
+        bindingHint={
+          pendingBindVaultId ? (
+            <div className="sync-settings-binding-hint">
+              <div className="sync-settings-binding-copy">
+                <strong>{t("settings.bindingHintTitle")}</strong>
+                <span>
+                  {t("settings.bindingHintDescription", {
+                    vault:
+                      sortedVaults.find((vault) => vault.id === pendingBindVaultId)?.name ??
+                      t("sync.localVault")
+                  })}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="sync-settings-inline-action"
+                onClick={() => {
+                  setPendingBindVaultId(null);
+                  setDraftLink(null);
+                }}
+              >
+                {t("filters.clear")}
+              </button>
+            </div>
+          ) : undefined
+        }
+        feedback={
+          feedback ? (
+            <div className={`sync-settings-feedback ${feedback.tone === "error" ? "is-error" : "is-success"}`}>
+              <span>{feedback.text}</span>
+            </div>
+          ) : undefined
+        }
+      >
         <div className="sync-settings-columns">
           <section className="sync-settings-column is-vaults">
               <div className="sync-settings-column-head">
@@ -3040,85 +3096,50 @@ export default function SyncSettingsPanel({
             </div>
           </section>
         </div>
-      </div>
+      </SyncSettingsLayout>
 
-      {pendingBindVaultId ? (
-        <div className="sync-settings-binding-hint">
-          <div className="sync-settings-binding-copy">
-            <strong>{t("settings.bindingHintTitle")}</strong>
-            <span>
-              {t("settings.bindingHintDescription", {
-                vault:
-                  sortedVaults.find((vault) => vault.id === pendingBindVaultId)?.name ??
-                  t("sync.localVault")
-              })}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="sync-settings-inline-action"
-            onClick={() => {
-              setPendingBindVaultId(null);
-              setDraftLink(null);
-            }}
-          >
-            {t("filters.clear")}
-          </button>
-        </div>
-      ) : null}
-
-      {feedback ? (
-        <div className={`sync-settings-feedback ${feedback.tone === "error" ? "is-error" : "is-success"}`}>
-          <span>{feedback.text}</span>
-        </div>
-      ) : null}
-
-      {panelModal ? (
-        <div className="sync-settings-modal-layer" role="dialog" aria-modal="true">
-          <button className="sync-settings-modal-dim" aria-label={t("orbit.closeModal")} onClick={closeModal} />
-          <div className="sync-settings-modal-card">
-            <div className="sync-settings-modal-head">
-              <div className="sync-settings-modal-heading">
-                <p className="panel-kicker">
-                  {panelModal.kind === "createVault"
-                    ? t("sync.localVaultCreate")
-                    : panelModal.kind === "renameVault"
-                      ? t("sync.localVaultRename")
-                      : panelModal.kind === "vaultEncryption"
-                        ? t("settings.vaultEncryptionKicker")
-                        : panelModal.kind === "addConnection"
-                          ? t("settings.addConnection")
-                          : panelModal.kind === "addGoogleDrive"
-                            ? t("sync.googleDrive")
-                            : panelModal.kind === "addHosted"
-                              ? t("sync.hosted")
-                              : t("sync.selfHosted")}
-                </p>
-                <h3>
-                  {panelModal.kind === "createVault"
-                    ? t("settings.createVaultTitle")
-                    : panelModal.kind === "renameVault"
-                      ? t("settings.renameVaultTitle")
-                      : panelModal.kind === "vaultEncryption"
-                        ? t("settings.vaultEncryptionTitle", {
-                            vault: getVaultLabel(panelModal.vault)
-                          })
-                        : panelModal.kind === "addConnection"
-                          ? t("settings.connectionCatalogTitle")
-                        : panelModal.kind === "addGoogleDrive"
-                          ? t("settings.googleDriveConnectionTitle")
-                          : panelModal.kind === "addHosted"
-                            ? t("settings.hostedConnectionTitle")
-                              : selfHostedEditingConnection
-                                ? t("settings.selfHostedReconnectTitle")
-                                : t("settings.selfHostedConnectionTitle")}
-                </h3>
-              </div>
-              <button type="button" className="sync-settings-icon-button" onClick={closeModal} title={t("orbit.closeModal")}>
-                <CloseGlyph />
-              </button>
-            </div>
-
+      <SyncSettingsDialog
+        open={Boolean(panelModal)}
+        closeLabel={t("orbit.closeModal")}
+        closeIcon={<CloseGlyph />}
+        onClose={closeModal}
+        kicker={
+          panelModal?.kind === "createVault"
+            ? t("sync.localVaultCreate")
+            : panelModal?.kind === "renameVault"
+              ? t("sync.localVaultRename")
+              : panelModal?.kind === "vaultEncryption"
+                ? t("settings.vaultEncryptionKicker")
+                : panelModal?.kind === "addConnection"
+                  ? t("settings.addConnection")
+                  : panelModal?.kind === "addGoogleDrive"
+                    ? t("sync.googleDrive")
+                    : panelModal?.kind === "addHosted"
+                      ? t("sync.hosted")
+                      : t("sync.selfHosted")
+        }
+        title={
+          panelModal?.kind === "createVault"
+            ? t("settings.createVaultTitle")
+            : panelModal?.kind === "renameVault"
+              ? t("settings.renameVaultTitle")
+              : panelModal?.kind === "vaultEncryption"
+                ? t("settings.vaultEncryptionTitle", {
+                    vault: getVaultLabel(panelModal.vault)
+                  })
+                : panelModal?.kind === "addConnection"
+                  ? t("settings.connectionCatalogTitle")
+                  : panelModal?.kind === "addGoogleDrive"
+                    ? t("settings.googleDriveConnectionTitle")
+                    : panelModal?.kind === "addHosted"
+                      ? t("settings.hostedConnectionTitle")
+                      : selfHostedEditingConnection
+                        ? t("settings.selfHostedReconnectTitle")
+                        : t("settings.selfHostedConnectionTitle")
+        }
+      >
+        {panelModal ? (
+          <>
             {panelModal.kind === "createVault" || panelModal.kind === "renameVault" ? (
               <div className="sync-settings-modal-body">
                 <p className="sync-settings-modal-copy">
@@ -3730,9 +3751,9 @@ export default function SyncSettingsPanel({
                 </div>
               </div>
             ) : null}
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </SyncSettingsDialog>
 
       <ConfirmDialog
         open={Boolean(confirmState)}
@@ -3749,6 +3770,6 @@ export default function SyncSettingsPanel({
         onSecondary={() => void confirmState?.secondaryAction?.()}
         onConfirm={() => void confirmState?.action()}
       />
-    </section>
+    </>
   );
 }

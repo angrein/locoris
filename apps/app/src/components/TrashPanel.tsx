@@ -1,3 +1,4 @@
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { AppLanguage, Note } from "../types";
 import { getDisplayNotePreview, getDisplayNoteTitle } from "../lib/displayNames";
 import { formatTimestamp } from "../lib/notes";
@@ -24,6 +25,122 @@ interface TrashPanelProps {
   onRestore: (noteId: string) => void;
   onDelete: (noteId: string) => void;
   onClear: () => void;
+  onClose?: () => void;
+}
+
+type TrashFilter = "all" | "note" | "canvas";
+
+const TRASH_TEXT: Record<
+  AppLanguage,
+  {
+    all: string;
+    close: string;
+    filteredEmptyTitle: string;
+    filteredEmptyDescription: string;
+    recovery: string;
+    subtitle: string;
+  }
+> = {
+  en: {
+    all: "All",
+    close: "Close",
+    filteredEmptyTitle: "Nothing here",
+    filteredEmptyDescription: "Choose another section to keep reviewing deleted content.",
+    recovery: "Recovery",
+    subtitle: "Review deleted notes and canvases before permanent removal."
+  },
+  ru: {
+    all: "Все",
+    close: "Закрыть",
+    filteredEmptyTitle: "Здесь пусто",
+    filteredEmptyDescription: "Выбери другой раздел, чтобы продолжить разбор удаленных материалов.",
+    recovery: "Восстановление",
+    subtitle: "Проверь удаленные заметки и холсты перед окончательным удалением."
+  }
+};
+
+function CloseGlyph() {
+  return <span aria-hidden="true">×</span>;
+}
+
+function TrashGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 7h16" />
+      <path d="M9 7V5.7A1.7 1.7 0 0 1 10.7 4h2.6A1.7 1.7 0 0 1 15 5.7V7" />
+      <path d="m7.2 7 .7 11.6A2.1 2.1 0 0 0 10 20.6h4a2.1 2.1 0 0 0 2.1-2L16.8 7" />
+      <path d="M10.1 11v5M13.9 11v5" className="trash-recovery-glyph-accent" />
+    </svg>
+  );
+}
+
+function NoteGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M7 4.6h7.2L18 8.4v9.8a2.2 2.2 0 0 1-2.2 2.2H7a2.2 2.2 0 0 1-2.2-2.2V6.8A2.2 2.2 0 0 1 7 4.6Z" />
+      <path d="M14 4.8v2.9a1 1 0 0 0 1 1h2.7" className="trash-recovery-glyph-accent" />
+      <path d="M8.5 12.5h7M8.5 15.7h5.2" />
+    </svg>
+  );
+}
+
+function CanvasGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 6.6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10.8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6.6Z" />
+      <path d="m8.2 15.8 2.9-3.1 2.3 2.1 2.5-3.4" className="trash-recovery-glyph-accent" />
+      <circle cx="9.2" cy="8.9" r="1.05" />
+    </svg>
+  );
+}
+
+function AllItemsGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M7.1 5.1h5.6a2 2 0 0 1 2 2v5.6a2 2 0 0 1-2 2H7.1a2 2 0 0 1-2-2V7.1a2 2 0 0 1 2-2Z" />
+      <path d="M10.2 9.4h6.7a2 2 0 0 1 2 2v5.5a2 2 0 0 1-2 2h-5.5a2 2 0 0 1-2-2v-6.7" />
+      <path d="M8.5 9.8h2.8M8.5 12h2.1" className="trash-recovery-glyph-accent" />
+      <path d="M13.1 14.2h2.7M13.1 16.4h2" className="trash-recovery-glyph-accent" />
+    </svg>
+  );
+}
+
+function RestoreGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M8.2 8.6H4.8V5.2" className="trash-recovery-glyph-accent" />
+      <path d="M5.1 8.5a7.3 7.3 0 1 1 1.8 7.4" />
+      <path d="M5.2 8.5 7.9 6" className="trash-recovery-glyph-accent" />
+    </svg>
+  );
+}
+
+function DeleteGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5.2 7.2h13.6" />
+      <path d="M9.2 7.2V5.8a1.4 1.4 0 0 1 1.4-1.4h2.8a1.4 1.4 0 0 1 1.4 1.4v1.4" />
+      <path d="m8 7.2.7 10.9a1.8 1.8 0 0 0 1.8 1.7h3a1.8 1.8 0 0 0 1.8-1.7L16 7.2" />
+      <path d="m10.2 11 3.6 3.6M13.8 11l-3.6 3.6" className="trash-recovery-glyph-accent" />
+    </svg>
+  );
+}
+
+function FolderGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4.5 7.4a2 2 0 0 1 2-2h4l1.9 2.1h5.1a2 2 0 0 1 2 2v7.1a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V7.4Z" />
+    </svg>
+  );
+}
+
+function ClockGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="7.2" />
+      <path d="M12 8.4v4l2.8 1.7" className="trash-recovery-glyph-accent" />
+    </svg>
+  );
 }
 
 export default function TrashPanel({
@@ -33,88 +150,196 @@ export default function TrashPanel({
   labels,
   onRestore,
   onDelete,
-  onClear
+  onClear,
+  onClose
 }: TrashPanelProps) {
+  const text = TRASH_TEXT[language];
+  const [activeFilter, setActiveFilter] = useState<TrashFilter>("all");
+  const counts = useMemo(
+    () => ({
+      all: notes.length,
+      note: notes.filter((note) => note.contentType === "note").length,
+      canvas: notes.filter((note) => note.contentType === "canvas").length
+    }),
+    [notes]
+  );
+  const resolvedFilter = activeFilter !== "all" && counts[activeFilter] === 0 ? "all" : activeFilter;
+  const filteredNotes = useMemo(
+    () =>
+      resolvedFilter === "all"
+        ? notes
+        : notes.filter((note) => note.contentType === resolvedFilter),
+    [notes, resolvedFilter]
+  );
+  const tabs: Array<{ id: TrashFilter; label: string; count: number; icon: ReactNode }> = [
+    { id: "all", label: text.all, count: counts.all, icon: <AllItemsGlyph /> },
+    { id: "note", label: labels.noteType, count: counts.note, icon: <NoteGlyph /> },
+    { id: "canvas", label: labels.canvasType, count: counts.canvas, icon: <CanvasGlyph /> }
+  ];
+  const activeTabLabel = tabs.find((tab) => tab.id === resolvedFilter)?.label ?? labels.title;
+
   return (
-    <section className="trash-panel-shell">
-      <header className="trash-panel-header">
-        <div className="trash-panel-heading">
-          <h2 className="panel-title trash-panel-title">{labels.title}</h2>
-          {notes.length === 0 ? <p className="trash-panel-caption">{labels.emptyDescription}</p> : null}
+    <section className="trash-recovery-shell" aria-label={labels.title}>
+      <header className="trash-recovery-header">
+        <span className="trash-recovery-header-icon" aria-hidden="true">
+          <TrashGlyph />
+        </span>
+
+        <div className="trash-recovery-heading">
+          <p className="trash-recovery-kicker">{text.recovery}</p>
+          <h2 className="panel-title trash-recovery-title">{labels.title}</h2>
+          <p className="trash-recovery-caption">
+            {notes.length === 0 ? labels.emptyDescription : text.subtitle}
+          </p>
         </div>
-        <div className="trash-panel-tools">
-          <span className="trash-panel-chip">
-            {notes.length} {labels.noteCount}
-          </span>
-          <button
-            type="button"
-            className="trash-panel-clear"
-            onClick={onClear}
-            disabled={notes.length === 0}
-          >
-            {labels.clearTrash}
-          </button>
+
+        <div className="trash-recovery-header-actions">
+          {onClose ? (
+            <button
+              type="button"
+              className="trash-recovery-close"
+              onClick={onClose}
+              aria-label={text.close}
+              title={text.close}
+            >
+              <span className="trash-recovery-close-icon">
+                <CloseGlyph />
+              </span>
+            </button>
+          ) : null}
         </div>
       </header>
 
       {notes.length === 0 ? (
-        <div className="trash-empty-card">
-          <div className="trash-empty-card-copy">
-            <strong>{labels.emptyTitle}</strong>
+        <div className="trash-recovery-empty">
+          <span className="trash-recovery-empty-icon" aria-hidden="true">
+            <TrashGlyph />
+          </span>
+          <div className="trash-recovery-empty-copy">
+            <h3>{labels.emptyTitle}</h3>
             <p>{labels.emptyDescription}</p>
           </div>
         </div>
       ) : (
-        <div className="trash-list-scroll">
-          <div className="trash-list">
-            {notes.map((note) => {
-              const deletedAt = formatTimestamp(note.trashedAt ?? note.updatedAt, language);
-              const folderLabel = note.folderId
-                ? folderPathMap.get(note.folderId) ?? labels.allNotes
-                : labels.allNotes;
-              const preview = getDisplayNotePreview(note, language);
-
-              return (
-                <article
-                  className={`trash-card ${note.contentType === "canvas" ? "is-canvas" : "is-note"}`}
-                  key={note.id}
+        <div className="trash-recovery-workspace">
+          <section className="trash-recovery-toolbar" aria-label={labels.title}>
+            <div className="trash-recovery-tabs" role="tablist" aria-label={labels.title}>
+              {tabs.map((tab) => (
+                <button
+                  type="button"
+                  role="tab"
+                  key={tab.id}
+                  className={`trash-recovery-tab is-${tab.id} ${
+                    resolvedFilter === tab.id ? "is-active" : ""
+                  }`}
+                  aria-selected={resolvedFilter === tab.id}
+                  onClick={() => setActiveFilter(tab.id)}
+                  disabled={tab.id !== "all" && tab.count === 0}
                 >
-                  <div className="trash-card-head">
-                    <div className="trash-card-copy">
-                      <div className="trash-card-titleline">
-                        <h3>{getDisplayNoteTitle(note, language)}</h3>
-                        <span className="trash-card-chip is-type">
-                          {note.contentType === "canvas" ? labels.canvasType : labels.noteType}
-                        </span>
-                      </div>
-                      {preview ? <p>{preview}</p> : null}
-                      <div className="trash-card-meta-inline">
-                        <span>
-                          {folderLabel} · {deletedAt}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <span className="trash-recovery-tab-icon">{tab.icon}</span>
+                  <span className="trash-recovery-tab-label">{tab.label}</span>
+                  <strong>{tab.count}</strong>
+                </button>
+              ))}
+            </div>
 
-                  <div className="trash-card-actions">
-                    <button
-                      type="button"
-                      className="trash-card-action is-primary"
-                      onClick={() => onRestore(note.id)}
+            <button type="button" className="trash-recovery-clear" onClick={onClear}>
+              <span className="trash-recovery-button-icon">
+                <DeleteGlyph />
+              </span>
+              <span>{labels.clearTrash}</span>
+            </button>
+          </section>
+
+          <div className="trash-recovery-list-scroll" role="tabpanel" aria-label={activeTabLabel}>
+            {filteredNotes.length === 0 ? (
+              <div className="trash-recovery-empty is-filtered">
+                <span className="trash-recovery-empty-icon" aria-hidden="true">
+                  {resolvedFilter === "canvas" ? <CanvasGlyph /> : <NoteGlyph />}
+                </span>
+                <div className="trash-recovery-empty-copy">
+                  <h3>{text.filteredEmptyTitle}</h3>
+                  <p>{text.filteredEmptyDescription}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="trash-recovery-list">
+                {filteredNotes.map((note) => {
+                  const isCanvas = note.contentType === "canvas";
+                  const title = getDisplayNoteTitle(note, language);
+                  const preview = getDisplayNotePreview(note, language);
+                  const typeLabel = isCanvas ? labels.canvasType : labels.noteType;
+                  const deletedAt = formatTimestamp(note.trashedAt ?? note.updatedAt, language);
+                  const folderLabel = note.folderId
+                    ? folderPathMap.get(note.folderId) ?? labels.allNotes
+                    : labels.allNotes;
+                  const itemStyle = {
+                    "--trash-item-accent":
+                      note.color ||
+                      (isCanvas
+                        ? "var(--trash-recovery-secondary)"
+                        : "var(--trash-recovery-tertiary)")
+                  } as CSSProperties;
+
+                  return (
+                    <article
+                      className={`trash-recovery-item ${isCanvas ? "is-canvas" : "is-note"}`}
+                      key={note.id}
+                      style={itemStyle}
                     >
-                      {labels.restore}
-                    </button>
-                    <button
-                      type="button"
-                      className="trash-card-action is-danger"
-                      onClick={() => onDelete(note.id)}
-                    >
-                      {labels.deletePermanently}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+                      <span className="trash-recovery-item-icon" aria-hidden="true">
+                        {isCanvas ? <CanvasGlyph /> : <NoteGlyph />}
+                      </span>
+
+                      <div className="trash-recovery-item-main">
+                        <div className="trash-recovery-item-head">
+                          <h3>{title}</h3>
+                          <span>{typeLabel}</span>
+                        </div>
+
+                        {preview ? <p className="trash-recovery-preview">{preview}</p> : null}
+
+                        <div className="trash-recovery-meta">
+                          <span>
+                            <FolderGlyph />
+                            {folderLabel}
+                          </span>
+                          <span>
+                            <ClockGlyph />
+                            {deletedAt}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="trash-recovery-item-actions">
+                        <button
+                          type="button"
+                          className="trash-recovery-action is-restore"
+                          onClick={() => onRestore(note.id)}
+                          title={labels.restore}
+                        >
+                          <span className="trash-recovery-button-icon">
+                            <RestoreGlyph />
+                          </span>
+                          <span>{labels.restore}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="trash-recovery-action is-danger"
+                          onClick={() => onDelete(note.id)}
+                          title={labels.deletePermanently}
+                        >
+                          <span className="trash-recovery-button-icon">
+                            <DeleteGlyph />
+                          </span>
+                          <span>{labels.deletePermanently}</span>
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

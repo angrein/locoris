@@ -2271,6 +2271,12 @@ export default function OrbitalMapView({
           onClose: () => setActiveModal(null)
         } as { onClose: () => void })
       : settingsModalSlot;
+  const resolvedTrashModalSlot =
+    trashModalSlot && isValidElement(trashModalSlot)
+      ? cloneElement(trashModalSlot, {
+          onClose: () => setActiveModal(null)
+        } as { onClose: () => void })
+      : trashModalSlot;
   const [isCanvasEditorFullscreen, setIsCanvasEditorFullscreen] = useState(false);
   const [isDocumentVisible, setIsDocumentVisible] = useState(
     typeof document === "undefined" ? true : document.visibilityState !== "hidden"
@@ -11434,7 +11440,7 @@ export default function OrbitalMapView({
               <span aria-hidden="true">×</span>
             </button>
             <div className="orbital-modal-content orbital-utility-modal-content">
-              {activeModal === "settings" ? resolvedSettingsModalSlot : trashModalSlot}
+              {activeModal === "settings" ? resolvedSettingsModalSlot : resolvedTrashModalSlot}
             </div>
           </div>
         </div>
