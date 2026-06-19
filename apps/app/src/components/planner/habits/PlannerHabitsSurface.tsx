@@ -80,6 +80,67 @@ function getLastLogLabel(value: number | null, language: AppLanguage) {
   }).format(value);
 }
 
+function getShortDateLabel(value: number, language: AppLanguage) {
+  return new Intl.DateTimeFormat(language === "ru" ? "ru-RU" : "en-US", {
+    day: "numeric",
+    month: "short"
+  }).format(value);
+}
+
+function formatHabitRate(value: number | null, language: AppLanguage) {
+  if (value === null) {
+    return language === "ru" ? "нет данных" : "no data";
+  }
+
+  return `${Math.round(value * 100)}%`;
+}
+
+function getHabitHealthLabel(summary: PlannerHabitSummary, language: AppLanguage) {
+  if (language === "ru") {
+    return {
+      new: "Новая",
+      steady: "Стабильно",
+      watch: "Внимание",
+      risk: "Риск",
+      paused: "Пауза"
+    }[summary.health];
+  }
+
+  return {
+    new: "New",
+    steady: "Steady",
+    watch: "Watch",
+    risk: "At risk",
+    paused: "Paused"
+  }[summary.health];
+}
+
+function getHabitHealthDescription(summary: PlannerHabitSummary, language: AppLanguage) {
+  if (summary.health === "paused") {
+    return language === "ru" ? "Пауза не ломает streak и не считается пропуском." : "Paused days keep the streak intact.";
+  }
+
+  if (summary.health === "new") {
+    return language === "ru" ? "Данных пока мало. После нескольких отметок появится точнее." : "Not enough history yet.";
+  }
+
+  if (summary.health === "steady") {
+    return language === "ru" ? "Ритм держится хорошо за последние 30 дней." : "The last 30 days look stable.";
+  }
+
+  if (summary.health === "risk") {
+    return language === "ru" ? "За последние 30 дней накопились пропуски." : "Misses are piling up over the last 30 days.";
+  }
+
+  return summary.dueToday && !summary.completedToday
+    ? language === "ru"
+      ? "Сегодня привычка еще ждет отметки."
+      : "Today's check-in is still open."
+    : language === "ru"
+      ? "Ритм живой, но ему стоит уделить внимание."
+      : "The rhythm is active, but worth watching.";
+}
+
 function getWeekdayLabel(value: number, language: AppLanguage) {
   return new Intl.DateTimeFormat(language === "ru" ? "ru-RU" : "en-US", {
     weekday: "short"
@@ -131,6 +192,69 @@ function HabitWeekStrip({ summary, language }: { summary: PlannerHabitSummary; l
         />
       ))}
     </div>
+  );
+}
+
+function HabitHistoryHeatmap({ summary, language }: { summary: PlannerHabitSummary; language: AppLanguage }) {
+  return (
+    <section className="planner-habit-history">
+      <div className="planner-habit-history-head">
+        <div>
+          <span>{language === "ru" ? "История" : "History"}</span>
+          <strong>{language === "ru" ? "Последние 8 недель" : "Last 8 weeks"}</strong>
+        </div>
+        <em>
+          {summary.last30CompletedCount}/{summary.last30DueCount} · {formatHabitRate(summary.last30CompletionRate, language)}
+        </em>
+      </div>
+      <div className="planner-habit-history-heatmap" aria-label={language === "ru" ? "История отметок" : "Check-in history"}>
+        {summary.historyDays.map((day) => (
+          <span
+            key={day.dayAt}
+            className={`${day.due ? "is-due" : ""} ${day.completed ? "is-complete" : ""} ${
+              day.missed ? "is-missed" : ""
+            } ${day.paused ? "is-paused" : ""} ${day.today ? "is-today" : ""}`}
+            title={`${getShortDateLabel(day.dayAt, language)}${
+              day.completed
+                ? language === "ru"
+                  ? " · сделано"
+                  : " · done"
+                : day.missed
+                  ? language === "ru"
+                    ? " · пропущено"
+                    : " · missed"
+                  : day.due
+                    ? language === "ru"
+                      ? " · по плану"
+                      : " · scheduled"
+                    : ""
+            }`}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HabitRecentLogs({ summary, language }: { summary: PlannerHabitSummary; language: AppLanguage }) {
+  return (
+    <section className="planner-habit-recent">
+      <div className="planner-habit-history-head">
+        <div>
+          <span>{language === "ru" ? "Последние отметки" : "Recent"}</span>
+          <strong>{language === "ru" ? "Живая история" : "Recent check-ins"}</strong>
+        </div>
+      </div>
+      {summary.recentLogDays.length > 0 ? (
+        <div className="planner-habit-recent-row">
+          {summary.recentLogDays.map((dayAt) => (
+            <span key={dayAt}>{getShortDateLabel(dayAt, language)}</span>
+          ))}
+        </div>
+      ) : (
+        <p>{language === "ru" ? "Отметок пока нет." : "No check-ins yet."}</p>
+      )}
+    </section>
   );
 }
 
@@ -204,7 +328,7 @@ export function PlannerHabitInspectorPanel({
   const content = summary ? (
     <>
       {variant === "sheet" ? <div className="planner-habit-mobile-sheet-handle" aria-hidden="true" /> : null}
-      <div className={`planner-habit-detail-content is-${variant}`}>
+      <div className={`planner-habit-detail-content is-${variant}`} style={{ "--planner-habit-color": summary.habit.color } as CSSProperties}>
         <div className="planner-habit-detail-head" style={{ "--planner-habit-color": summary.habit.color } as CSSProperties}>
           <span />
           <div>
@@ -241,16 +365,39 @@ export function PlannerHabitInspectorPanel({
             <strong>{summary.streak}</strong>
           </div>
           <div>
-            <span>{language === "ru" ? "За неделю" : "This week"}</span>
+            <span>{language === "ru" ? "Лучший" : "Best"}</span>
+            <strong>{summary.bestStreak}</strong>
+          </div>
+          <div>
+            <span>{language === "ru" ? "Неделя" : "Week"}</span>
             <strong>
               {summary.weekCompletedCount}/{summary.weekDueCount}
             </strong>
+          </div>
+          <div>
+            <span>{language === "ru" ? "30 дней" : "30 days"}</span>
+            <strong>{formatHabitRate(summary.last30CompletionRate, language)}</strong>
+          </div>
+          <div>
+            <span>{language === "ru" ? "Пропуски" : "Missed"}</span>
+            <strong>{summary.last30MissedCount}</strong>
           </div>
           <div>
             <span>{language === "ru" ? "Последняя" : "Last"}</span>
             <strong>{getLastLogLabel(summary.lastLogAt, language)}</strong>
           </div>
         </div>
+
+        <div className={`planner-habit-health-card is-${summary.health}`}>
+          <div>
+            <span>{language === "ru" ? "Состояние" : "State"}</span>
+            <strong>{getHabitHealthLabel(summary, language)}</strong>
+          </div>
+          <p>{getHabitHealthDescription(summary, language)}</p>
+        </div>
+
+        <HabitHistoryHeatmap summary={summary} language={language} />
+        <HabitRecentLogs summary={summary} language={language} />
 
         <div className="planner-habit-detail-week">
           <div>
@@ -356,11 +503,14 @@ function HabitCard({
         <div className="planner-habit-card-meta">
           <span>{getPlannerHabitCadenceLabel(habit.frequencyRule, language)}</span>
           <span className="is-progress">
-            {language === "ru" ? "Неделя" : "Week"} {summary.weekCompletedCount}/{summary.weekDueCount}
+            {language === "ru" ? "30 дней" : "30 days"} {formatHabitRate(summary.last30CompletionRate, language)}
           </span>
-          {summary.streak > 0 ? <span>{language === "ru" ? `${summary.streak} дн. streak` : `${summary.streak} day streak`}</span> : null}
-          {summary.missed ? <span className="is-warning">{language === "ru" ? "Пропущено" : "Missed"}</span> : null}
-          {!summary.missed && summary.dueToday ? <span>{getTodayState(summary, language)}</span> : null}
+          {summary.last30MissedCount > 0 ? (
+            <span className="is-warning">{language === "ru" ? `${summary.last30MissedCount} проп.` : `${summary.last30MissedCount} missed`}</span>
+          ) : summary.streak > 0 ? (
+            <span>{language === "ru" ? `${summary.streak} дн.` : `${summary.streak}d streak`}</span>
+          ) : null}
+          <span className={`is-health is-${summary.health}`}>{getHabitHealthLabel(summary, language)}</span>
         </div>
         <HabitWeekStrip summary={summary} language={language} />
       </div>
@@ -419,7 +569,7 @@ export default function PlannerHabitsSurface({
   const activeCount = summaries.filter((summary) => summary.habit.status === "active").length;
   const doneTodayCount = summaries.filter((summary) => summary.completedToday).length;
   const dueTodayCount = summaries.filter((summary) => summary.dueToday).length;
-  const missedCount = summaries.filter((summary) => summary.missed).length;
+  const missedCount = summaries.reduce((sum, summary) => sum + summary.last30MissedCount, 0);
 
   const resetComposer = () => {
     setTitleDraft("");

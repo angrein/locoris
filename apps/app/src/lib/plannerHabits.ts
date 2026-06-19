@@ -13,14 +13,28 @@ export interface PlannerHabitSummary {
   completedToday: boolean;
   missed: boolean;
   streak: number;
+  bestStreak: number;
   weekDueCount: number;
   weekCompletedCount: number;
   weekDays: PlannerHabitWeekDay[];
+  historyDays: PlannerHabitHistoryDay[];
+  recentLogDays: number[];
+  last30DueCount: number;
+  last30CompletedCount: number;
+  last30MissedCount: number;
+  last30CompletionRate: number | null;
+  last90DueCount: number;
+  last90CompletedCount: number;
+  last90MissedCount: number;
+  last90CompletionRate: number | null;
   lastLogAt: number | null;
+  health: PlannerHabitHealth;
 }
 
 const WEEKDAY_CODES = ["MO", "TU", "WE", "TH", "FR"];
 const DAY_MS = 86_400_000;
+
+export type PlannerHabitHealth = "new" | "steady" | "watch" | "risk" | "paused";
 
 export interface PlannerHabitWeekDay {
   dayAt: number;
@@ -30,6 +44,10 @@ export interface PlannerHabitWeekDay {
   missed: boolean;
   today: boolean;
   future: boolean;
+}
+
+export interface PlannerHabitHistoryDay extends PlannerHabitWeekDay {
+  logCount: number;
 }
 
 export function buildPlannerHabitFrequencyRule(preset: PlannerHabitCadencePreset, intervalDays = 2) {
@@ -188,6 +206,132 @@ export function getPlannerHabitStreak(habit: Habit, habitLogs: HabitLog[], now =
   return streak;
 }
 
+export function getPlannerHabitBestStreak(habit: Habit, habitLogs: HabitLog[], now = Date.now(), maxDays = 370) {
+  let bestStreak = 0;
+  let currentStreak = 0;
+  const todayStart = getStartOfLocalDay(now);
+  const firstDayAt = todayStart - (Math.max(1, maxDays) - 1) * DAY_MS;
+
+  for (let dayAt = firstDayAt; dayAt <= todayStart; dayAt += DAY_MS) {
+    if (!isPlannerHabitDueOnDay(habit, dayAt)) {
+      continue;
+    }
+
+    const completed = isPlannerHabitCompletedOnDay(habit, habitLogs, dayAt);
+
+    if (!completed && dayAt === todayStart) {
+      continue;
+    }
+
+    if (!completed) {
+      currentStreak = 0;
+      continue;
+    }
+
+    currentStreak += 1;
+    bestStreak = Math.max(bestStreak, currentStreak);
+  }
+
+  return bestStreak;
+}
+
+export function getPlannerHabitRangeStats(habit: Habit, habitLogs: HabitLog[], days: number, now = Date.now()) {
+  const todayStart = getStartOfLocalDay(now);
+  const normalizedDays = Math.max(1, Math.round(days || 1));
+  const historyDays: PlannerHabitHistoryDay[] = [];
+  let due = 0;
+  let completed = 0;
+  let missed = 0;
+
+  for (let offset = normalizedDays - 1; offset >= 0; offset -= 1) {
+    const dayAt = todayStart - offset * DAY_MS;
+    const paused = isPlannerHabitPausedOnDay(habit, dayAt);
+    const isDue = isPlannerHabitDueOnDay(habit, dayAt);
+    const logs = getPlannerHabitLogsForDay(habitLogs, habit.id, dayAt);
+    const isCompleted = isDue && isPlannerHabitCompletedOnDay(habit, habitLogs, dayAt);
+    const isMissed = isDue && !isCompleted && dayAt < todayStart;
+
+    historyDays.push({
+      dayAt,
+      due: isDue,
+      completed: isCompleted,
+      paused,
+      missed: isMissed,
+      today: dayAt === todayStart,
+      future: false,
+      logCount: logs.length
+    });
+
+    if (!isDue || dayAt > todayStart) {
+      continue;
+    }
+
+    due += 1;
+
+    if (isCompleted) {
+      completed += 1;
+    } else if (dayAt < todayStart) {
+      missed += 1;
+    }
+  }
+
+  return {
+    due,
+    completed,
+    missed,
+    historyDays,
+    completionRate: due > 0 ? completed / due : null
+  };
+}
+
+function getPlannerHabitRecentLogDays(habitLogs: HabitLog[], habitId: string, limit = 5) {
+  const seen = new Set<number>();
+  return habitLogs
+    .filter((log) => log.habitId === habitId)
+    .sort((left, right) => right.occurredAt - left.occurredAt)
+    .map((log) => getStartOfLocalDay(log.occurredAt))
+    .filter((dayAt) => {
+      if (seen.has(dayAt)) {
+        return false;
+      }
+
+      seen.add(dayAt);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+function getPlannerHabitHealth(input: {
+  habit: Habit;
+  dueToday: boolean;
+  completedToday: boolean;
+  last30DueCount: number;
+  last30CompletionRate: number | null;
+  last30MissedCount: number;
+}) {
+  if (input.habit.status === "paused") {
+    return "paused" satisfies PlannerHabitHealth;
+  }
+
+  if (input.last30DueCount < 3) {
+    return "new" satisfies PlannerHabitHealth;
+  }
+
+  if (input.last30MissedCount >= 3 || (input.last30CompletionRate ?? 1) < 0.55) {
+    return "risk" satisfies PlannerHabitHealth;
+  }
+
+  if (!input.completedToday && input.dueToday) {
+    return "watch" satisfies PlannerHabitHealth;
+  }
+
+  if ((input.last30CompletionRate ?? 0) >= 0.82) {
+    return "steady" satisfies PlannerHabitHealth;
+  }
+
+  return "watch" satisfies PlannerHabitHealth;
+}
+
 export function getPlannerHabitWeekStats(habit: Habit, habitLogs: HabitLog[], now = Date.now()) {
   const cursor = new Date(getStartOfLocalDay(now));
   const day = cursor.getDay();
@@ -256,9 +400,20 @@ export function buildPlannerHabitSummaries(input: {
     .sort((left, right) => (left.sortOrder ?? left.createdAt) - (right.sortOrder ?? right.createdAt))
     .map((habit) => {
       const weekStats = getPlannerHabitWeekStats(habit, input.habitLogs, now);
+      const last30Stats = getPlannerHabitRangeStats(habit, input.habitLogs, 30, now);
+      const last90Stats = getPlannerHabitRangeStats(habit, input.habitLogs, 90, now);
+      const historyStats = getPlannerHabitRangeStats(habit, input.habitLogs, 56, now);
       const dueToday = isPlannerHabitDueOnDay(habit, now);
       const completedToday = dueToday && isPlannerHabitCompletedOnDay(habit, input.habitLogs, now);
       const missed = weekStats.days.some((day) => day.missed);
+      const health = getPlannerHabitHealth({
+        habit,
+        dueToday,
+        completedToday,
+        last30DueCount: last30Stats.due,
+        last30CompletionRate: last30Stats.completionRate,
+        last30MissedCount: last30Stats.missed
+      });
 
       return {
         habit,
@@ -267,10 +422,22 @@ export function buildPlannerHabitSummaries(input: {
         completedToday,
         missed,
         streak: getPlannerHabitStreak(habit, input.habitLogs, now),
+        bestStreak: getPlannerHabitBestStreak(habit, input.habitLogs, now),
         weekDueCount: weekStats.due,
         weekCompletedCount: weekStats.completed,
         weekDays: weekStats.days,
-        lastLogAt: getPlannerHabitLastLogAt(input.habitLogs, habit.id)
+        historyDays: historyStats.historyDays,
+        recentLogDays: getPlannerHabitRecentLogDays(input.habitLogs, habit.id),
+        last30DueCount: last30Stats.due,
+        last30CompletedCount: last30Stats.completed,
+        last30MissedCount: last30Stats.missed,
+        last30CompletionRate: last30Stats.completionRate,
+        last90DueCount: last90Stats.due,
+        last90CompletedCount: last90Stats.completed,
+        last90MissedCount: last90Stats.missed,
+        last90CompletionRate: last90Stats.completionRate,
+        lastLogAt: getPlannerHabitLastLogAt(input.habitLogs, habit.id),
+        health
       } satisfies PlannerHabitSummary;
     });
 }

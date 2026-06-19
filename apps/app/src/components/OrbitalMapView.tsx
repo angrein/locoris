@@ -9360,19 +9360,6 @@ export default function OrbitalMapView({
               <strong>{mobileInspectorSummaryTitle}</strong>
             </div>
             <div className="orbital-mobile-inspector-actionstrip">
-              <button
-                type="button"
-                className={isMobileSelectionMode ? "is-active" : ""}
-                onClick={() => setIsMobileSelectionMode((current) => !current)}
-                aria-pressed={isMobileSelectionMode}
-                aria-label={isMobileSelectionMode ? t("orbit.mobileDone") : t("orbit.mobileSelect")}
-                title={isMobileSelectionMode ? t("orbit.mobileDone") : t("orbit.mobileSelect")}
-              >
-                <span className="orbital-mobile-inspector-action-icon">
-                  {renderMobileActionGlyph("select")}
-                </span>
-                <small>{isMobileSelectionMode ? t("orbit.mobileDone") : t("orbit.mobileSelect")}</small>
-              </button>
               {selectedNode?.note ? (
                 <button
                   type="button"
@@ -10472,11 +10459,25 @@ export default function OrbitalMapView({
                 </span>
                 {isTemporalLayerVisible &&
                 (temporalMapSignals.totalToday > 0 || temporalMapSignals.totalOverdue > 0) ? (
-                  <span className={`orbital-filter-chip ${temporalMapSignals.totalOverdue > 0 ? "is-warning" : "is-accent"}`}>
-                    {t("orbit.timeLayerToday")}: {temporalMapSignals.totalToday}
-                    {temporalMapSignals.totalOverdue > 0
-                      ? ` · ${t("orbit.timeLayerOverdue")}: ${temporalMapSignals.totalOverdue}`
-                      : ""}
+                  <span
+                    className={`orbital-filter-chip orbital-filter-temporal-chip ${
+                      temporalMapSignals.totalOverdue > 0 ? "is-warning" : "is-accent"
+                    }`}
+                  >
+                    <span className="orbital-filter-temporal-part is-today">
+                      <span className="orbital-filter-temporal-icon" aria-hidden="true" />
+                      <span>
+                        {t("orbit.timeLayerToday")}: <strong>{temporalMapSignals.totalToday}</strong>
+                      </span>
+                    </span>
+                    {temporalMapSignals.totalOverdue > 0 ? (
+                      <span className="orbital-filter-temporal-part is-overdue">
+                        <span className="orbital-filter-temporal-icon" aria-hidden="true" />
+                        <span>
+                          {t("orbit.timeLayerOverdue")}: <strong>{temporalMapSignals.totalOverdue}</strong>
+                        </span>
+                      </span>
+                    ) : null}
                   </span>
                 ) : null}
                 {isTemporalLayerVisible && selectedNode?.project && onOpenProjectPlan ? (
@@ -10951,13 +10952,16 @@ export default function OrbitalMapView({
               {selectedProjectTemporalSignal ? (
                 <div className="orbital-mobile-temporal-summary">
                   <span>
+                    <i className="is-today" aria-hidden="true" />
                     {t("orbit.timeLayerToday")}: <strong>{selectedProjectTemporalSignal.todayCount}</strong>
                   </span>
                   <span className={selectedProjectTemporalSignal.overdueCount > 0 ? "is-overdue" : ""}>
+                    <i className="is-overdue" aria-hidden="true" />
                     {t("orbit.timeLayerOverdue")}: <strong>{selectedProjectTemporalSignal.overdueCount}</strong>
                   </span>
                   {selectedProjectTemporalSignal.milestoneTitle ? (
                     <span>
+                      <i className="is-milestone" aria-hidden="true" />
                       {t("orbit.timeLayerMilestone")}:{" "}
                       <strong>{truncateLabel(selectedProjectTemporalSignal.milestoneTitle, 18)}</strong>
                     </span>

@@ -3485,6 +3485,7 @@ export default function App() {
 	                  setOrbitalEditorNoteId(canvas.id);
 	                }}
 	                onCreateTaskFromContext={handleCreatePlannerTaskFromContext}
+	                onClose={handleCloseOrbitalEditor}
 	                libraryStorageScopeId={activeLocalVaultId}
 	                privateVaultWarningContext={activePrivateVaultWarningContext}
 	              />

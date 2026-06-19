@@ -8,6 +8,7 @@
 .editor-pane-mobile-options-field-title,
 .editor-pane-mobile-option-icon,
 .editor-pane-mobile-insert-layer,
+.editor-pane-mobile-task-toast,
 .editor-ai-mobile-backdrop,
 .editor-pane-mobile-only-action {
   display: none;
@@ -118,6 +119,9 @@
   top: calc(58px + env(safe-area-inset-top));
   left: 50%;
   z-index: 78;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   max-width: calc(100% - 28px);
   transform: translateX(-50%);
   padding: 8px 12px;
@@ -210,16 +214,30 @@
     22px
     max(16px, env(safe-area-inset-right))
     calc(118px + env(safe-area-inset-bottom))
-    max(74px, calc(env(safe-area-inset-left) + 64px));
+    max(50px, calc(env(safe-area-inset-left) + 44px));
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu {
+  width: 38px;
+  height: auto !important;
+  display: grid;
+  grid-auto-flow: row;
+  gap: 4px;
   opacity: 1;
   margin-left: 0;
+  padding: 4px;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.016)),
+    rgb(var(--surface-deep-rgb) / 0.78) !important;
+  box-shadow:
+    0 12px 34px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px) saturate(135%);
   z-index: 20;
 }
 
-.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu button,
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu > button,
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-formatting-toolbar button,
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-file-panel button,
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-link-toolbar button,
@@ -228,10 +246,18 @@
   min-height: 40px;
 }
 
-.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu button {
-  min-width: 36px;
-  min-height: 36px;
-  border-radius: 14px;
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu > button {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-side-menu > button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-floating-toolbar-popover {
@@ -327,7 +353,6 @@
   display: none;
 }
 
-.locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-menu-dropdown,
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-form-popover,
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-panel-popover {
   max-width: calc(100vw - 16px);
@@ -362,11 +387,20 @@
   right: max(8px, env(safe-area-inset-right));
   bottom: max(8px, env(safe-area-inset-bottom));
   z-index: 1320;
-  max-height: min(86vh, calc(100vh - max(18px, env(safe-area-inset-top))));
-  max-height: min(86dvh, calc(100dvh - max(18px, env(safe-area-inset-top))));
+  box-sizing: border-box;
+  max-height:
+    min(
+      88vh,
+      calc(100vh - max(16px, env(safe-area-inset-top)) - max(10px, env(safe-area-inset-bottom)))
+    );
+  max-height:
+    min(
+      88dvh,
+      calc(100dvh - max(16px, env(safe-area-inset-top)) - max(10px, env(safe-area-inset-bottom)))
+    );
   display: grid;
   grid-auto-rows: min-content;
-  gap: 11px;
+  gap: 12px;
   overflow: auto;
   width: auto;
   padding:
@@ -378,14 +412,15 @@
   border: 1px solid color-mix(in srgb, var(--editor-accent) 26%, rgb(var(--line-rgb) / 0.13));
   background:
     radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--editor-accent) 16%, transparent), transparent 38%),
-    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 8%, transparent), transparent 48%),
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 12%, transparent), transparent 58%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.082), rgba(255, 255, 255, 0.024)),
-    rgb(var(--surface-deep-rgb) / 0.96);
+    rgb(var(--surface-deep-rgb) / 0.97);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.062),
-    0 28px 70px rgba(0, 0, 0, 0.44);
-  backdrop-filter: blur(24px);
+    0 28px 76px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(24px) saturate(140%);
   overscroll-behavior: contain;
+  pointer-events: auto;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--editor-accent) 36%, transparent) transparent;
 }
@@ -405,7 +440,7 @@
   z-index: 1310;
   display: block;
   border: 0;
-  background: rgba(0, 0, 0, 0.24);
+  background: rgba(1, 4, 12, 0.22);
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-head {
@@ -417,14 +452,10 @@
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-head {
-  position: sticky;
-  top: -10px;
-  z-index: 2;
   align-items: start;
-  padding: 4px 0 8px;
-  background:
-    linear-gradient(180deg, rgb(var(--surface-deep-rgb) / 0.98), rgb(var(--surface-deep-rgb) / 0.84) 72%, transparent);
-  backdrop-filter: blur(16px);
+  padding: 0 2px 2px;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-sheet-head span {
@@ -436,20 +467,21 @@
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-kicker {
-  color: color-mix(in srgb, var(--text) 76%, var(--editor-accent) 24%) !important;
-  font-size: 0.62rem !important;
-  font-weight: 800 !important;
-  letter-spacing: 0 !important;
+  color: color-mix(in srgb, var(--editor-accent) 70%, var(--text-faint)) !important;
+  font-size: 0.66rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-title {
   display: block;
   max-width: min(68vw, 520px);
-  margin-top: 3px;
+  margin-top: 2px;
   overflow: hidden;
   color: var(--text);
-  font-size: 1rem;
-  font-weight: 780;
+  font-size: 1.08rem;
+  font-weight: 860;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -468,13 +500,20 @@
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-head .editor-pane-mobile-sheet-close {
   flex: 0 0 auto;
-  width: 38px;
-  min-width: 38px;
-  height: 38px;
-  min-height: 38px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
   transform: none;
   border-radius: 16px;
-  color: var(--text-dim);
+  border-color: color-mix(in srgb, var(--editor-accent) 24%, rgb(var(--line-rgb) / 0.14));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.046);
+  color: var(--text);
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-head .editor-pane-mobile-sheet-close svg {
@@ -485,19 +524,19 @@
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
+  gap: 8px;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-summary span {
   min-width: 0;
-  min-height: 48px;
+  min-height: 46px;
   display: grid;
   place-items: center;
   gap: 3px;
   padding: 6px 4px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--editor-accent) 18%, rgb(var(--line-rgb) / 0.1));
-  border-radius: 18px;
+  border-radius: 17px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.014)),
     rgba(255, 255, 255, 0.024);
@@ -526,14 +565,15 @@
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-detail-card,
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card {
+  min-width: 0;
   gap: 12px;
-  padding: 12px;
-  border-radius: 24px;
+  padding: 14px;
+  border-radius: 22px;
   border-color: color-mix(in srgb, var(--editor-accent) 20%, rgb(var(--line-rgb) / 0.11));
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 8%, transparent), transparent 58%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
-    rgba(255, 255, 255, 0.022);
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 9%, transparent), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.032);
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-section-head {
@@ -625,14 +665,15 @@
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .editor-pane-color-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  gap: 10px;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-card .color-swatch.compact {
   width: 100%;
   min-width: 0;
-  height: 38px;
+  min-height: 50px;
+  height: auto;
   border-radius: 15px;
 }
 
@@ -642,31 +683,37 @@
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-detail-card-actions .editor-pane-action-grid {
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-detail-card-actions .micro-action,
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row {
   width: 100%;
-  min-height: 48px;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 7px 10px;
-  border-radius: 18px;
-  font-size: 0.76rem;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  justify-content: initial;
+  padding: 9px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  line-height: 1.25;
   text-align: left;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row .editor-pane-mobile-option-icon {
-  flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  border-radius: 14px;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 17px;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row .editor-pane-mobile-option-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-task-icon::before {
@@ -678,9 +725,13 @@
   transform: rotate(-45deg);
 }
 
-.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row span:last-child {
+.locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-action-row > span:last-child {
   min-width: 0;
+  align-self: center;
   overflow: hidden;
+  color: inherit;
+  font-weight: 760;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1038,7 +1089,15 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-mobile-options-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .locoris-adaptive-shell[data-mobile-shell="true"] .editor-pane-detail-card-actions .editor-pane-action-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .locoris-adaptive-shell[data-mobile-shell="true"] .editor-stage-shell .bn-editor {
-    padding-left: max(68px, calc(env(safe-area-inset-left) + 58px));
+    padding-left: max(46px, calc(env(safe-area-inset-left) + 40px));
   }
 }

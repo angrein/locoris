@@ -4,9 +4,13 @@ import {
   getStartOfLocalDay,
   isPlannerTaskActive
 } from "./planner";
-import { getPlannerTaskOccurrencesForRange } from "./plannerRecurrence";
+import {
+  getPlannerTaskOccurrencesForRange,
+  type PlannerTaskOccurrence
+} from "./plannerRecurrence";
 
 export type PlannerProjectTemporalHealth = "calm" | "active" | "attention" | "critical";
+export type PlannerProjectOverdueSeverity = "none" | "low" | "medium" | "high";
 
 export interface PlannerProjectTemporalSignal {
   projectId: string;
@@ -16,6 +20,8 @@ export interface PlannerProjectTemporalSignal {
   focusCount: number;
   activeCount: number;
   nearestDueAt: number | null;
+  overdueNearestAt: number | null;
+  overdueSeverity: PlannerProjectOverdueSeverity;
   milestoneTaskId: string | null;
   milestoneTitle: string | null;
   milestoneAt: number | null;
@@ -30,6 +36,7 @@ export interface PlannerMapSignalsModel {
 }
 
 const UPCOMING_WINDOW_DAYS = 7;
+const OVERDUE_LOOKBACK_DAYS = 365;
 
 const EMPTY_SIGNAL: Omit<PlannerProjectTemporalSignal, "projectId"> = {
   todayCount: 0,
@@ -38,15 +45,13 @@ const EMPTY_SIGNAL: Omit<PlannerProjectTemporalSignal, "projectId"> = {
   focusCount: 0,
   activeCount: 0,
   nearestDueAt: null,
+  overdueNearestAt: null,
+  overdueSeverity: "none",
   milestoneTaskId: null,
   milestoneTitle: null,
   milestoneAt: null,
   health: "calm"
 };
-
-function getTaskPrimaryScheduleAt(task: Task) {
-  return task.scheduledStartAt ?? task.dueAt ?? task.recurrenceAnchorAt ?? null;
-}
 
 function isMilestoneCandidate(task: Task) {
   return task.kind === "milestone" || task.priority === "urgent" || task.priority === "high";
@@ -59,8 +64,67 @@ function createSignal(projectId: string): PlannerProjectTemporalSignal {
   };
 }
 
+function isOccurrenceToday(occurrence: PlannerTaskOccurrence, startOfToday: number, endOfToday: number) {
+  return occurrence.startAt <= endOfToday && occurrence.endAt >= startOfToday;
+}
+
+function isOccurrenceOverdue(occurrence: PlannerTaskOccurrence, startOfToday: number) {
+  return occurrence.endAt < startOfToday;
+}
+
+function getOccurrenceAnchor(occurrence: PlannerTaskOccurrence) {
+  return occurrence.dueAt ?? occurrence.scheduledStartAt ?? occurrence.startAt;
+}
+
+function updateNearest(signal: PlannerProjectTemporalSignal, occurrence: PlannerTaskOccurrence, upcomingEndAt: number) {
+  const anchor = getOccurrenceAnchor(occurrence);
+
+  if (anchor > upcomingEndAt) {
+    return;
+  }
+
+  signal.nearestDueAt =
+    signal.nearestDueAt === null ? anchor : Math.min(signal.nearestDueAt, anchor);
+}
+
+function updateMilestone(signal: PlannerProjectTemporalSignal, task: Task, occurrence: PlannerTaskOccurrence, startOfToday: number) {
+  if (!isMilestoneCandidate(task) || occurrence.startAt < startOfToday) {
+    return;
+  }
+
+  const milestoneAt = getOccurrenceAnchor(occurrence);
+  const betterMilestone =
+    signal.milestoneAt === null ||
+    milestoneAt < signal.milestoneAt ||
+    (milestoneAt === signal.milestoneAt && task.priority === "urgent");
+
+  if (!betterMilestone) {
+    return;
+  }
+
+  signal.milestoneTaskId = task.id;
+  signal.milestoneTitle = task.title;
+  signal.milestoneAt = milestoneAt;
+}
+
+function resolveOverdueSeverity(overdueCount: number): PlannerProjectOverdueSeverity {
+  if (overdueCount >= 5) {
+    return "high";
+  }
+
+  if (overdueCount >= 2) {
+    return "medium";
+  }
+
+  if (overdueCount > 0) {
+    return "low";
+  }
+
+  return "none";
+}
+
 function resolveHealth(signal: PlannerProjectTemporalSignal): PlannerProjectTemporalHealth {
-  if (signal.overdueCount >= 3 || (signal.overdueCount > 0 && signal.focusCount > 0)) {
+  if (signal.overdueSeverity === "high" || (signal.overdueCount > 0 && signal.focusCount > 0)) {
     return "critical";
   }
 
@@ -86,10 +150,11 @@ export function buildPlannerMapSignals(input: {
   const upcomingEndAt = getEndOfLocalDay(
     startOfToday + UPCOMING_WINDOW_DAYS * 24 * 60 * 60 * 1000
   );
+  const occurrenceRangeStartAt = getStartOfLocalDay(
+    startOfToday - OVERDUE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+  );
   const projectIds = new Set(input.projects.map((project) => project.id));
   const byProjectId = new Map<string, PlannerProjectTemporalSignal>();
-  const countedToday = new Map<string, Set<string>>();
-  const countedUpcoming = new Map<string, Set<string>>();
 
   const ensureSignal = (projectId: string) => {
     const existing = byProjectId.get(projectId);
@@ -103,71 +168,48 @@ export function buildPlannerMapSignals(input: {
     return signal;
   };
 
-  const markSet = (map: Map<string, Set<string>>, projectId: string, taskId: string) => {
-    const projectSet = map.get(projectId) ?? new Set<string>();
-    const alreadyMarked = projectSet.has(taskId);
-    projectSet.add(taskId);
-    map.set(projectId, projectSet);
-    return !alreadyMarked;
-  };
-
   input.tasks.forEach((task) => {
     if (!isPlannerTaskActive(task) || !task.projectId || !projectIds.has(task.projectId)) {
       return;
     }
 
     const signal = ensureSignal(task.projectId);
-    const scheduleAt = getTaskPrimaryScheduleAt(task);
     signal.activeCount += 1;
 
     if (task.status === "inProgress") {
       signal.focusCount += 1;
     }
 
-    if (scheduleAt && scheduleAt < startOfToday) {
-      signal.overdueCount += 1;
-    }
-
-    if (scheduleAt && scheduleAt <= upcomingEndAt) {
-      signal.nearestDueAt =
-        signal.nearestDueAt === null ? scheduleAt : Math.min(signal.nearestDueAt, scheduleAt);
-    }
-
-    if (isMilestoneCandidate(task) && scheduleAt && scheduleAt >= startOfToday) {
-      const betterMilestone =
-        signal.milestoneAt === null ||
-        scheduleAt < signal.milestoneAt ||
-        (scheduleAt === signal.milestoneAt && task.priority === "urgent");
-
-      if (betterMilestone) {
-        signal.milestoneTaskId = task.id;
-        signal.milestoneTitle = task.title;
-        signal.milestoneAt = scheduleAt;
-      }
-    }
-
-    const occurrences = getPlannerTaskOccurrencesForRange(task, startOfToday, upcomingEndAt);
+    const occurrences = getPlannerTaskOccurrencesForRange(task, occurrenceRangeStartAt, upcomingEndAt);
     occurrences.forEach((occurrence) => {
       if (occurrence.completed || occurrence.skipped) {
         return;
       }
 
-      if (occurrence.startAt >= startOfToday && occurrence.startAt <= endOfToday) {
-        if (markSet(countedToday, task.projectId!, task.id)) {
-          signal.todayCount += 1;
-        }
+      updateNearest(signal, occurrence, upcomingEndAt);
+      updateMilestone(signal, task, occurrence, startOfToday);
+
+      if (isOccurrenceOverdue(occurrence, startOfToday)) {
+        const overdueAt = getOccurrenceAnchor(occurrence);
+        signal.overdueCount += 1;
+        signal.overdueNearestAt =
+          signal.overdueNearestAt === null ? overdueAt : Math.min(signal.overdueNearestAt, overdueAt);
+        return;
+      }
+
+      if (isOccurrenceToday(occurrence, startOfToday, endOfToday)) {
+        signal.todayCount += 1;
         return;
       }
 
       if (occurrence.startAt > endOfToday && occurrence.startAt <= upcomingEndAt) {
-        if (markSet(countedUpcoming, task.projectId!, task.id)) {
-          signal.upcomingCount += 1;
-        }
+        signal.upcomingCount += 1;
       }
     });
   });
 
   byProjectId.forEach((signal) => {
+    signal.overdueSeverity = resolveOverdueSeverity(signal.overdueCount);
     signal.health = resolveHealth(signal);
   });
 

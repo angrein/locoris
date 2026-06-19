@@ -41,17 +41,42 @@ function TemporalBadge({
   label: string;
   compact: boolean;
 }) {
-  const width = compact ? 28 : Math.max(34, label.length * 8 + 18);
+  const width = compact ? 34 : Math.max(42, label.length * 8 + 28);
   const height = compact ? 22 : 24;
+  const iconX = -width / 2 + (compact ? 11 : 12);
+  const textX = compact ? 8 : 9;
 
   return (
     <g className={`orbital-temporal-badge is-${kind}`} transform={`translate(${x} ${y})`}>
       <rect x={-width / 2} y={-height / 2} width={width} height={height} rx={height / 2} />
-      <text y="4" textAnchor="middle">
+      {kind === "overdue" ? (
+        <g className="orbital-temporal-badge-icon is-overdue" transform={`translate(${iconX} 0)`}>
+          <circle r="5.2" />
+          <path d="M 0 -2.4 V 0.8 M 0 3.4 V 3.6" />
+        </g>
+      ) : (
+        <g className="orbital-temporal-badge-icon is-today" transform={`translate(${iconX} 0)`}>
+          <circle r="4.2" />
+          <path d="M -1.9 0.2 L -0.4 1.8 L 2.3 -2" />
+        </g>
+      )}
+      <text x={textX} y="4" textAnchor="middle">
         {label}
       </text>
     </g>
   );
+}
+
+function formatTemporalCount(value: number, compact: boolean) {
+  if (compact && value > 9) {
+    return "9+";
+  }
+
+  if (value > 99) {
+    return "99+";
+  }
+
+  return String(value);
 }
 
 export default function TemporalMapLayer({
@@ -79,8 +104,8 @@ export default function TemporalMapLayer({
         const glowRadius = node.radius * (compact ? 2.42 : 2.62);
         const badgeOffsetX = node.radius + (compact ? 18 : 24);
         const badgeOffsetY = -node.radius - (compact ? 18 : 24);
-        const overdueLabel = compact ? `${signal.overdueCount}!` : `! ${signal.overdueCount}`;
-        const todayLabel = `${signal.todayCount}`;
+        const overdueLabel = formatTemporalCount(signal.overdueCount, compact);
+        const todayLabel = formatTemporalCount(signal.todayCount, compact);
         const hasOverdue = signal.overdueCount > 0;
         const hasToday = signal.todayCount > 0;
         const style = {
@@ -124,7 +149,7 @@ export default function TemporalMapLayer({
             {hasOverdue ? (
               <TemporalBadge
                 kind="overdue"
-                x={hasToday ? badgeOffsetX + (compact ? 21 : 42) : badgeOffsetX}
+                x={hasToday ? badgeOffsetX + (compact ? 25 : 46) : badgeOffsetX}
                 y={badgeOffsetY}
                 label={overdueLabel}
                 compact={compact}

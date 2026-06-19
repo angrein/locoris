@@ -1,16 +1,30 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="112" fill="#0D0A24"/>
-  <rect x="38" y="38" width="436" height="436" rx="88" fill="url(#paint0_linear)" stroke="#93ADFF" stroke-opacity="0.28" stroke-width="4"/>
-  <circle cx="128" cy="370" r="34" fill="#FF678C"/>
-  <circle cx="388" cy="144" r="28" fill="#73F7FF"/>
-  <circle cx="318" cy="320" r="18" fill="#66F0A4"/>
-  <path d="M132 160H390" stroke="#FFE08A" stroke-width="24" stroke-linecap="round"/>
-  <path d="M132 256H326" stroke="#FFE08A" stroke-width="24" stroke-linecap="round" stroke-opacity="0.92"/>
-  <path d="M132 352H358" stroke="#FFE08A" stroke-width="24" stroke-linecap="round" stroke-opacity="0.72"/>
+  <rect width="512" height="512" rx="116" fill="#08101C"/>
+  <rect x="34" y="34" width="444" height="444" rx="98" fill="url(#bg)" stroke="url(#edge)" stroke-width="8"/>
+  <circle cx="256" cy="256" r="94" fill="url(#core)"/>
+  <circle cx="256" cy="256" r="69" stroke="url(#orbitPrimary)" stroke-width="16"/>
+  <ellipse cx="256" cy="256" rx="145" ry="56" stroke="rgba(255, 255, 255, 0.58)" stroke-width="12" transform="rotate(-18 256 256)"/>
+  <circle cx="318" cy="184" r="21" fill="#FFFFFF"/>
   <defs>
-    <linearGradient id="paint0_linear" x1="256" y1="38" x2="256" y2="474" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1C1745"/>
-      <stop offset="1" stop-color="#140F34"/>
+    <linearGradient id="bg" x1="84" y1="68" x2="444" y2="452" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#203846"/>
+      <stop offset="0.48" stop-color="#17162E"/>
+      <stop offset="1" stop-color="#28333E"/>
     </linearGradient>
+    <linearGradient id="edge" x1="88" y1="48" x2="444" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE7A4" stop-opacity="0.58"/>
+      <stop offset="0.52" stop-color="#73F7FF" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#FF7DA9" stop-opacity="0.52"/>
+    </linearGradient>
+    <linearGradient id="orbitPrimary" x1="188" y1="176" x2="328" y2="336" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE7A4"/>
+      <stop offset="0.48" stop-color="#73F7FF"/>
+      <stop offset="1" stop-color="#FF7DA9"/>
+    </linearGradient>
+    <radialGradient id="core" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(212 200) rotate(48) scale(192)">
+      <stop stop-color="#FFE8AF" stop-opacity="0.88"/>
+      <stop offset="0.48" stop-color="#61DDE7" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#FF6D9B" stop-opacity="0.18"/>
+    </radialGradient>
   </defs>
 </svg>

@@ -302,6 +302,14 @@
   padding: 14px;
 }
 
+.planner-calendar-side-card.is-agenda.is-revealed {
+  border-color: color-mix(in srgb, var(--planner-calendar-accent) 48%, rgba(255, 255, 255, 0.14));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--planner-calendar-accent) 18%, transparent),
+    0 18px 44px color-mix(in srgb, var(--planner-calendar-accent) 14%, rgba(0, 0, 0, 0.22));
+}
+
 .planner-calendar-side-card p {
   margin: 0;
   color: rgba(224, 234, 247, 0.58);
@@ -950,16 +958,46 @@
 }
 
 .planner-calendar-more {
+  appearance: none;
   display: inline-flex;
   width: fit-content;
   min-height: 24px;
   align-items: center;
+  justify-content: center;
   padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--planner-calendar-accent) 13%, transparent), transparent 68%),
+    rgba(255, 255, 255, 0.06);
   color: rgba(230, 239, 250, 0.66);
+  cursor: pointer;
+  font: inherit;
   font-size: 0.7rem;
   font-weight: 850;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.planner-calendar-more:hover,
+.planner-calendar-more:focus-visible {
+  border-color: color-mix(in srgb, var(--planner-calendar-accent) 42%, rgba(255, 255, 255, 0.16));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--planner-calendar-accent) 24%, transparent), transparent 68%),
+    rgba(255, 255, 255, 0.09);
+  color: rgba(248, 251, 255, 0.9);
+}
+
+.planner-calendar-more:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--planner-calendar-accent) 54%, transparent);
+  outline-offset: 2px;
+}
+
+.planner-calendar-more:active {
+  transform: translateY(1px);
 }
 
 .planner-calendar-unscheduled-list button {

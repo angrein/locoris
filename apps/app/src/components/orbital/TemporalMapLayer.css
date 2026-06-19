@@ -4,7 +4,9 @@
 }
 
 .orbital-temporal-signal {
-  --temporal-health: color-mix(in srgb, var(--temporal-color) 72%, var(--accent-theme-primary, #ffd166) 28%);
+  --temporal-health: color-mix(in srgb, var(--temporal-color) 72%, var(--accent-theme-primary, #8edcff) 28%);
+  --temporal-overdue: #ff8fa7;
+  --temporal-overdue-strong: #ff6f8d;
 }
 
 .orbital-temporal-signal.is-health-active {
@@ -12,11 +14,11 @@
 }
 
 .orbital-temporal-signal.is-health-attention {
-  --temporal-health: color-mix(in srgb, var(--temporal-color) 54%, #ffd166 46%);
+  --temporal-health: color-mix(in srgb, var(--temporal-color) 48%, var(--temporal-overdue) 52%);
 }
 
 .orbital-temporal-signal.is-health-critical {
-  --temporal-health: color-mix(in srgb, var(--temporal-color) 34%, #ff7f98 66%);
+  --temporal-health: color-mix(in srgb, var(--temporal-color) 28%, var(--temporal-overdue-strong) 72%);
 }
 
 .orbital-temporal-health-glow {
@@ -51,6 +53,37 @@
   vector-effect: non-scaling-stroke;
 }
 
+.orbital-temporal-badge-icon circle {
+  fill: color-mix(in srgb, rgba(255, 255, 255, 0.18) 42%, transparent);
+  stroke-width: 1.35;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbital-temporal-badge-icon path {
+  fill: none;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbital-temporal-badge-icon.is-today circle {
+  stroke: color-mix(in srgb, var(--temporal-health) 72%, rgba(255, 255, 255, 0.22));
+}
+
+.orbital-temporal-badge-icon.is-today path {
+  stroke: rgba(238, 255, 247, 0.96);
+}
+
+.orbital-temporal-badge-icon.is-overdue circle {
+  fill: color-mix(in srgb, var(--temporal-overdue) 18%, rgba(255, 255, 255, 0.1));
+  stroke: color-mix(in srgb, var(--temporal-overdue) 78%, rgba(255, 255, 255, 0.18));
+}
+
+.orbital-temporal-badge-icon.is-overdue path {
+  stroke: rgba(255, 239, 243, 0.98);
+}
+
 .orbital-temporal-badge text {
   fill: rgba(249, 252, 255, 0.96);
   font-family: var(--font-ui);
@@ -68,8 +101,8 @@
 }
 
 .orbital-temporal-badge.is-overdue rect {
-  fill: color-mix(in srgb, #ff7f98 34%, rgb(var(--surface-deep-rgb) / 0.78));
-  stroke: color-mix(in srgb, #ff9caf 62%, rgba(255, 255, 255, 0.18));
+  fill: color-mix(in srgb, var(--temporal-overdue-strong) 32%, rgb(var(--surface-deep-rgb) / 0.78));
+  stroke: color-mix(in srgb, var(--temporal-overdue) 68%, rgba(255, 255, 255, 0.18));
 }
 
 .orbital-temporal-focus circle {

@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import "@excalidraw/excalidraw/index.css";
 import "./CanvasPane.css";
 import "./CanvasPane.excalidraw.css";
+import CanvasMobileChrome from "./CanvasMobileChrome";
 import ConfirmDialog from "./ConfirmDialog";
 import FolderPicker from "./FolderPicker";
 import {
@@ -113,6 +114,7 @@ interface CanvasPaneProps {
     title?: string
   ) => Promise<void> | void;
   onCreateTaskFromContext?: (input: PlannerContextTaskInput) => Promise<unknown> | void;
+  onClose?: () => void;
   libraryStorageScopeId: string;
   privateVaultWarningContext?: PrivateVaultWarningContext | null;
   immersive?: boolean;
@@ -1033,6 +1035,7 @@ export default function CanvasPane({
   onLoadFiles,
   onCreateCanvasFromAi,
   onCreateTaskFromContext,
+  onClose = () => undefined,
   libraryStorageScopeId,
   privateVaultWarningContext = null,
   immersive = false
@@ -1064,8 +1067,10 @@ export default function CanvasPane({
   const [canvasTaskStatus, setCanvasTaskStatus] = useState<CanvasTaskStatus>(null);
   const [canvasExportStatus, setCanvasExportStatus] = useState<CanvasExportStatus>(null);
   const [canvasSelectionCount, setCanvasSelectionCount] = useState(0);
+  const [isNativeCanvasMenuOpen, setIsNativeCanvasMenuOpen] = useState(false);
   const canvasStageShellRef = useRef<HTMLDivElement | null>(null);
   const canvasAiShellRef = useRef<HTMLDivElement | null>(null);
+  const canvasAiMobileShellRef = useRef<HTMLDivElement | null>(null);
   const titleTimeoutRef = useRef<number | null>(null);
   const contentTimeoutRef = useRef<number | null>(null);
   const canvasAiNoticeTimeoutRef = useRef<number | null>(null);
@@ -1242,8 +1247,13 @@ export default function CanvasPane({
 
     const handlePointerDown = (event: PointerEvent) => {
       const shell = canvasAiShellRef.current;
+      const mobileShell = canvasAiMobileShellRef.current;
 
-      if (!shell || !(event.target instanceof Node) || shell.contains(event.target)) {
+      if (
+        !(event.target instanceof Node) ||
+        shell?.contains(event.target) ||
+        mobileShell?.contains(event.target)
+      ) {
         return;
       }
 
@@ -1396,6 +1406,15 @@ export default function CanvasPane({
           Boolean(menu.querySelector(".canvas-mainmenu-section"))
         );
       });
+
+      const hasNativeCanvasMenu = Boolean(
+        canvasRoot.querySelector(".dropdown-menu.canvas-mainmenu-dropdown")
+      );
+      setIsNativeCanvasMenuOpen((wasOpen) =>
+        wasOpen === hasNativeCanvasMenu ? wasOpen : hasNativeCanvasMenu
+      );
+    } else {
+      setIsNativeCanvasMenuOpen((wasOpen) => (wasOpen ? false : wasOpen));
     }
 
     document.querySelectorAll<HTMLElement>(".ImageExportModal").forEach((modal) => {
@@ -2310,6 +2329,128 @@ export default function CanvasPane({
     }
   };
 
+  const handleFitCanvasContent = () => {
+    const api = excalidrawApiRef.current;
+
+    if (!api) {
+      return;
+    }
+
+    const liveElements = api.getSceneElements().filter((element) => !element.isDeleted);
+
+    if (liveElements.length > 0) {
+      api.scrollToContent(liveElements, {
+        fitToContent: true,
+        viewportZoomFactor: 0.78,
+        animate: true,
+        duration: 260
+      });
+      return;
+    }
+
+    api.scrollToContent(undefined, {
+      fitToViewport: true,
+      viewportZoomFactor: 0.9,
+      animate: true,
+      duration: 260
+    });
+  };
+
+  const handleOpenNativeCanvasMenu = () => {
+    setActiveSurface("canvas");
+    setIsCanvasAiOpen(false);
+
+    window.requestAnimationFrame(() => {
+      const nativeMenuTrigger =
+        canvasStageShellRef.current?.querySelector<HTMLButtonElement>(".excalidraw .main-menu-trigger");
+
+      if (!nativeMenuTrigger) {
+        return;
+      }
+
+      nativeMenuTrigger.click();
+      window.requestAnimationFrame(syncCanvasUiChrome);
+    });
+  };
+
+  const handleCloseNativeCanvasMenu = () => {
+    const hasNativeMenu =
+      canvasStageShellRef.current?.querySelector(".dropdown-menu.canvas-mainmenu-dropdown") != null;
+    const nativeMenuTrigger =
+      canvasStageShellRef.current?.querySelector<HTMLButtonElement>(".excalidraw .main-menu-trigger");
+
+    if (hasNativeMenu) {
+      nativeMenuTrigger?.click();
+    }
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        code: "Escape",
+        bubbles: true
+      })
+    );
+    setIsNativeCanvasMenuOpen(false);
+    window.requestAnimationFrame(syncCanvasUiChrome);
+  };
+
+  useEffect(() => {
+    if (!isNativeCanvasMenuOpen) {
+      return undefined;
+    }
+
+    const handleNativeMenuOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      if (
+        target.closest(".dropdown-menu.canvas-mainmenu-dropdown") ||
+        target.closest(".Dialog") ||
+        target.closest(".Modal")
+      ) {
+        return;
+      }
+
+      handleCloseNativeCanvasMenu();
+    };
+
+    document.addEventListener("pointerdown", handleNativeMenuOutsidePointerDown, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleNativeMenuOutsidePointerDown, true);
+    };
+  }, [isNativeCanvasMenuOpen]);
+
+  useEffect(() => {
+    const updateMobileDialogScope = () => {
+      const isMobileCanvasShell =
+        canvasStageShellRef.current?.closest(".locoris-adaptive-shell[data-mobile-shell='true']") != null;
+
+      document.body.classList.toggle("locoris-canvas-mobile-dialogs", isMobileCanvasShell);
+    };
+
+    updateMobileDialogScope();
+
+    const adaptiveShell = canvasStageShellRef.current?.closest(".locoris-adaptive-shell") ?? null;
+    const mobileShellObserver = adaptiveShell ? new MutationObserver(updateMobileDialogScope) : null;
+
+    if (adaptiveShell && mobileShellObserver) {
+      mobileShellObserver.observe(adaptiveShell, {
+        attributeFilter: ["data-mobile-shell"],
+        attributes: true
+      });
+    }
+    window.addEventListener("resize", updateMobileDialogScope);
+
+    return () => {
+      mobileShellObserver?.disconnect();
+      window.removeEventListener("resize", updateMobileDialogScope);
+      document.body.classList.remove("locoris-canvas-mobile-dialogs");
+    };
+  }, []);
+
   useEffect(() => {
     return () => {
       if (titleTimeoutRef.current) {
@@ -2336,6 +2477,11 @@ export default function CanvasPane({
     const shell = canvasAiShellRef.current;
 
     if (!shell) {
+      return;
+    }
+
+    if (shell.closest('.locoris-adaptive-shell[data-mobile-shell="true"]')) {
+      setCanvasAiPopoverStyle({});
       return;
     }
 
@@ -2513,6 +2659,406 @@ export default function CanvasPane({
     }
   });
 
+  const renderCanvasAiPanel = (style?: CSSProperties) => (
+    <div
+      className="canvas-ai-popover"
+      role="dialog"
+      aria-label={t("canvas.aiTitle")}
+      style={style}
+    >
+      <label className="canvas-ai-prompt-card">
+        <span className="canvas-ai-prompt-icon" aria-hidden="true">
+          <CanvasAiIcon />
+        </span>
+        <textarea
+          value={canvasAiPrompt}
+          onChange={(event) => {
+            setCanvasAiPrompt(event.target.value);
+            resetCanvasAiPreviewState();
+          }}
+          placeholder={t("canvas.aiPromptPlaceholder")}
+          aria-label={t("canvas.aiPromptLabel")}
+          rows={3}
+          disabled={canvasAiBusy}
+        />
+        <button
+          type="button"
+          className="canvas-ai-prompt-run"
+          onClick={() => void handleGenerateCanvasAiPreview()}
+          disabled={canvasAiRunDisabled}
+          title={canvasAiPreview ? t("canvas.aiRegenerate") : t("canvas.aiGenerate")}
+          aria-label={canvasAiPreview ? t("canvas.aiRegenerate") : t("canvas.aiGenerate")}
+        >
+          <CanvasAiRunIcon />
+        </button>
+      </label>
+
+      <div className="canvas-ai-command-card">
+        <div className="canvas-ai-panel-section">
+          <div className="canvas-ai-section-title">
+            <span>{t("canvas.aiSourceLabel")}</span>
+          </div>
+          <div className="canvas-ai-source-switch" role="radiogroup" aria-label={t("canvas.aiSourceLabel")}>
+            {CANVAS_AI_SOURCE_MODES.map((sourceMode) => {
+              const noticeKey = `source:${sourceMode}`;
+              const isAllowed = activeCanvasAiSourceModes.includes(sourceMode);
+              const needsSelection = sourceMode === "selection" && !hasCanvasSelection;
+              const unavailableMessage = !isAllowed
+                ? t("canvas.aiSourceUnavailable")
+                : needsSelection
+                  ? t("canvas.aiSelectionRequired")
+                  : "";
+
+              return (
+                <button
+                  key={sourceMode}
+                  type="button"
+                  className={`canvas-ai-source-pill ${canvasAiSourceMode === sourceMode ? "is-active" : ""} ${
+                    unavailableMessage ? "is-disabled" : ""
+                  }`}
+                  onClick={() => {
+                    if (unavailableMessage) {
+                      showCanvasAiNotice(noticeKey, unavailableMessage);
+                      return;
+                    }
+
+                    setCanvasAiSourceMode(sourceMode);
+                    resetCanvasAiPreviewState();
+                  }}
+                  disabled={canvasAiBusy}
+                  aria-disabled={unavailableMessage ? true : undefined}
+                  title={unavailableMessage || undefined}
+                >
+                  {t(`canvas.aiSource.${sourceMode}`)}
+                  {canvasAiNotice?.key === noticeKey ? (
+                    <span className="canvas-ai-inline-notice" role="status">
+                      {canvasAiNotice.message}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
+          {canvasAiSourceMode === "note" ? (
+            <div className="canvas-ai-note-source">
+              <input
+                type="search"
+                value={canvasAiNoteSearch}
+                onChange={(event) => {
+                  setCanvasAiNoteSearch(event.target.value);
+                  setCanvasAiSourceNoteId("");
+                  resetCanvasAiPreviewState();
+                }}
+                placeholder={t("canvas.aiSourceNoteSearch")}
+                aria-label={t("canvas.aiSourceNoteSearch")}
+                disabled={canvasAiBusy}
+              />
+              <div className="canvas-ai-note-list">
+                {filteredCanvasAiSourceNotes.length > 0 ? (
+                  filteredCanvasAiSourceNotes.map((sourceNote) => {
+                    const isSelected =
+                      sourceNote.id === (selectedCanvasAiSourceNote?.id ?? filteredCanvasAiSourceNotes[0]?.id);
+
+                    return (
+                      <button
+                        key={sourceNote.id}
+                        type="button"
+                        className={`canvas-ai-note-row ${isSelected ? "is-active" : ""}`}
+                        onClick={() => {
+                          setCanvasAiSourceNoteId(sourceNote.id);
+                          resetCanvasAiPreviewState();
+                        }}
+                        disabled={canvasAiBusy}
+                      >
+                        <span>{getDisplayNoteTitle(sourceNote, language)}</span>
+                        <small>{sourceNote.excerpt || sourceNote.plainText || t("canvas.aiPreviewEmptySource")}</small>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p className="canvas-ai-note-empty">{t("canvas.aiSourceNoNotes")}</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="canvas-ai-panel-section">
+          <div className="canvas-ai-section-title">
+            <span>{t("canvas.aiWorkflowLabel")}</span>
+          </div>
+          <div className="canvas-ai-workflow-switch" role="tablist" aria-label={t("canvas.aiWorkflowLabel")}>
+            {CANVAS_AI_WORKFLOWS.map((workflow) => (
+              <button
+                key={workflow.id}
+                type="button"
+                className={`canvas-ai-workflow-pill ${canvasAiWorkflow === workflow.id ? "is-active" : ""}`}
+                onClick={() => {
+                  const nextCommand =
+                    CANVAS_AI_COMMANDS.find((command) => command.workflow === workflow.id && !command.hiddenByDefault) ??
+                    CANVAS_AI_COMMANDS.find((command) => command.workflow === workflow.id);
+
+                  if (nextCommand) {
+                    handleSelectCanvasAiCommand(nextCommand, { collapseCommands: true });
+                  } else {
+                    setCanvasAiWorkflow(workflow.id);
+                    setCanvasAiShowMoreCommands(false);
+                    resetCanvasAiPreviewState();
+                  }
+                }}
+                disabled={canvasAiBusy}
+              >
+                {t(workflow.labelKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="canvas-ai-panel-section">
+          <div className="canvas-ai-section-title">
+            <span>{t("canvas.aiInsertModeLabel")}</span>
+          </div>
+          <div className="canvas-ai-mode-switch" role="radiogroup" aria-label={t("canvas.aiInsertModeLabel")}>
+            {CANVAS_AI_INSERT_MODES.map((insertMode) => {
+              const noticeKey = `insert:${insertMode}`;
+              const isAllowed = activeCanvasAiInsertModes.includes(insertMode);
+              const needsSelection = insertMode === "replaceSelection" && !hasCanvasSelection;
+              const needsCreateHandler = insertMode === "newCanvas" && !onCreateCanvasFromAi;
+              const unavailableMessage = !isAllowed
+                ? t("canvas.aiInsertModeUnavailable")
+                : needsSelection
+                  ? t("canvas.aiReplaceNeedsSelection")
+                  : needsCreateHandler
+                    ? t("canvas.aiNewCanvasUnavailable")
+                    : "";
+
+              return (
+                <button
+                  key={insertMode}
+                  type="button"
+                  className={`canvas-ai-mode-pill ${canvasAiInsertMode === insertMode ? "is-active" : ""} ${
+                    unavailableMessage ? "is-disabled" : ""
+                  }`}
+                  onClick={() => {
+                    if (unavailableMessage) {
+                      showCanvasAiNotice(noticeKey, unavailableMessage);
+                      return;
+                    }
+
+                    setCanvasAiInsertMode(insertMode);
+                    resetCanvasAiPreviewState();
+                  }}
+                  disabled={canvasAiBusy}
+                  aria-disabled={unavailableMessage ? true : undefined}
+                  title={unavailableMessage || undefined}
+                >
+                  {insertMode === "replaceSelection"
+                    ? t("canvas.aiReplaceSelection")
+                    : insertMode === "newCanvas"
+                      ? t("canvas.aiNewCanvas")
+                      : t("canvas.aiInsertNearby")}
+                  {canvasAiNotice?.key === noticeKey ? (
+                    <span className="canvas-ai-inline-notice" role="status">
+                      {canvasAiNotice.message}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="canvas-ai-panel-section">
+          <div className="canvas-ai-section-title">
+            <span>{t("canvas.aiCommandLabel")}</span>
+            {hiddenCanvasAiCommandCount > 0 ? (
+              <button
+                type="button"
+                className="canvas-ai-more-button"
+                onClick={() => setCanvasAiShowMoreCommands((showMore) => !showMore)}
+                disabled={canvasAiBusy}
+              >
+                {canvasAiShowMoreCommands
+                  ? t("canvas.aiLessCommands")
+                  : t("canvas.aiMoreCommands", { count: hiddenCanvasAiCommandCount })}
+              </button>
+            ) : null}
+          </div>
+          <div className="canvas-ai-command-list" role="radiogroup" aria-label={t("canvas.aiCommandLabel")}>
+            {visibleCanvasAiCommands.map((command) => {
+              const noticeKey = `command:${command.id}`;
+              const unavailableMessage =
+                command.requiresSelection && !hasCanvasSelection
+                  ? t("canvas.aiSelectionRequired")
+                  : "";
+
+              return (
+                <button
+                  key={command.id}
+                  type="button"
+                  className={`canvas-ai-command-row ${canvasAiCommandId === command.id ? "is-active" : ""} ${
+                    unavailableMessage ? "is-disabled" : ""
+                  }`}
+                  onClick={() => {
+                    if (unavailableMessage) {
+                      showCanvasAiNotice(noticeKey, unavailableMessage);
+                      return;
+                    }
+
+                    handleSelectCanvasAiCommand(command);
+                  }}
+                  disabled={canvasAiBusy}
+                  aria-disabled={unavailableMessage ? true : undefined}
+                  title={unavailableMessage || undefined}
+                >
+                  <span className="canvas-ai-command-icon" aria-hidden="true">
+                    <CanvasAiIcon />
+                  </span>
+                  <span>
+                    <strong>{t(command.labelKey)}</strong>
+                    <small>{t(command.descriptionKey)}</small>
+                  </span>
+                  {canvasAiNotice?.key === noticeKey ? (
+                    <span className="canvas-ai-inline-notice" role="status">
+                      {canvasAiNotice.message}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {!canvasAiNotice && canvasAiValidationWarning ? (
+          <p className="canvas-ai-message is-warning">
+            {getCanvasAiErrorMessage(canvasAiValidationWarning)}
+          </p>
+        ) : null}
+
+        {canvasAiMessage ? (
+          <p className={`canvas-ai-message is-${canvasAiStatus}`}>{canvasAiMessage}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  const renderCanvasInfoPanel = ({
+    className = "",
+    mobile = false
+  }: {
+    className?: string;
+    mobile?: boolean;
+  } = {}) => (
+    <aside
+      className={["canvas-sidepanel", className].filter(Boolean).join(" ")}
+      role={mobile ? "dialog" : undefined}
+      aria-modal={mobile ? true : undefined}
+      aria-label={mobile ? t("canvas.infoTab") : undefined}
+    >
+      <div className="canvas-mobile-info-head">
+        <div className="canvas-mobile-sheet-handle" aria-hidden="true" />
+        <header>
+          <div>
+            <span>{t("canvas.mobile.infoKicker")}</span>
+            <strong>{t("canvas.infoTab")}</strong>
+          </div>
+          <button
+            type="button"
+            className="canvas-mobile-sheet-close"
+            onClick={() => setActiveSurface("canvas")}
+            aria-label={t("canvas.mobile.closeSheet")}
+          >
+            <span aria-hidden="true" />
+          </button>
+        </header>
+      </div>
+
+      <div className="canvas-mobile-info-body">
+        <section className="canvas-detail-card">
+          <div className="canvas-detail-field">
+            <span className="canvas-detail-label">{t("note.folder")}</span>
+            <FolderPicker
+              options={folderOptions}
+              value={note.folderId}
+              emptyLabel={t("orbit.uncategorized")}
+              ariaLabel={t("note.folder")}
+              onChange={onFolderChange}
+            />
+          </div>
+
+          <div className="canvas-detail-field">
+            <span className="canvas-detail-label">{t("note.tags")}</span>
+            <TagInputField
+              tags={tags}
+              selectedTagIds={note.tagIds}
+              language={language}
+              onChangeTagIds={onTagIdsChange}
+              onCreateTag={onCreateTag}
+            />
+          </div>
+
+          <div className="canvas-detail-field">
+            <span className="canvas-detail-label">{t("note.color")}</span>
+            <div className="color-swatch-grid compact">
+              {COLOR_PALETTE.map((colorOption) => (
+                <button
+                  type="button"
+                  key={colorOption.id}
+                  className={`color-swatch compact ${note.color === colorOption.hex ? "is-active" : ""}`}
+                  onClick={() => onNoteColorChange(colorOption.hex)}
+                  style={{ "--swatch-color": colorOption.hex } as CSSProperties}
+                  aria-label={`${t("note.color")}: ${t(colorOption.labelKey)}`}
+                  title={t(colorOption.labelKey)}
+                >
+                  <span className="color-swatch-fill" />
+                </button>
+              ))}
+            </div>
+            <label className="orbital-custom-color-picker">
+              <span className="orbital-color-label">{t("orbit.customColor")}</span>
+              <span className="orbital-custom-color-control">
+                <input
+                  type="color"
+                  className="orbital-custom-color-input"
+                  value={note.color || DEFAULT_NOTE_COLOR}
+                  onChange={(event) => onNoteColorChange(event.target.value)}
+                  aria-label={t("orbit.customColor")}
+                />
+                <span className="orbital-custom-color-value">
+                  {(note.color || DEFAULT_NOTE_COLOR).toUpperCase()}
+                </span>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        {!mobile ? (
+          <section className="canvas-detail-card canvas-detail-card-actions">
+            <div className="canvas-action-grid">
+              <button
+                type="button"
+                className={`micro-action ${note.pinned || note.favorite ? "is-active" : ""}`}
+                onClick={onTogglePin}
+              >
+                {note.pinned || note.favorite ? t("note.unpin") : t("note.pin")}
+              </button>
+              {note.trashedAt ? (
+                <button type="button" className="micro-action" onClick={onRestore}>
+                  {t("note.restore")}
+                </button>
+              ) : null}
+              <button type="button" className="micro-action danger" onClick={onDelete}>
+                {note.trashedAt ? t("note.deletePermanently") : t("note.moveToTrash")}
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+      </div>
+    </aside>
+  );
+
   return (
     <section
       className={`canvas-pane ${immersive ? "is-immersive" : ""} ${
@@ -2520,6 +3066,71 @@ export default function CanvasPane({
       }`}
       style={{ "--note-accent": note.color || DEFAULT_NOTE_COLOR } as CSSProperties}
     >
+      <CanvasMobileChrome
+        title={titleDraft}
+        placeholder={t("canvas.titlePlaceholder")}
+        saveState={saveState}
+        exportStatus={canvasExportStatus}
+        taskStatus={canvasTaskStatus}
+        selectionCount={canvasSelectionCount}
+        isAiOpen={isCanvasAiOpen}
+        isPinned={Boolean(note.pinned || note.favorite)}
+        isTrashed={Boolean(note.trashedAt)}
+        onTitleChange={handleTitleChange}
+        onClose={onClose}
+        onToggleAi={() => {
+          setActiveSurface("canvas");
+          setIsCanvasAiOpen((isOpen) => !isOpen);
+          setCanvasAiMessage("");
+        }}
+        onOpenInfo={() => {
+          setIsCanvasAiOpen(false);
+          setActiveSurface("info");
+        }}
+        onFitContent={handleFitCanvasContent}
+        onCreateTask={() => void handleCreateTaskFromCanvasSelection()}
+        onOpenNativeMenu={handleOpenNativeCanvasMenu}
+        onTogglePin={onTogglePin}
+        onRestore={onRestore}
+        onDelete={onDelete}
+        onClearCanvas={() => {
+          setIsCanvasAiOpen(false);
+          setActiveSurface("canvas");
+          setIsClearCanvasDialogOpen(true);
+        }}
+      />
+      {isCanvasAiOpen ? (
+        <div ref={canvasAiMobileShellRef} className="canvas-ai-mobile-sheet-layer" role="presentation">
+          <button
+            type="button"
+            className="canvas-ai-mobile-backdrop"
+            onClick={() => setIsCanvasAiOpen(false)}
+            aria-label={t("canvas.mobile.closeSheet")}
+          />
+          <section className="canvas-ai-mobile-sheet" role="presentation">
+            <button
+              type="button"
+              className="canvas-ai-mobile-sheet-close"
+              onClick={() => setIsCanvasAiOpen(false)}
+              aria-label={t("canvas.mobile.closeSheet")}
+            >
+              <CanvasAiCloseIcon />
+            </button>
+            {renderCanvasAiPanel()}
+          </section>
+        </div>
+      ) : null}
+      {activeSurface === "info" ? (
+        <div className="canvas-info-mobile-sheet-layer" role="presentation">
+          <button
+            type="button"
+            className="canvas-info-mobile-backdrop"
+            onClick={() => setActiveSurface("canvas")}
+            aria-label={t("canvas.mobile.closeSheet")}
+          />
+          {renderCanvasInfoPanel({ className: "is-mobile-sheet", mobile: true })}
+        </div>
+      ) : null}
       <div className="canvas-pane-toolbar">
         <div className="canvas-pane-toolbar-main">
           <input
@@ -2569,7 +3180,7 @@ export default function CanvasPane({
             </button>
           </div>
 
-	          <div ref={canvasAiShellRef} className="canvas-ai-shell">
+	          <div ref={canvasAiShellRef} className={`canvas-ai-shell ${isCanvasAiOpen ? "is-open" : ""}`}>
 	            {onCreateTaskFromContext ? (
 	              <button
 	                type="button"
@@ -2600,288 +3211,15 @@ export default function CanvasPane({
             </button>
 
             {isCanvasAiOpen ? (
-              <div
-                className="canvas-ai-popover"
-                role="dialog"
-                aria-label={t("canvas.aiTitle")}
-                style={canvasAiPopoverStyle}
-              >
-                <label className="canvas-ai-prompt-card">
-                  <span className="canvas-ai-prompt-icon" aria-hidden="true">
-                    <CanvasAiIcon />
-                  </span>
-                  <textarea
-                    value={canvasAiPrompt}
-                    onChange={(event) => {
-                      setCanvasAiPrompt(event.target.value);
-                      resetCanvasAiPreviewState();
-                    }}
-                    placeholder={t("canvas.aiPromptPlaceholder")}
-                    aria-label={t("canvas.aiPromptLabel")}
-                    rows={3}
-                    disabled={canvasAiBusy}
-                  />
-                  <button
-                    type="button"
-                    className="canvas-ai-prompt-run"
-                    onClick={() => void handleGenerateCanvasAiPreview()}
-                    disabled={canvasAiRunDisabled}
-                    title={canvasAiPreview ? t("canvas.aiRegenerate") : t("canvas.aiGenerate")}
-                    aria-label={canvasAiPreview ? t("canvas.aiRegenerate") : t("canvas.aiGenerate")}
-                  >
-                    <CanvasAiRunIcon />
-                  </button>
-                </label>
-
-                <div className="canvas-ai-command-card">
-                  <div className="canvas-ai-panel-section">
-                    <div className="canvas-ai-section-title">
-                      <span>{t("canvas.aiSourceLabel")}</span>
-                    </div>
-                    <div className="canvas-ai-source-switch" role="radiogroup" aria-label={t("canvas.aiSourceLabel")}>
-                      {CANVAS_AI_SOURCE_MODES.map((sourceMode) => {
-                        const noticeKey = `source:${sourceMode}`;
-                        const isAllowed = activeCanvasAiSourceModes.includes(sourceMode);
-                        const needsSelection = sourceMode === "selection" && !hasCanvasSelection;
-                        const unavailableMessage = !isAllowed
-                          ? t("canvas.aiSourceUnavailable")
-                          : needsSelection
-                            ? t("canvas.aiSelectionRequired")
-                            : "";
-
-                        return (
-                          <button
-                            key={sourceMode}
-                            type="button"
-                            className={`canvas-ai-source-pill ${canvasAiSourceMode === sourceMode ? "is-active" : ""} ${
-                              unavailableMessage ? "is-disabled" : ""
-                            }`}
-                            onClick={() => {
-                              if (unavailableMessage) {
-                                showCanvasAiNotice(noticeKey, unavailableMessage);
-                                return;
-                              }
-
-                              setCanvasAiSourceMode(sourceMode);
-                              resetCanvasAiPreviewState();
-                            }}
-                            disabled={canvasAiBusy}
-                            aria-disabled={unavailableMessage ? true : undefined}
-                            title={unavailableMessage || undefined}
-                          >
-                            {t(`canvas.aiSource.${sourceMode}`)}
-                            {canvasAiNotice?.key === noticeKey ? (
-                              <span className="canvas-ai-inline-notice" role="status">
-                                {canvasAiNotice.message}
-                              </span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {canvasAiSourceMode === "note" ? (
-                      <div className="canvas-ai-note-source">
-                        <input
-                          type="search"
-                          value={canvasAiNoteSearch}
-                          onChange={(event) => {
-                            setCanvasAiNoteSearch(event.target.value);
-                            setCanvasAiSourceNoteId("");
-                            resetCanvasAiPreviewState();
-                          }}
-                          placeholder={t("canvas.aiSourceNoteSearch")}
-                          aria-label={t("canvas.aiSourceNoteSearch")}
-                          disabled={canvasAiBusy}
-                        />
-                        <div className="canvas-ai-note-list">
-                          {filteredCanvasAiSourceNotes.length > 0 ? (
-                            filteredCanvasAiSourceNotes.map((sourceNote) => {
-                              const isSelected =
-                                sourceNote.id === (selectedCanvasAiSourceNote?.id ?? filteredCanvasAiSourceNotes[0]?.id);
-
-                              return (
-                                <button
-                                  key={sourceNote.id}
-                                  type="button"
-                                  className={`canvas-ai-note-row ${isSelected ? "is-active" : ""}`}
-                                  onClick={() => {
-                                    setCanvasAiSourceNoteId(sourceNote.id);
-                                    resetCanvasAiPreviewState();
-                                  }}
-                                  disabled={canvasAiBusy}
-                                >
-                                  <span>{getDisplayNoteTitle(sourceNote, language)}</span>
-                                  <small>{sourceNote.excerpt || sourceNote.plainText || t("canvas.aiPreviewEmptySource")}</small>
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <p className="canvas-ai-note-empty">{t("canvas.aiSourceNoNotes")}</p>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="canvas-ai-panel-section">
-                    <div className="canvas-ai-section-title">
-                      <span>{t("canvas.aiWorkflowLabel")}</span>
-                    </div>
-                    <div className="canvas-ai-workflow-switch" role="tablist" aria-label={t("canvas.aiWorkflowLabel")}>
-                      {CANVAS_AI_WORKFLOWS.map((workflow) => (
-                        <button
-                          key={workflow.id}
-                          type="button"
-                          className={`canvas-ai-workflow-pill ${canvasAiWorkflow === workflow.id ? "is-active" : ""}`}
-                          onClick={() => {
-                            const nextCommand =
-                              CANVAS_AI_COMMANDS.find((command) => command.workflow === workflow.id && !command.hiddenByDefault) ??
-                              CANVAS_AI_COMMANDS.find((command) => command.workflow === workflow.id);
-
-                            if (nextCommand) {
-                              handleSelectCanvasAiCommand(nextCommand, { collapseCommands: true });
-                            } else {
-                              setCanvasAiWorkflow(workflow.id);
-                              setCanvasAiShowMoreCommands(false);
-                              resetCanvasAiPreviewState();
-                            }
-                          }}
-                          disabled={canvasAiBusy}
-                        >
-                          {t(workflow.labelKey)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="canvas-ai-panel-section">
-                    <div className="canvas-ai-section-title">
-                      <span>{t("canvas.aiInsertModeLabel")}</span>
-                    </div>
-                    <div className="canvas-ai-mode-switch" role="radiogroup" aria-label={t("canvas.aiInsertModeLabel")}>
-                      {CANVAS_AI_INSERT_MODES.map((insertMode) => {
-                        const noticeKey = `insert:${insertMode}`;
-                        const isAllowed = activeCanvasAiInsertModes.includes(insertMode);
-                        const needsSelection = insertMode === "replaceSelection" && !hasCanvasSelection;
-                        const needsCreateHandler = insertMode === "newCanvas" && !onCreateCanvasFromAi;
-                        const unavailableMessage = !isAllowed
-                          ? t("canvas.aiInsertModeUnavailable")
-                          : needsSelection
-                            ? t("canvas.aiReplaceNeedsSelection")
-                            : needsCreateHandler
-                              ? t("canvas.aiNewCanvasUnavailable")
-                              : "";
-
-                        return (
-                          <button
-                            key={insertMode}
-                            type="button"
-                            className={`canvas-ai-mode-pill ${canvasAiInsertMode === insertMode ? "is-active" : ""} ${
-                              unavailableMessage ? "is-disabled" : ""
-                            }`}
-                            onClick={() => {
-                              if (unavailableMessage) {
-                                showCanvasAiNotice(noticeKey, unavailableMessage);
-                                return;
-                              }
-
-                              setCanvasAiInsertMode(insertMode);
-                              resetCanvasAiPreviewState();
-                            }}
-                            disabled={canvasAiBusy}
-                            aria-disabled={unavailableMessage ? true : undefined}
-                            title={unavailableMessage || undefined}
-                          >
-                            {insertMode === "replaceSelection"
-                              ? t("canvas.aiReplaceSelection")
-                              : insertMode === "newCanvas"
-                                ? t("canvas.aiNewCanvas")
-                                : t("canvas.aiInsertNearby")}
-                            {canvasAiNotice?.key === noticeKey ? (
-                              <span className="canvas-ai-inline-notice" role="status">
-                                {canvasAiNotice.message}
-                              </span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="canvas-ai-panel-section">
-                    <div className="canvas-ai-section-title">
-                      <span>{t("canvas.aiCommandLabel")}</span>
-                      {hiddenCanvasAiCommandCount > 0 ? (
-                        <button
-                          type="button"
-                          className="canvas-ai-more-button"
-                          onClick={() => setCanvasAiShowMoreCommands((showMore) => !showMore)}
-                          disabled={canvasAiBusy}
-                        >
-                          {canvasAiShowMoreCommands
-                            ? t("canvas.aiLessCommands")
-                            : t("canvas.aiMoreCommands", { count: hiddenCanvasAiCommandCount })}
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="canvas-ai-command-list" role="radiogroup" aria-label={t("canvas.aiCommandLabel")}>
-                      {visibleCanvasAiCommands.map((command) => {
-                        const noticeKey = `command:${command.id}`;
-                        const unavailableMessage =
-                          command.requiresSelection && !hasCanvasSelection
-                            ? t("canvas.aiSelectionRequired")
-                            : "";
-
-                        return (
-                          <button
-                            key={command.id}
-                            type="button"
-                            className={`canvas-ai-command-row ${canvasAiCommandId === command.id ? "is-active" : ""} ${
-                              unavailableMessage ? "is-disabled" : ""
-                            }`}
-                            onClick={() => {
-                              if (unavailableMessage) {
-                                showCanvasAiNotice(noticeKey, unavailableMessage);
-                                return;
-                              }
-
-                              handleSelectCanvasAiCommand(command);
-                            }}
-                            disabled={canvasAiBusy}
-                            aria-disabled={unavailableMessage ? true : undefined}
-                            title={unavailableMessage || undefined}
-                          >
-                            <span className="canvas-ai-command-icon" aria-hidden="true">
-                              <CanvasAiIcon />
-                            </span>
-                            <span>
-                              <strong>{t(command.labelKey)}</strong>
-                              <small>{t(command.descriptionKey)}</small>
-                            </span>
-                            {canvasAiNotice?.key === noticeKey ? (
-                              <span className="canvas-ai-inline-notice" role="status">
-                                {canvasAiNotice.message}
-                              </span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {!canvasAiNotice && canvasAiValidationWarning ? (
-                    <p className="canvas-ai-message is-warning">
-                      {getCanvasAiErrorMessage(canvasAiValidationWarning)}
-                    </p>
-                  ) : null}
-
-                  {canvasAiMessage ? (
-                    <p className={`canvas-ai-message is-${canvasAiStatus}`}>{canvasAiMessage}</p>
-                  ) : null}
-                </div>
-              </div>
+              <button
+                type="button"
+                className="canvas-ai-mobile-backdrop"
+                onClick={() => setIsCanvasAiOpen(false)}
+                aria-label={t("canvas.mobile.closeSheet")}
+              />
             ) : null}
+
+            {isCanvasAiOpen ? renderCanvasAiPanel(canvasAiPopoverStyle) : null}
           </div>
         </div>
       </div>
@@ -3115,85 +3453,9 @@ export default function CanvasPane({
           </div>
         </div>
 
-        <aside className={`canvas-sidepanel ${activeSurface === "canvas" ? "is-hidden-mobile" : ""}`}>
-          <section className="canvas-detail-card">
-            <div className="canvas-detail-field">
-              <span className="canvas-detail-label">{t("note.folder")}</span>
-              <FolderPicker
-                options={folderOptions}
-                value={note.folderId}
-                emptyLabel={t("orbit.uncategorized")}
-                ariaLabel={t("note.folder")}
-                onChange={onFolderChange}
-              />
-            </div>
-
-            <div className="canvas-detail-field">
-              <span className="canvas-detail-label">{t("note.tags")}</span>
-              <TagInputField
-                tags={tags}
-                selectedTagIds={note.tagIds}
-                language={language}
-                onChangeTagIds={onTagIdsChange}
-                onCreateTag={onCreateTag}
-              />
-            </div>
-
-            <div className="canvas-detail-field">
-              <span className="canvas-detail-label">{t("note.color")}</span>
-              <div className="color-swatch-grid compact">
-                {COLOR_PALETTE.map((colorOption) => (
-                  <button
-                    type="button"
-                    key={colorOption.id}
-                    className={`color-swatch compact ${note.color === colorOption.hex ? "is-active" : ""}`}
-                    onClick={() => onNoteColorChange(colorOption.hex)}
-                    style={{ "--swatch-color": colorOption.hex } as CSSProperties}
-                    aria-label={`${t("note.color")}: ${t(colorOption.labelKey)}`}
-                    title={t(colorOption.labelKey)}
-                  >
-                    <span className="color-swatch-fill" />
-                  </button>
-                ))}
-              </div>
-              <label className="orbital-custom-color-picker">
-                <span className="orbital-color-label">{t("orbit.customColor")}</span>
-                <span className="orbital-custom-color-control">
-                  <input
-                    type="color"
-                    className="orbital-custom-color-input"
-                    value={note.color || DEFAULT_NOTE_COLOR}
-                    onChange={(event) => onNoteColorChange(event.target.value)}
-                    aria-label={t("orbit.customColor")}
-                  />
-                  <span className="orbital-custom-color-value">
-                    {(note.color || DEFAULT_NOTE_COLOR).toUpperCase()}
-                  </span>
-                </span>
-              </label>
-            </div>
-          </section>
-
-          <section className="canvas-detail-card canvas-detail-card-actions">
-            <div className="canvas-action-grid">
-              <button
-                type="button"
-                className={`micro-action ${note.pinned || note.favorite ? "is-active" : ""}`}
-                onClick={onTogglePin}
-              >
-                {note.pinned || note.favorite ? t("note.unpin") : t("note.pin")}
-              </button>
-              {note.trashedAt ? (
-                <button type="button" className="micro-action" onClick={onRestore}>
-                  {t("note.restore")}
-                </button>
-              ) : null}
-              <button type="button" className="micro-action danger" onClick={onDelete}>
-                {note.trashedAt ? t("note.deletePermanently") : t("note.moveToTrash")}
-              </button>
-            </div>
-          </section>
-        </aside>
+        {renderCanvasInfoPanel({
+          className: `is-desktop-panel ${activeSurface === "canvas" ? "is-hidden-mobile" : ""}`
+        })}
       </div>
     </section>
   );

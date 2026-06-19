@@ -28,6 +28,11 @@
   z-index: 80;
 }
 
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topbar.is-canvas-mode,
+.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-modal-window.is-canvas-mode > .orbital-editor-topbar {
+  display: none;
+}
+
 .locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topactions,
 .locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topactions.is-canvas-mode,
 .locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-topactions.is-note-mode {
@@ -46,132 +51,6 @@
   min-height: 34px;
 }
 
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-layer {
-  padding: 0;
-  place-items: stretch;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-modal {
-  width: 100vw;
-  width: 100dvw;
-  max-width: 100vw;
-  max-width: 100dvw;
-  height: 100vh;
-  height: 100dvh;
-  max-height: 100vh;
-  max-height: 100dvh;
-  border: 0;
-  border-radius: 0;
-  padding:
-    max(16px, env(safe-area-inset-top))
-    max(14px, env(safe-area-inset-right))
-    max(14px, env(safe-area-inset-bottom))
-    max(14px, env(safe-area-inset-left));
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-grid {
-  max-height: none;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-secondary,
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-preview-primary {
-  min-height: 44px;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-modal-window.is-canvas-mode .canvas-pane {
-  gap: 0;
-  padding: 0;
-  background: #080a16;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .orbital-editor-modal-window.is-canvas-mode .canvas-pane-toolbar {
-  position: absolute;
-  z-index: 42;
-  top: max(52px, calc(env(safe-area-inset-top) + 46px));
-  left: max(8px, env(safe-area-inset-left));
-  right: max(8px, env(safe-area-inset-right));
-  flex-wrap: wrap;
-  max-height: min(34vh, 230px);
-  overflow: visible;
-  padding: 7px;
-  border-radius: 24px;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-toolbar-main {
-  flex-basis: 100%;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-title-field {
-  min-height: 44px;
-  flex-basis: 100%;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-toolbar-meta {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-toolbar-meta::-webkit-scrollbar {
-  display: none;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-contextmeta {
-  display: none;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane-shell,
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-pane-shell {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-stage-column,
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-stage-column {
-  display: flex;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-sidepanel,
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane.is-details-open .canvas-sidepanel {
-  display: none;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-stage-frame,
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-pane.is-immersive .canvas-stage-frame {
-  height: 100vh;
-  height: 100dvh;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-stage-shell {
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  touch-action: none;
-  overscroll-behavior: none;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-stage-shell .excalidraw {
-  touch-action: none;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-popover {
-  position: fixed !important;
-  inset:
-    auto
-    max(8px, env(safe-area-inset-right))
-    max(8px, env(safe-area-inset-bottom))
-    max(8px, env(safe-area-inset-left)) !important;
-  width: auto !important;
-  max-height: min(78vh, calc(100vh - 24px)) !important;
-  max-height: min(78dvh, calc(100dvh - 24px)) !important;
-  z-index: 1350;
-}
-
-.locoris-adaptive-shell[data-mobile-shell="true"] .canvas-ai-command-card {
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
 .locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .zoom-button,
 .locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .undo-redo-buttons button,
 .locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .main-menu-trigger,
@@ -187,14 +66,4 @@
 .locoris-adaptive-shell[data-pointer-mode="coarse"] .canvas-stage-shell .excalidraw .ToolIcon__icon {
   min-width: 42px;
   min-height: 42px;
-}
-
-@media (max-width: 430px) {
-  .locoris-adaptive-shell[data-mobile-shell="true"] .canvas-surface-switcher {
-    flex: 1 1 auto;
-  }
-
-  .locoris-adaptive-shell[data-mobile-shell="true"] .canvas-surface-tab {
-    flex: 1 1 0;
-  }
 }

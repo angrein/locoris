@@ -792,9 +792,12 @@ export default function PlannerCalendarSurface({
   const [manualEventDragId, setManualEventDragId] = useState<string | null>(null);
   const [manualEventDropKey, setManualEventDropKey] = useState<string | null>(null);
   const [dragGhost, setDragGhost] = useState<CalendarDragGhost | null>(null);
+  const [agendaRevealToken, setAgendaRevealToken] = useState(0);
   const undoTimerRef = useRef<number | null>(null);
   const scrollFocusTimerRef = useRef<number | null>(null);
+  const agendaRevealTimerRef = useRef<number | null>(null);
   const calendarBoardRef = useRef<HTMLElement | null>(null);
+  const agendaCardRef = useRef<HTMLElement | null>(null);
   const dayElementRefs = useRef<Map<number, HTMLElement>>(new Map());
   const timeSlotElementRefs = useRef<Map<string, HTMLElement>>(new Map());
   const resizeRef = useRef<CalendarResizeState | null>(null);
@@ -1084,6 +1087,10 @@ export default function PlannerCalendarSurface({
     () => () => {
       if (undoTimerRef.current) {
         window.clearTimeout(undoTimerRef.current);
+      }
+
+      if (agendaRevealTimerRef.current) {
+        window.clearTimeout(agendaRevealTimerRef.current);
       }
     },
     []
@@ -1691,6 +1698,44 @@ export default function PlannerCalendarSurface({
     if (task) {
       await scheduleTask(task, normalizedDayStartAt, hour);
     }
+  };
+
+  const revealDayAgenda = (day: CalendarDay) => {
+    const normalizedDayStartAt = getStartOfLocalDay(day.startAt);
+    setSelectedDayAt(normalizedDayStartAt);
+    setSelectedSlotHour(null);
+
+    if (mode === "month" && day.isOutsideMonth) {
+      setCursorAt(normalizedDayStartAt);
+    }
+
+    if (isMobile) {
+      setMobilePanel("agenda");
+      return;
+    }
+
+    setAgendaRevealToken((current) => current + 1);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.setTimeout(() => {
+      agendaCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest"
+      });
+    }, 40);
+
+    if (agendaRevealTimerRef.current) {
+      window.clearTimeout(agendaRevealTimerRef.current);
+    }
+
+    agendaRevealTimerRef.current = window.setTimeout(() => {
+      setAgendaRevealToken(0);
+      agendaRevealTimerRef.current = null;
+    }, 1200);
   };
 
   const shiftCursor = (direction: -1 | 1) => {
@@ -2469,9 +2514,31 @@ export default function PlannerCalendarSurface({
             <div className="planner-calendar-day-stack">
               {visibleEvents.map((event) => renderCalendarEvent(event, eventVariant))}
               {hiddenCount > 0 ? (
-                <span className="planner-calendar-more">
+                <button
+                  type="button"
+                  className="planner-calendar-more"
+                  aria-label={
+                    language === "ru"
+                      ? `Показать все события за ${formatPlannerDate(day.startAt, language)}`
+                      : `Show all events for ${formatPlannerDate(day.startAt, language)}`
+                  }
+                  title={
+                    language === "ru"
+                      ? `Показать все события за ${formatPlannerDate(day.startAt, language)}`
+                      : `Show all events for ${formatPlannerDate(day.startAt, language)}`
+                  }
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    revealDayAgenda(day);
+                  }}
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                >
                   +{hiddenCount} {language === "ru" ? "еще" : "more"}
-                </span>
+                </button>
               ) : null}
             </div>
           </section>
@@ -3572,7 +3639,10 @@ export default function PlannerCalendarSurface({
           </main>
 
           <aside className="planner-calendar-side">
-            <section className="planner-calendar-side-card is-agenda">
+            <section
+              ref={agendaCardRef}
+              className={`planner-calendar-side-card is-agenda ${agendaRevealToken > 0 ? "is-revealed" : ""}`}
+            >
               <div className="planner-calendar-side-title">
                 <div>
                   <span>{language === "ru" ? "Повестка" : "Agenda"}</span>
