@@ -7,6 +7,9 @@
     radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--ai-settings-cyan) 10%, transparent), transparent 38%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
     color-mix(in srgb, var(--ai-settings-accent) 4%, rgba(255, 255, 255, 0.028));
+  position: relative;
+  z-index: 3;
+  isolation: isolate;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -22,18 +25,28 @@
   scrollbar-color: color-mix(in srgb, var(--ai-settings-accent) 34%, transparent) transparent;
 }
 
+.ai-settings-panel.is-layer-open {
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+.ai-settings-panel.is-layer-open::-webkit-scrollbar,
+.ai-settings-panel.is-layer-open::-webkit-scrollbar-thumb,
+.ai-settings-panel.is-layer-open::-webkit-scrollbar-track {
+  width: 0;
+  height: 0;
+  display: none;
+  background: transparent;
+}
+
 .ai-settings-panel::-webkit-scrollbar,
-.ai-settings-guide-body::-webkit-scrollbar,
-.ai-settings-advanced-model::-webkit-scrollbar,
-.ai-settings-model-modal-body::-webkit-scrollbar {
+.ai-settings-guide-body::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 .ai-settings-panel::-webkit-scrollbar-thumb,
-.ai-settings-guide-body::-webkit-scrollbar-thumb,
-.ai-settings-advanced-model::-webkit-scrollbar-thumb,
-.ai-settings-model-modal-body::-webkit-scrollbar-thumb {
+.ai-settings-guide-body::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: color-mix(in srgb, var(--ai-settings-accent) 30%, rgba(255, 255, 255, 0.14));
 }
@@ -567,10 +580,11 @@
     linear-gradient(180deg, var(--ai-settings-modal-base-soft), var(--ai-settings-modal-base));
   position: fixed;
   inset: 0;
-  z-index: 180;
+  z-index: 2147482000;
   display: grid;
   place-items: center;
   padding: 18px;
+  overflow: hidden;
 }
 
 .ai-settings-layer-dim {
@@ -590,7 +604,7 @@
   z-index: 1;
   min-width: 0;
   min-height: 0;
-  max-height: min(760px, calc(100dvh - 48px));
+  max-height: min(760px, calc(100dvh - 36px));
   display: grid;
   gap: 15px;
   overflow: hidden;
@@ -605,12 +619,12 @@
 }
 
 .ai-settings-model-modal {
-  width: min(980px, calc(100vw - 44px));
+  width: min(980px, calc(100dvw - 44px));
   grid-template-rows: auto minmax(0, 1fr);
 }
 
 .ai-settings-guide-modal {
-  width: min(720px, calc(100vw - 44px));
+  width: min(720px, calc(100dvw - 44px));
   grid-template-rows: auto minmax(0, 1fr);
 }
 
@@ -652,6 +666,11 @@
   grid-template-columns: minmax(0, 1.12fr) minmax(270px, 0.88fr);
   gap: 14px;
   overflow: hidden;
+  scrollbar-width: none;
+}
+
+.ai-settings-model-modal-body::-webkit-scrollbar {
+  display: none;
 }
 
 .ai-settings-model-list {
@@ -753,8 +772,9 @@
   min-height: 0;
   display: grid;
   align-content: start;
+  align-self: start;
   gap: 12px;
-  overflow: auto;
+  overflow: visible;
   padding: 15px;
   border: 1px solid color-mix(in srgb, var(--ai-settings-accent) 14%, rgba(255, 255, 255, 0.105));
   border-radius: 23px;
@@ -916,10 +936,25 @@
     grid-template-columns: 1fr;
   }
 
-  .ai-settings-model-modal-body {
+  .ai-settings-layer {
+    align-items: start;
+    place-items: start center;
     overflow: auto;
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--ai-settings-accent) 34%, transparent) transparent;
+    overscroll-behavior: contain;
+  }
+
+  .ai-settings-modal {
+    max-height: none;
+  }
+
+  .ai-settings-model-modal {
+    grid-template-rows: auto auto;
+  }
+
+  .ai-settings-model-modal-body {
+    min-height: auto;
+    overflow: visible;
+    scrollbar-width: none;
   }
 
   .ai-settings-model-list {
@@ -994,12 +1029,14 @@
   }
 
   .ai-settings-model-modal {
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
   }
 
   .ai-settings-model-modal-body {
-    overflow: auto;
-    padding-right: 2px;
+    min-height: auto;
+    overflow: visible;
+    padding-right: 0;
+    scrollbar-width: none;
   }
 
   .ai-settings-guide-card-grid {
@@ -1032,4 +1069,32 @@
   .ai-settings-choice-head em {
     max-width: 100%;
   }
+}
+
+/* Tauri/WebKit can render an inner scrollbar thumb inside the advanced model card. */
+.ai-settings-model-modal-body,
+.ai-settings-advanced-model,
+.ai-settings-advanced-model * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none;
+}
+
+.ai-settings-advanced-model {
+  overflow: hidden !important;
+  overflow: clip !important;
+}
+
+.ai-settings-model-modal-body::-webkit-scrollbar,
+.ai-settings-model-modal-body::-webkit-scrollbar-thumb,
+.ai-settings-model-modal-body::-webkit-scrollbar-track,
+.ai-settings-advanced-model::-webkit-scrollbar,
+.ai-settings-advanced-model::-webkit-scrollbar-thumb,
+.ai-settings-advanced-model::-webkit-scrollbar-track,
+.ai-settings-advanced-model *::-webkit-scrollbar,
+.ai-settings-advanced-model *::-webkit-scrollbar-thumb,
+.ai-settings-advanced-model *::-webkit-scrollbar-track {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  background: transparent !important;
 }

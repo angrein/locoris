@@ -4174,6 +4174,117 @@ export async function removePlannerTimeBlock(timeBlockId: string) {
   scheduleActiveLocalVaultDesktopBackup();
 }
 
+export type PlannerDataClearResult = {
+  tasks: number;
+  habits: number;
+  habitLogs: number;
+  goals: number;
+  timeBlocks: number;
+  total: number;
+};
+
+export async function clearPlannerData(): Promise<PlannerDataClearResult> {
+  const timestamp = now();
+  const result: PlannerDataClearResult = {
+    tasks: 0,
+    habits: 0,
+    habitLogs: 0,
+    goals: 0,
+    timeBlocks: 0,
+    total: 0
+  };
+
+  await db.transaction(
+    "rw",
+    [
+      db.tasks,
+      db.habits,
+      db.habitLogs,
+      db.goals,
+      db.timeBlocks,
+      db.syncTombstones,
+      db.syncDirtyEntries
+    ],
+    async () => {
+      const [tasks, habits, habitLogs, goals, timeBlocks] = await Promise.all([
+        db.tasks.toArray(),
+        db.habits.toArray(),
+        db.habitLogs.toArray(),
+        db.goals.toArray(),
+        db.timeBlocks.toArray()
+      ]);
+      const taskIds = tasks.map((task) => task.id);
+      const habitIds = habits.map((habit) => habit.id);
+      const habitLogIds = habitLogs.map((habitLog) => habitLog.id);
+      const goalIds = goals.map((goal) => goal.id);
+      const timeBlockIds = timeBlocks.map((timeBlock) => timeBlock.id);
+      const tombstones: SyncTombstone[] = [
+        ...taskIds.map((entityId) => ({
+          key: getSyncEntityKey("task", entityId),
+          entityType: "task" as const,
+          entityId,
+          deletedAt: timestamp
+        })),
+        ...habitIds.map((entityId) => ({
+          key: getSyncEntityKey("habit", entityId),
+          entityType: "habit" as const,
+          entityId,
+          deletedAt: timestamp
+        })),
+        ...habitLogIds.map((entityId) => ({
+          key: getSyncEntityKey("habitLog", entityId),
+          entityType: "habitLog" as const,
+          entityId,
+          deletedAt: timestamp
+        })),
+        ...goalIds.map((entityId) => ({
+          key: getSyncEntityKey("goal", entityId),
+          entityType: "goal" as const,
+          entityId,
+          deletedAt: timestamp
+        })),
+        ...timeBlockIds.map((entityId) => ({
+          key: getSyncEntityKey("timeBlock", entityId),
+          entityType: "timeBlock" as const,
+          entityId,
+          deletedAt: timestamp
+        }))
+      ];
+
+      result.tasks = taskIds.length;
+      result.habits = habitIds.length;
+      result.habitLogs = habitLogIds.length;
+      result.goals = goalIds.length;
+      result.timeBlocks = timeBlockIds.length;
+      result.total = tombstones.length;
+
+      if (result.total === 0) {
+        return;
+      }
+
+      await Promise.all([
+        taskIds.length > 0 ? db.tasks.bulkDelete(taskIds) : Promise.resolve(),
+        habitIds.length > 0 ? db.habits.bulkDelete(habitIds) : Promise.resolve(),
+        habitLogIds.length > 0 ? db.habitLogs.bulkDelete(habitLogIds) : Promise.resolve(),
+        goalIds.length > 0 ? db.goals.bulkDelete(goalIds) : Promise.resolve(),
+        timeBlockIds.length > 0 ? db.timeBlocks.bulkDelete(timeBlockIds) : Promise.resolve()
+      ]);
+      await db.syncTombstones.bulkPut(tombstones);
+      await putSyncDirtyEntries(
+        tombstones.map((tombstone) =>
+          createSyncDirtyEntry(tombstone.entityType, tombstone.entityId, tombstone.deletedAt, true)
+        )
+      );
+    }
+  );
+
+  if (result.total > 0) {
+    scheduleActiveLocalVaultDesktopBackup();
+  }
+
+  return result;
+}
+
 function detectAssetKind(file: File): AssetKind {
   if (file.type.startsWith("image/")) {
     return "image";

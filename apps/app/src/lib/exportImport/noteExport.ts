@@ -25,6 +25,7 @@ import {
   blocksToPlainText,
   buildNoteHtmlDocument
 } from "./noteSerialization";
+import { getSelfContainedReadableExportFontCss } from "./readableExportFonts";
 import { textBlob } from "./blob";
 import { sanitizeExportFileName } from "./filenames";
 
@@ -745,7 +746,7 @@ export function getNoteExportBaseName(note: Note, language: AppLanguage) {
   return sanitizeExportFileName(getDisplayNoteTitle(note, language), "Locoris Note");
 }
 
-export function createNoteHtmlBlob(input: {
+export async function createNoteHtmlBlob(input: {
   note: Note;
   language: AppLanguage;
   markdown?: string;
@@ -754,7 +755,8 @@ export function createNoteHtmlBlob(input: {
     buildNoteHtmlDocument({
       note: input.note,
       language: input.language,
-      markdown: input.markdown
+      markdown: input.markdown,
+      additionalCss: await getSelfContainedReadableExportFontCss()
     }),
     "text/html;charset=utf-8"
   );

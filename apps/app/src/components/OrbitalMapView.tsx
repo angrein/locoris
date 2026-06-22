@@ -52,6 +52,7 @@ import type {
   OrbitalTemporalSignalsMode
 } from "../lib/interfacePreferences";
 import { buildPlannerMapSignals } from "../lib/plannerMapSignals";
+import type { PlannerViewId } from "../lib/planner";
 import { useAndroidBackHandler } from "../lib/useAndroidBackHandler";
 import type { AppLanguage, Asset, Folder, Note, Project, Tag, Task } from "../types";
 
@@ -178,6 +179,7 @@ interface OrbitalMapViewProps {
   onCreateCanvas: (folderId: string | null, projectId?: string) => Promise<Note>;
   onOpenNote: (noteId: string) => void;
   onOpenProjectPlan?: (projectId: string) => void;
+  onOpenPlannerView?: (viewId: PlannerViewId) => void;
   onToggleNoteChecklistItem?: (
     noteId: string,
     blockId: string,
@@ -2242,6 +2244,7 @@ export default function OrbitalMapView({
   onCreateCanvas,
   onOpenNote,
   onOpenProjectPlan,
+  onOpenPlannerView,
   onToggleNoteChecklistItem,
   onResolveFileUrl,
   labels
@@ -2473,6 +2476,11 @@ export default function OrbitalMapView({
     Boolean(plannerSlot) && (isAndroidMobileShell ? mobileSection === "planner" : surfaceMode === "planner");
   const isMapSurfaceVisible = !isPlannerSurfaceVisible;
   const isMobileMapVisible = !isAndroidMobileShell || mobileSection === "map";
+  const openPlannerView = (viewId: PlannerViewId) => {
+    onOpenPlannerView?.(viewId);
+    setSurfaceMode("planner");
+    setMobileSection("planner");
+  };
   useEffect(() => {
     setIsTemporalLayerQuickHidden(false);
   }, [activeLocalVaultId, orbitalTemporalSignalsMode]);
@@ -3207,6 +3215,9 @@ export default function OrbitalMapView({
     selectedNode?.kind === "core" && selectedNode.project
       ? temporalMapSignals.byProjectId.get(selectedNode.project.id) ?? null
       : null;
+  const selectedProjectPlanLabel = selectedNode?.project
+    ? `${t("orbit.timeLayer")} “${selectedNode.project.name}”`
+    : t("orbit.timeLayerOpenPlan");
   const shouldShowHierarchyInspector =
     inspectorMenu === "folders" && (selectedNode?.kind === "folder" || selectedNode?.kind === "note");
   const effectiveInspectorMenu = shouldShowHierarchyInspector ? "folders" : inspectorMenu;
@@ -10458,27 +10469,40 @@ export default function OrbitalMapView({
                   {isSceneFocusActive ? labels.focusMode : labels.showAll}
                 </span>
                 {isTemporalLayerVisible &&
+                onOpenPlannerView &&
                 (temporalMapSignals.totalToday > 0 || temporalMapSignals.totalOverdue > 0) ? (
-                  <span
-                    className={`orbital-filter-chip orbital-filter-temporal-chip ${
-                      temporalMapSignals.totalOverdue > 0 ? "is-warning" : "is-accent"
-                    }`}
-                  >
-                    <span className="orbital-filter-temporal-part is-today">
-                      <span className="orbital-filter-temporal-icon" aria-hidden="true" />
-                      <span>
-                        {t("orbit.timeLayerToday")}: <strong>{temporalMapSignals.totalToday}</strong>
+                  <>
+                    <button
+                      type="button"
+                      className="orbital-filter-chip orbital-filter-temporal-chip is-today-chip is-accent"
+                      onClick={() => openPlannerView("today")}
+                      title={`${t("orbit.timeLayerToday")}: ${temporalMapSignals.totalToday}`}
+                      aria-label={`${t("orbit.timeLayerToday")}: ${temporalMapSignals.totalToday}`}
+                    >
+                      <span className="orbital-filter-temporal-part is-today">
+                        <span className="orbital-filter-temporal-icon" aria-hidden="true" />
+                        <span>
+                          {t("orbit.timeLayerToday")}: <strong>{temporalMapSignals.totalToday}</strong>
+                        </span>
                       </span>
-                    </span>
-                    {temporalMapSignals.totalOverdue > 0 ? (
+                    </button>
+                    <button
+                      type="button"
+                      className={`orbital-filter-chip orbital-filter-temporal-chip is-overdue-chip ${
+                        temporalMapSignals.totalOverdue > 0 ? "is-warning" : ""
+                      }`}
+                      onClick={() => openPlannerView("overdue")}
+                      title={`${t("orbit.timeLayerOverdue")}: ${temporalMapSignals.totalOverdue}`}
+                      aria-label={`${t("orbit.timeLayerOverdue")}: ${temporalMapSignals.totalOverdue}`}
+                    >
                       <span className="orbital-filter-temporal-part is-overdue">
                         <span className="orbital-filter-temporal-icon" aria-hidden="true" />
                         <span>
                           {t("orbit.timeLayerOverdue")}: <strong>{temporalMapSignals.totalOverdue}</strong>
                         </span>
                       </span>
-                    ) : null}
-                  </span>
+                    </button>
+                  </>
                 ) : null}
                 {isTemporalLayerVisible && selectedNode?.project && onOpenProjectPlan ? (
                   <button
@@ -10492,12 +10516,12 @@ export default function OrbitalMapView({
                       setMobileSection("planner");
                     }}
                     style={{ "--pill-color": selectedNode.project.color } as CSSProperties}
-                    title={`${t("orbit.timeLayerOpenPlan")}: ${selectedNode.project.name}`}
-                    aria-label={`${t("orbit.timeLayerOpenPlan")}: ${selectedNode.project.name}`}
+                    title={selectedProjectPlanLabel}
+                    aria-label={selectedProjectPlanLabel}
                   >
                     <span className="orbital-filter-plan-dot" aria-hidden="true" />
                     <span className="orbital-filter-plan-copy">
-                      <strong>{t("orbit.timeLayerOpenPlan")}</strong>
+                      <strong>{selectedProjectPlanLabel}</strong>
                       <span>
                         {t("orbit.timeLayerToday")}: {selectedProjectTemporalSignal?.todayCount ?? 0}
                         {(selectedProjectTemporalSignal?.overdueCount ?? 0) > 0
@@ -10978,7 +11002,7 @@ export default function OrbitalMapView({
                       setMobileSection("planner");
                     }}
                   >
-                    {t("orbit.timeLayerOpenPlan")}
+                    {selectedProjectPlanLabel}
                   </button>
                 ) : null}
                 {selectedNode.note ? (

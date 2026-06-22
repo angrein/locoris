@@ -45,6 +45,14 @@ type SyncFeedbackState = {
   text: string;
 } | null;
 
+type PlannerDataCounts = {
+  tasks: number;
+  habits: number;
+  habitLogs: number;
+  goals: number;
+  timeBlocks: number;
+};
+
 interface SettingsPanelProps {
   settings: AppSettings;
   accentThemeId: AppAccentThemeId;
@@ -58,6 +66,7 @@ interface SettingsPanelProps {
   syncBindings: SyncVaultBinding[];
   vaultEncryptionById: Record<string, VaultEncryptionSummary>;
   syncFeedback?: SyncFeedbackState;
+  plannerDataCounts?: PlannerDataCounts;
   onAccentThemeChange: (themeId: AppAccentThemeId) => void;
   onOrbitalAnimationModeChange: (mode: OrbitalAnimationMode) => void;
   onOrbitalTemporalSignalsModeChange: (mode: OrbitalTemporalSignalsMode) => void;
@@ -69,6 +78,7 @@ interface SettingsPanelProps {
       >
     >
   ) => void | Promise<void>;
+  onClearPlannerData?: () => boolean | Promise<boolean>;
   onLanguageChange: (language: AppLanguage) => void;
   onSelectLocalVault: (localVaultId: string) => void;
   onCreateLocalVault: (input: {
@@ -349,10 +359,18 @@ export default function SettingsPanel({
   syncBindings,
   vaultEncryptionById,
   syncFeedback = null,
+  plannerDataCounts = {
+    tasks: 0,
+    habits: 0,
+    habitLogs: 0,
+    goals: 0,
+    timeBlocks: 0
+  },
   onAccentThemeChange,
   onOrbitalAnimationModeChange,
   onOrbitalTemporalSignalsModeChange,
   onPlannerSettingsChange,
+  onClearPlannerData,
   onLanguageChange,
   onSelectLocalVault,
   onCreateLocalVault,
@@ -378,6 +396,8 @@ export default function SettingsPanel({
   const [appUpdateState, setAppUpdateState] = useState(() => readAppUpdateSnapshot());
   const [aiConnected, setAiConnected] = useState(false);
   const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+  const [plannerClearBusy, setPlannerClearBusy] = useState(false);
+  const [plannerClearFeedback, setPlannerClearFeedback] = useState<SyncFeedbackState>(null);
   const languagePickerRef = useRef<HTMLDivElement | null>(null);
   const appUpdatesEnabled = supportsAppUpdates();
 
@@ -464,6 +484,33 @@ export default function SettingsPanel({
 
   const handleResolveAppUpdatePermissionIssue = async () => {
     await resolveAppUpdatePermissionIssue();
+  };
+
+  const handleClearPlannerDataClick = async () => {
+    if (!onClearPlannerData || plannerClearBusy || plannerDataTotal === 0) {
+      return;
+    }
+
+    setPlannerClearBusy(true);
+    setPlannerClearFeedback(null);
+
+    try {
+      const cleared = await onClearPlannerData();
+
+      if (cleared) {
+        setPlannerClearFeedback({
+          tone: "success",
+          text: t("settings.plannerClearDataSuccess")
+        });
+      }
+    } catch {
+      setPlannerClearFeedback({
+        tone: "error",
+        text: t("settings.plannerClearDataError")
+      });
+    } finally {
+      setPlannerClearBusy(false);
+    }
   };
 
   const appUpdateCurrentVersion = appUpdateState.currentVersion;
@@ -575,6 +622,19 @@ export default function SettingsPanel({
   const plannerDefaultCalendarViewOption =
     PLANNER_CALENDAR_VIEW_OPTIONS.find((option) => option.value === plannerDefaultCalendarView) ??
     PLANNER_CALENDAR_VIEW_OPTIONS[1];
+  const plannerDataTotal =
+    plannerDataCounts.tasks +
+    plannerDataCounts.habits +
+    plannerDataCounts.habitLogs +
+    plannerDataCounts.goals +
+    plannerDataCounts.timeBlocks;
+  const plannerDataStatItems = [
+    { key: "tasks", label: t("settings.plannerClearDataTasks"), count: plannerDataCounts.tasks },
+    { key: "habits", label: t("settings.plannerClearDataHabits"), count: plannerDataCounts.habits },
+    { key: "habitLogs", label: t("settings.plannerClearDataHabitLogs"), count: plannerDataCounts.habitLogs },
+    { key: "goals", label: t("settings.plannerClearDataGoals"), count: plannerDataCounts.goals },
+    { key: "timeBlocks", label: t("settings.plannerClearDataTimeBlocks"), count: plannerDataCounts.timeBlocks }
+  ];
   const currentAccentThemeId = resolveAppAccentThemeId(accentThemeId);
   const currentAccentTheme = getAppAccentTheme(currentAccentThemeId);
   const aiConnectionLabel = aiConnected
@@ -886,6 +946,52 @@ export default function SettingsPanel({
               plannerDefaultCalendarView,
               (value) => void onPlannerSettingsChange({ plannerDefaultCalendarView: value })
             )}
+          </section>
+
+          <section className="settings-panel-block settings-planner-danger-block">
+            <div className="settings-planner-danger-head">
+              <div>
+                <p className="panel-kicker settings-panel-block-kicker">
+                  {t("settings.plannerClearDataKicker")}
+                </p>
+                <h3>{t("settings.plannerClearDataTitle")}</h3>
+                <p>{t("settings.plannerClearDataDescription")}</p>
+              </div>
+              <span className={`settings-planner-data-total ${plannerDataTotal === 0 ? "is-empty" : ""}`}>
+                {plannerDataTotal > 0
+                  ? t("settings.plannerClearDataTotal", { count: plannerDataTotal })
+                  : t("settings.plannerClearDataEmpty")}
+              </span>
+            </div>
+
+            <div className="settings-planner-data-grid" aria-label={t("settings.plannerClearDataStatsLabel")}>
+              {plannerDataStatItems.map((item) => (
+                <span key={item.key} className="settings-planner-data-pill">
+                  <strong>{item.count}</strong>
+                  <span>{item.label}</span>
+                </span>
+              ))}
+            </div>
+
+            <div className="settings-planner-danger-footer">
+              <p>{t("settings.plannerClearDataBoundary")}</p>
+              <button
+                type="button"
+                className="settings-row-action settings-row-action-danger settings-planner-clear-action"
+                onClick={() => void handleClearPlannerDataClick()}
+                disabled={!onClearPlannerData || plannerClearBusy || plannerDataTotal === 0}
+              >
+                {plannerClearBusy
+                  ? t("settings.plannerClearDataBusy")
+                  : t("settings.plannerClearDataAction")}
+              </button>
+            </div>
+
+            {plannerClearFeedback ? (
+              <div className={`settings-planner-clear-feedback is-${plannerClearFeedback.tone}`} role="status">
+                {plannerClearFeedback.text}
+              </div>
+            ) : null}
           </section>
         </div>
       </section>

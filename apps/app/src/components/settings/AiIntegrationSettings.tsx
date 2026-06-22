@@ -168,6 +168,8 @@ export default function AiIntegrationSettings({
   const aiConnectionLabel = hasGeminiKey
     ? t("settings.aiConnected")
     : t("settings.aiNotConnected");
+  const aiLayerOpen = aiInstructionsOpen || aiModelPickerOpen;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -518,7 +520,7 @@ export default function AiIntegrationSettings({
   );
 
   return (
-    <div className="ai-settings-panel">
+    <div className={`ai-settings-panel ${aiLayerOpen ? "is-layer-open" : ""}`}>
       <section className="ai-settings-hero-card">
         <div className="ai-settings-hero-main">
           <div className="ai-settings-orb" aria-hidden="true">

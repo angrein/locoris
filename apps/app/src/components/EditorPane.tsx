@@ -3001,19 +3001,31 @@ export default function EditorPane({
 	      <div className="editor-pane-toolbar">
         <div className="editor-pane-toolbar-main">
           <div className="editor-pane-title-stack">
-            <input
-              value={titleDraft}
-              onChange={(event) => handleTitleChange(event.target.value)}
-              onFocus={() => {
-                isTitleFieldFocusedRef.current = true;
-              }}
-              onBlur={() => {
-                isTitleFieldFocusedRef.current = false;
-                flushTitleDraft();
-              }}
-              className="note-title-input editor-pane-title-field"
-              placeholder={t("note.titlePlaceholder")}
-            />
+            <div className="editor-pane-title-row">
+              <input
+                value={titleDraft}
+                onChange={(event) => handleTitleChange(event.target.value)}
+                onFocus={() => {
+                  isTitleFieldFocusedRef.current = true;
+                }}
+                onBlur={() => {
+                  isTitleFieldFocusedRef.current = false;
+                  flushTitleDraft();
+                }}
+                className="note-title-input editor-pane-title-field"
+                placeholder={t("note.titlePlaceholder")}
+              />
+
+              <div className="editor-pane-markdown-actions" aria-label={t("note.markdownActions")}>
+                <button
+                  type="button"
+                  className="editor-pane-ghost-action editor-pane-transfer-action"
+                  onClick={() => setNoteTransferOpen(true)}
+                >
+                  {t("note.transferButton")}
+                </button>
+              </div>
+            </div>
 
             <div className="editor-pane-toolbar-meta">
               <div
@@ -3091,16 +3103,6 @@ export default function EditorPane({
 	                </span>
 	              ) : null}
 	            </div>
-          </div>
-
-          <div className="editor-pane-markdown-actions" aria-label={t("note.markdownActions")}>
-            <button
-              type="button"
-              className="editor-pane-ghost-action editor-pane-transfer-action"
-              onClick={() => setNoteTransferOpen(true)}
-            >
-              {t("note.transferButton")}
-            </button>
           </div>
         </div>
       </div>
@@ -3748,16 +3750,6 @@ export default function EditorPane({
             </div>
 
 	            <div className="editor-pane-action-grid">
-	              {onCreateTaskFromContext ? (
-	                <button
-	                  type="button"
-	                  className="micro-action editor-pane-mobile-action-row"
-	                  onClick={() => void handleCreateTaskFromEditor("note")}
-	                >
-	                  <span className="editor-pane-mobile-option-icon editor-pane-mobile-task-icon" aria-hidden="true" />
-	                  <span>{t("note.createTaskFromNote")}</span>
-	                </button>
-	              ) : null}
 	              <button
                 type="button"
                 className="micro-action editor-pane-mobile-only-action editor-pane-mobile-action-row"

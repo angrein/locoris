@@ -1,17 +1,6 @@
 import type { ReactNode, Ref } from "react";
 import "./SyncSettingsLayout.css";
 
-export type SyncSettingsOverviewTone = "vaults" | "connections" | "selected" | "status";
-
-export type SyncSettingsOverviewItem = {
-  id: string;
-  icon: ReactNode;
-  label: string;
-  value: ReactNode;
-  caption: ReactNode;
-  tone?: SyncSettingsOverviewTone;
-};
-
 interface SyncSettingsLayoutProps {
   title: string;
   kicker: ReactNode;
@@ -20,7 +9,6 @@ interface SyncSettingsLayoutProps {
   closeLabel: string;
   backIcon: ReactNode;
   closeIcon: ReactNode;
-  overviewItems: SyncSettingsOverviewItem[];
   stageRef: Ref<HTMLDivElement>;
   wires: ReactNode;
   bindingHint?: ReactNode;
@@ -48,7 +36,6 @@ export function SyncSettingsLayout({
   closeLabel,
   backIcon,
   closeIcon,
-  overviewItems,
   stageRef,
   wires,
   bindingHint,
@@ -93,23 +80,6 @@ export function SyncSettingsLayout({
         </div>
       </header>
 
-      <div className="sync-settings-overview" aria-label={title}>
-        {overviewItems.map((item) => (
-          <section
-            className={`sync-settings-overview-card is-${item.tone ?? "status"}`}
-            key={item.id}
-          >
-            <span className="sync-settings-overview-icon" aria-hidden="true">
-              {item.icon}
-            </span>
-            <div className="sync-settings-overview-copy">
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-              <p>{item.caption}</p>
-            </div>
-          </section>
-        ))}
-      </div>
 
       <div className="sync-settings-workspace" ref={stageRef}>
         {wires}

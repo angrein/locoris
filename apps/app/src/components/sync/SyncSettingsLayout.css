@@ -4,7 +4,7 @@
   --sync-settings-success: #8ff0c2;
   --sync-settings-warning: #ffd27d;
   --sync-settings-danger: var(--red, #ff678c);
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 8px;
 }
 
@@ -58,110 +58,6 @@
 .sync-settings-panel-close-icon svg {
   width: 20px;
   height: 20px;
-}
-
-.sync-settings-overview {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-}
-
-.sync-settings-overview-card {
-  --overview-accent: var(--sync-settings-accent);
-  min-width: 0;
-  min-height: 52px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--overview-accent) 16%, rgba(255, 255, 255, 0.11));
-  border-radius: 16px;
-  background:
-    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--overview-accent) 15%, transparent), transparent 50%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018)),
-    rgba(255, 255, 255, 0.026);
-  box-shadow:
-    0 16px 38px rgba(0, 0, 0, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(20px) saturate(124%);
-  -webkit-backdrop-filter: blur(20px) saturate(124%);
-}
-
-.sync-settings-overview-card.is-connections {
-  --overview-accent: var(--sync-settings-secondary);
-}
-
-.sync-settings-overview-card.is-selected {
-  --overview-accent: #b99cff;
-}
-
-.sync-settings-overview-card.is-status {
-  --overview-accent: var(--sync-settings-success);
-}
-
-.sync-settings-overview-icon {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--overview-accent) 28%, rgba(255, 255, 255, 0.13));
-  border-radius: 11px;
-  background:
-    radial-gradient(circle at 36% 16%, color-mix(in srgb, var(--overview-accent) 24%, transparent), transparent 52%),
-    rgba(255, 255, 255, 0.036);
-  color: color-mix(in srgb, var(--text) 72%, var(--overview-accent) 28%);
-  box-shadow:
-    0 10px 22px color-mix(in srgb, var(--overview-accent) 8%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.sync-settings-overview-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.sync-settings-overview-copy {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.sync-settings-overview-copy span {
-  min-width: 0;
-  color: color-mix(in srgb, var(--overview-accent) 52%, rgba(216, 224, 250, 0.78));
-  font-size: 0.54rem;
-  font-weight: 820;
-  letter-spacing: 0.11em;
-  line-height: 1.1;
-  text-transform: uppercase;
-  overflow-wrap: anywhere;
-}
-
-.sync-settings-overview-copy strong {
-  min-width: 0;
-  color: rgba(249, 251, 255, 0.96);
-  font-size: 0.78rem;
-  font-weight: 760;
-  line-height: 1.18;
-  overflow-wrap: anywhere;
-}
-
-.sync-settings-overview-copy p {
-  min-width: 0;
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
-  color: rgba(196, 205, 235, 0.72);
-  font-size: 0.61rem;
-  line-height: 1.18;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
 }
 
 .sync-settings-workspace {
@@ -613,18 +509,11 @@
     gap: 8px;
   }
 
-  .sync-settings-overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .sync-settings-overview-card.is-selected {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 960px) {
   .sync-settings-panel-shell {
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
   }
 
   .sync-settings-workspace {
@@ -649,24 +538,6 @@
     gap: 8px;
   }
 
-  .sync-settings-overview {
-    grid-template-columns: repeat(3, minmax(192px, 1fr));
-    margin-inline: -1px;
-    padding: 1px 1px 4px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-    scroll-snap-type: x proximity;
-  }
-
-  .sync-settings-overview::-webkit-scrollbar {
-    display: none;
-  }
-
-  .sync-settings-overview-card {
-    min-height: 50px;
-    scroll-snap-align: start;
-  }
 
   .sync-settings-panel-shell .sync-settings-column {
     min-height: 360px;
@@ -705,10 +576,4 @@
     font-size: 0.68rem;
   }
 
-  .sync-settings-overview-icon {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    min-height: 28px;
-  }
 }

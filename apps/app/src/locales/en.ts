@@ -58,7 +58,7 @@ const en = {
       detailPrimary:
         "This is a portable reading archive, not a private or encrypted restore format.",
       detailSecondary:
-        "It may contain DOCX, Markdown, images, files, and canvas exports with the original content.",
+        "It may contain HTML, Markdown, images, files, and canvas exports with the original content.",
       confirmLabel: "I understand, create ZIP"
     }
   },
@@ -780,6 +780,34 @@ const en = {
     plannerCalendarViewMonthChip: "Overview",
     plannerCalendarViewMonthDescription:
       "Opens the bigger monthly picture, deadlines, and task density by date.",
+    plannerClearDataKicker: "Data",
+    plannerClearDataTitle: "Clear Planner and calendar",
+    plannerClearDataDescription:
+      "Deletes tasks, habits, habit logs, goals, and calendar blocks in the current vault.",
+    plannerClearDataStatsLabel: "Planner data",
+    plannerClearDataTotal: "{{count}} items",
+    plannerClearDataEmpty: "No data",
+    plannerClearDataTasks: "Tasks",
+    plannerClearDataHabits: "Habits",
+    plannerClearDataHabitLogs: "Logs",
+    plannerClearDataGoals: "Goals",
+    plannerClearDataTimeBlocks: "Blocks",
+    plannerClearDataBoundary:
+      "Notes, projects, folders, and Planner preferences stay in place. This cannot be undone.",
+    plannerClearDataAction: "Clear data",
+    plannerClearDataBusy: "Clearing...",
+    plannerClearDataSuccess: "Planner and calendar data has been cleared.",
+    plannerClearDataError: "Could not clear Planner data.",
+    plannerClearDataConfirmTitle: "Clear Planner and calendar?",
+    plannerClearDataConfirmMessage:
+      "{{count}} Planner items in the current vault will be deleted. This cannot be undone.",
+    plannerClearDataConfirm: "Clear",
+    plannerClearDataConfirmBoundary: "Notes, projects, folders, and Planner preferences are not deleted.",
+    plannerClearDataDetailTasks: "Tasks: {{count}}",
+    plannerClearDataDetailHabits: "Habits: {{count}}",
+    plannerClearDataDetailHabitLogs: "Habit logs: {{count}}",
+    plannerClearDataDetailGoals: "Goals: {{count}}",
+    plannerClearDataDetailTimeBlocks: "Calendar blocks: {{count}}",
     aiTitle: "AI integration",
     aiDescription: "Connect Gemini API for note rewriting, translation, and formatting.",
     aiPanelCaption:
@@ -968,7 +996,7 @@ const en = {
     backupReadableTitle: "Readable ZIP",
     backupReadableChip: "Portable",
     backupReadableDescription:
-      "A ZIP archive with the same hierarchy, Markdown and DOCX notes, assets, canvas JSON, and canvas PNG previews when rendering is available.",
+      "A ZIP archive with the same hierarchy, Markdown and HTML notes, assets, canvas JSON, and canvas PNG previews when rendering is available.",
     backupSafetyTitle: "Safety note",
     backupSafetyDescription:
       "Exact restore replaces the current active vault. Readable ZIP is for access outside Locoris and is not intended as a full restore format.",
@@ -1146,7 +1174,7 @@ const en = {
     connectionLabelOptional: "Optional label",
     noConnectionsTitle: "No sync methods yet",
     noConnectionsDescription:
-      "Add cloud or self-hosted first, then connect vaults with a wire gesture or a simple tap.",
+      "Add cloud, Google Drive, or self-hosted sync first, then bind local vaults to it.",
     statusUnbound: "Unbound",
     statusReady: "Ready",
     statusSyncing: "Syncing",
@@ -1166,7 +1194,8 @@ const en = {
     remoteVaultsTitle: "Remote vault catalog",
     remoteVaultsDescription:
       "Browse vaults already stored on this sync method, import them to this device, or reconnect an existing local match.",
-    remoteVaultRefresh: "Refresh remote vaults",
+    remoteVaultRefresh: "Refresh remote vault list",
+    remoteVaultRefreshShort: "Refresh list",
     remoteVaultExpand: "Show remote vaults",
     remoteVaultLoading: "Loading remote vaults…",
     remoteVaultAvailableCount: "{{count}} available on this sync method",
@@ -1179,7 +1208,6 @@ const en = {
     remoteVaultLocalMatch: "Local vault: {{vault}}",
     remoteVaultWillAlias: "A local alias will be created to avoid a duplicate display name.",
     remoteVaultOpenLocal: "Open local",
-    selectLocalVault: "Select local vault",
     remoteImportAction: "Import",
     remoteImportLinkLocal: "Connect local",
     remoteImportAll: "Import all",
@@ -1227,7 +1255,36 @@ const en = {
     localDeleteOnlyAction: "Delete local only",
     localDeleteRemoteAction: "Delete local + remote",
     bindingHintTitle: "Choose a sync method",
-    bindingHintDescription: "Tap or drop onto a card in the right column to connect “{{vault}}”.",
+    bindingHintDescription:
+      "Now select a sync-method card on the right to bind “{{vault}}”. On phones, choose the method in the bottom sheet.",
+    bindingNeedsConnectionTitle: "Add a sync method first",
+    bindingNeedsConnectionDescription:
+      "To bind “{{vault}}”, add cloud, Google Drive, or self-hosted sync. After adding it, Locoris will return you to choosing a method.",
+    bindingNeedsConnectionFeedback:
+      "Add a sync method before binding “{{vault}}”.",
+    bindingChooseConnectionFeedback:
+      "Choose a sync method for “{{vault}}”.",
+    bindingAddConnectionNext:
+      "Add a sync method, then you can bind the selected vault right away.",
+    bindingConnectionAddedContinue:
+      "Sync method added. Choose it now to bind the selected vault.",
+    bindingSheetKicker: "Vault binding",
+    bindingSheetTitle: "Bind “{{vault}}”",
+    bindingSheetDescription: "Choose a sync method. Locoris will create a remote vault or connect the existing one with the same ID.",
+    bindingSheetEmptyDescription: "There are no sync methods yet. Add one to continue binding.",
+    bindVaultAction: "Bind",
+    changeBindingAction: "Change",
+    unbindVaultAction: "Unbind",
+    cancelBindingAction: "Cancel",
+    mobileSyncTabsLabel: "Sync sections",
+    mobileVaultCount: "{{count}} vaults",
+    mobileConnectionCount: "{{count}} methods",
+    mobileVaultsHint: "Manage local vaults and their bindings.",
+    mobileConnectionsHint: "Review sync methods, remote catalog, and imports.",
+    mobileConnectionDetails: "Open",
+    mobileConnectionSheetKicker: "Sync method",
+    mobileBoundVaultsTitle: "Bound vaults",
+    mobileNoBoundVaults: "No local vaults are bound to this sync method yet.",
     openSelectedVault: "Open selected vault",
     rebindTitle: "Replace binding",
     rebindDescription:

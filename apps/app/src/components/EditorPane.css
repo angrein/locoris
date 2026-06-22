@@ -68,16 +68,21 @@
 
 .editor-pane-toolbar-main {
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
+  display: block;
 }
 
 .editor-pane-title-stack {
   min-width: 0;
   display: grid;
   gap: 7px;
+}
+
+.editor-pane-title-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .editor-pane-title-field {
@@ -302,6 +307,10 @@
 .editor-pane-ghost-action {
   min-height: 30px;
   flex: 0 0 auto;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid rgb(var(--line-rgb) / 0.12);
@@ -312,8 +321,25 @@
   font: inherit;
   font-size: 0.68rem;
   line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.editor-pane-transfer-action {
+  min-height: 36px;
+  max-width: min(190px, 28vw);
+  padding-inline: 14px;
+  border-radius: 16px;
+  border-color: color-mix(in srgb, var(--editor-accent) 24%, rgb(var(--line-rgb) / 0.12));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--editor-accent) 13%, transparent), transparent 64%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.026);
+  color: color-mix(in srgb, var(--text) 90%, var(--editor-accent) 10%);
+  font-weight: 740;
 }
 
 .editor-pane-ghost-action:hover {
@@ -1252,11 +1278,19 @@
   }
 
   .editor-pane-toolbar-main {
+    display: block;
+  }
+
+  .editor-pane-title-row {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .editor-pane-markdown-actions {
     justify-content: flex-start;
+  }
+
+  .editor-pane-transfer-action {
+    max-width: min(260px, 100%);
   }
 }
 

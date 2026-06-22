@@ -84,17 +84,47 @@ async function writeDesktopFileReplacingExisting(
 function openBrowserFilePicker(accept: string) {
   return new Promise<File | null>((resolve) => {
     const input = document.createElement("input");
+    let settled = false;
     input.type = "file";
     input.accept = accept;
     input.style.display = "none";
-    input.addEventListener(
-      "change",
-      () => {
-        resolve(input.files?.[0] ?? null);
-        input.remove();
-      },
-      { once: true }
-    );
+
+    const cleanup = () => {
+      window.removeEventListener("focus", handleWindowFocus);
+      input.removeEventListener("change", handleChange);
+      input.removeEventListener("cancel", handleCancel);
+      input.remove();
+    };
+
+    const finish = (file: File | null) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      resolve(file);
+    };
+
+    const handleChange = () => {
+      finish(input.files?.[0] ?? null);
+    };
+
+    const handleCancel = () => {
+      finish(null);
+    };
+
+    const handleWindowFocus = () => {
+      window.setTimeout(() => {
+        if (!settled && (!input.files || input.files.length === 0)) {
+          finish(null);
+        }
+      }, 700);
+    };
+
+    input.addEventListener("change", handleChange);
+    input.addEventListener("cancel", handleCancel);
+    window.addEventListener("focus", handleWindowFocus);
     document.body.appendChild(input);
     input.click();
   });

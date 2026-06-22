@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 
 import "./ConfirmDialog.css";
 
@@ -148,7 +149,7 @@ export default function ConfirmDialog({
   const dialogToneClass = tone === "danger" ? "is-danger" : "is-default";
   const secondaryToneClass = secondaryTone === "danger" ? "is-secondary-danger" : "is-secondary";
 
-  return (
+  const dialog = (
     <div
       className={`confirm-dialog-layer ${dialogToneClass}`}
       role="alertdialog"
@@ -221,4 +222,10 @@ export default function ConfirmDialog({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") {
+    return dialog;
+  }
+
+  return createPortal(dialog, document.body);
 }

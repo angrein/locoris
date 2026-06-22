@@ -1085,6 +1085,143 @@ button.settings-row:focus-visible {
   min-height: 104px;
 }
 
+.settings-planner-danger-block {
+  --settings-row-accent: #ff8fa7;
+  gap: 14px;
+  border-color: color-mix(in srgb, #ff8fa7 22%, rgba(255, 255, 255, 0.1));
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 143, 167, 0.12), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.024);
+}
+
+.settings-planner-danger-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+}
+
+.settings-planner-danger-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.settings-planner-danger-head h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 780;
+  line-height: 1.2;
+}
+
+.settings-planner-danger-head p:not(.panel-kicker),
+.settings-planner-danger-footer p {
+  margin: 0;
+  color: rgba(216, 222, 242, 0.74);
+  font-size: 0.74rem;
+  font-weight: 520;
+  line-height: 1.5;
+}
+
+.settings-planner-data-total {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 143, 167, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 143, 167, 0.09);
+  color: rgba(255, 225, 232, 0.96);
+  font-size: 0.68rem;
+  font-weight: 840;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.settings-planner-data-total.is-empty {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.026);
+  color: rgba(205, 214, 240, 0.76);
+}
+
+.settings-planner-data-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-planner-data-pill {
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 9px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.095);
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+}
+
+.settings-planner-data-pill strong,
+.settings-planner-data-pill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-planner-data-pill strong {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 860;
+  line-height: 1;
+}
+
+.settings-planner-data-pill span {
+  color: rgba(196, 205, 235, 0.78);
+  font-size: 0.66rem;
+  font-weight: 680;
+  line-height: 1.1;
+}
+
+.settings-planner-danger-footer {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-planner-clear-action {
+  min-width: 170px;
+}
+
+.settings-planner-clear-feedback {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--settings-accent) 24%, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--settings-accent) 10%, rgba(255, 255, 255, 0.026));
+  color: color-mix(in srgb, var(--text) 86%, var(--settings-accent) 14%);
+  font-size: 0.74rem;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.settings-planner-clear-feedback.is-error {
+  border-color: rgba(255, 143, 167, 0.28);
+  background: rgba(255, 143, 167, 0.08);
+  color: rgba(255, 222, 230, 0.96);
+}
+
 .backup-settings-layout {
   min-width: 0;
   overflow: auto;
@@ -1278,6 +1415,24 @@ button.settings-row:focus-visible {
     grid-column: 1 / -1;
     width: fit-content;
   }
+
+  .settings-planner-danger-head,
+  .settings-planner-danger-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-planner-data-total {
+    width: fit-content;
+  }
+
+  .settings-planner-data-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-planner-clear-action {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1341,6 +1496,10 @@ button.settings-row:focus-visible {
 
   .settings-interface-motion-option-head span:last-child {
     max-width: 100%;
+  }
+
+  .settings-planner-data-grid {
+    grid-template-columns: 1fr;
   }
 }
 

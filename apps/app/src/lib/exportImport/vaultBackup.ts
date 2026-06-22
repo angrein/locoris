@@ -18,8 +18,14 @@ import type {
 } from "../../types";
 import { getDisplayNoteTitle } from "../displayNames";
 import { formatExportTimestamp, sanitizeExportFileName } from "./filenames";
-import { createNoteDocxBlob, type NoteDocxAsset } from "./noteExport";
-import { blocksToMarkdown } from "./noteSerialization";
+import {
+  blocksToMarkdown,
+  buildNoteHtmlDocument
+} from "./noteSerialization";
+import {
+  addReadableExportFontPack,
+  getReadableExportFontCss
+} from "./readableExportFonts";
 
 export type VaultBackupParseResult = {
   backup: DesktopLocalVaultBackup;
@@ -300,15 +306,6 @@ function addReadableAssets(input: {
   });
 }
 
-function backupAssetsToDocxAssets(assets: DesktopLocalVaultBackupAsset[]): NoteDocxAsset[] {
-  return assets.map((asset) => ({
-    id: asset.id,
-    name: asset.name,
-    mimeType: asset.mimeType,
-    blob: assetToBlob(asset)
-  }));
-}
-
 function buildCanvasFiles(assets: DesktopLocalVaultBackupAsset[]): BinaryFiles {
   const files: BinaryFiles = {};
 
@@ -323,6 +320,59 @@ function buildCanvasFiles(assets: DesktopLocalVaultBackupAsset[]): BinaryFiles {
   });
 
   return files;
+}
+
+function createReadableHtmlNote(input: {
+  note: Note;
+  assets: DesktopLocalVaultBackupAsset[];
+  language: AppLanguage;
+  additionalCss?: string;
+}) {
+  const { note, assets, language, additionalCss } = input;
+
+  if (assets.length === 0) {
+    return buildNoteHtmlDocument({ note, language, additionalCss });
+  }
+
+  const assetUrlById = new Map(assets.map((asset) => [asset.id, assetToDataUrl(asset)]));
+  const content = JSON.parse(JSON.stringify(note.content)) as Note["content"];
+
+  const replaceAssetUrls = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      value.forEach(replaceAssetUrls);
+      return value;
+    }
+
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+
+    Object.entries(value as Record<string, unknown>).forEach(([key, entry]) => {
+      if (typeof entry === "string" && (key === "url" || key === "href") && entry.startsWith("asset://")) {
+        const assetId = entry.replace("asset://", "");
+        const dataUrl = assetUrlById.get(assetId);
+
+        if (dataUrl) {
+          (value as Record<string, unknown>)[key] = dataUrl;
+        }
+        return;
+      }
+
+      replaceAssetUrls(entry);
+    });
+
+    return value;
+  };
+
+  replaceAssetUrls(content);
+  return buildNoteHtmlDocument({
+    note: {
+      ...note,
+      content
+    },
+    language,
+    additionalCss
+  });
 }
 
 function formatPlannerDate(value: number | null | undefined) {
@@ -481,11 +531,13 @@ export async function createReadableVaultZipBlob(input: {
       `Locoris readable export: ${input.vaultName}`,
       `Exported: ${new Date().toISOString()}`,
       "",
-      "This archive is optimized for reading outside Locoris. Use .locorisbackup for exact restore."
+      "This archive is optimized for reading outside Locoris. Use .locorisbackup for exact restore.",
+      "HTML notes use local fonts from _locoris/fonts. Font licenses are stored in _locoris/licenses/fonts."
     ].join("\n")
   );
 
   zip.file("manifest.json", JSON.stringify(createBackupManifest({ backup, vaultName: input.vaultName }), null, 2));
+  const hasReadableFontPack = await addReadableExportFontPack(zip);
   addReadablePlannerFiles(zip, backup);
 
   [...projectPaths.values()].forEach((projectPath) => zip.folder(projectPath));
@@ -510,14 +562,12 @@ export async function createReadableVaultZipBlob(input: {
       });
     } else {
       zip.file(`${basePath}.md`, blocksToMarkdown(note.content));
-      zip.file(
-        `${basePath}.docx`,
-        await createNoteDocxBlob({
-          note,
-          language: input.language,
-          assets: backupAssetsToDocxAssets(assets)
-        })
-      );
+      zip.file(`${basePath}.html`, createReadableHtmlNote({
+        note,
+        assets,
+        language: input.language,
+        additionalCss: hasReadableFontPack ? getReadableExportFontCss(`${basePath}.html`) : undefined
+      }));
     }
 
     addReadableAssets({

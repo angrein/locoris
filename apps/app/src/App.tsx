@@ -13,6 +13,7 @@ import TrashPanel from "./components/TrashPanel";
 import {
   createCanvas,
   clearTrash,
+  clearPlannerData,
   createProject,
   duplicateFolder,
   duplicateNote,
@@ -165,7 +166,8 @@ import {
   setPlannerTaskDone as setPlannerTaskDoneRecord,
   updatePlannerHabit as updatePlannerHabitRecord,
   updatePlannerTimeBlock as updatePlannerTimeBlockRecord,
-  updatePlannerTask as updatePlannerTaskRecord
+  updatePlannerTask as updatePlannerTaskRecord,
+  type PlannerViewId
 } from "./lib/planner";
 import {
   buildPlannerTaskLinks,
@@ -248,6 +250,7 @@ export default function App() {
   const tasks = useLiveQuery(() => db.tasks.toArray(), [activeLocalVaultId], []);
   const habits = useLiveQuery(() => db.habits.toArray(), [activeLocalVaultId], []);
   const habitLogs = useLiveQuery(() => db.habitLogs.toArray(), [activeLocalVaultId], []);
+  const goals = useLiveQuery(() => db.goals.toArray(), [activeLocalVaultId], []);
   const timeBlocks = useLiveQuery(() => db.timeBlocks.toArray(), [activeLocalVaultId], []);
   const syncDirtyEntries = useLiveQuery(() => db.syncDirtyEntries.toArray(), [activeLocalVaultId], []);
   const rawSettings = useLiveQuery(() => db.settings.get("app"), [activeLocalVaultId], undefined);
@@ -264,6 +267,10 @@ export default function App() {
   const [orbitalOpen, setOrbitalOpen] = useState(false);
   const [orbitalEditorNoteId, setOrbitalEditorNoteId] = useState<string | null>(null);
   const [plannerProjectFocusId, setPlannerProjectFocusId] = useState<string | null>(null);
+  const [plannerNavigationRequest, setPlannerNavigationRequest] = useState<{
+    viewId: PlannerViewId;
+    requestId: number;
+  } | null>(null);
   const [orbitalProjectFocusRequest, setOrbitalProjectFocusRequest] = useState<{
     projectId: string;
     requestId: number;
@@ -1935,6 +1942,60 @@ export default function App() {
     }
   };
 
+  const handleClearPlannerData = async () => {
+    const plannerDataCounts = {
+      tasks: tasks.length,
+      habits: habits.length,
+      habitLogs: habitLogs.length,
+      goals: goals.length,
+      timeBlocks: timeBlocks.length
+    };
+    const total =
+      plannerDataCounts.tasks +
+      plannerDataCounts.habits +
+      plannerDataCounts.habitLogs +
+      plannerDataCounts.goals +
+      plannerDataCounts.timeBlocks;
+
+    if (total === 0) {
+      return false;
+    }
+
+    const confirmed = await requestConfirmation({
+      title: t("settings.plannerClearDataConfirmTitle"),
+      message: t("settings.plannerClearDataConfirmMessage", {
+        count: total
+      }),
+      confirmLabel: t("settings.plannerClearDataConfirm"),
+      cancelLabel: t("dialog.cancel"),
+      details: [
+        t("settings.plannerClearDataDetailTasks", { count: plannerDataCounts.tasks }),
+        t("settings.plannerClearDataDetailHabits", { count: plannerDataCounts.habits }),
+        t("settings.plannerClearDataDetailHabitLogs", { count: plannerDataCounts.habitLogs }),
+        t("settings.plannerClearDataDetailGoals", { count: plannerDataCounts.goals }),
+        t("settings.plannerClearDataDetailTimeBlocks", { count: plannerDataCounts.timeBlocks }),
+        t("settings.plannerClearDataConfirmBoundary")
+      ]
+    });
+
+    if (!confirmed) {
+      return false;
+    }
+
+    const cleared = await clearPlannerData();
+
+    if (cleared.total === 0) {
+      return false;
+    }
+
+    setPlannerProjectFocusId(null);
+    requestAutoSync({
+      delayMs: 1200
+    });
+
+    return true;
+  };
+
   const handleCreateNote = async () => {
     setViewMode("all");
     const note = await handleCreateNoteAt(selectedFolderId, selectedTagId ? [selectedTagId] : []);
@@ -3337,6 +3398,18 @@ export default function App() {
 
   const handleOpenProjectPlan = (projectId: string) => {
     setPlannerProjectFocusId(projectId);
+    setPlannerNavigationRequest((current) => ({
+      viewId: "projects",
+      requestId: (current?.requestId ?? 0) + 1
+    }));
+  };
+
+  const handleOpenPlannerView = (viewId: PlannerViewId) => {
+    setPlannerProjectFocusId(null);
+    setPlannerNavigationRequest((current) => ({
+      viewId,
+      requestId: (current?.requestId ?? 0) + 1
+    }));
   };
 
   const handleOpenProjectOnMap = (projectId: string) => {
@@ -3555,6 +3628,7 @@ export default function App() {
 		            defaultCalendarView={settings.plannerDefaultCalendarView ?? "week"}
 		            weekStartsOn={settings.plannerWeekStartsOn ?? "monday"}
 		            focusProjectId={plannerProjectFocusId}
+		            navigationRequest={plannerNavigationRequest}
 		            onCreateTask={handleCreatePlannerTask}
 	            onUpdateTask={handleUpdatePlannerTask}
 	            onToggleTaskDone={handleTogglePlannerTaskDone}
@@ -3610,10 +3684,18 @@ export default function App() {
             syncBindings={syncBindings}
             vaultEncryptionById={vaultEncryptionById}
             syncFeedback={syncFeedback}
+            plannerDataCounts={{
+              tasks: tasks.length,
+              habits: habits.length,
+              habitLogs: habitLogs.length,
+              goals: goals.length,
+              timeBlocks: timeBlocks.length
+            }}
             onAccentThemeChange={handleChangeAccentTheme}
 	            onOrbitalAnimationModeChange={handleChangeOrbitalAnimationMode}
 	            onOrbitalTemporalSignalsModeChange={handleChangeOrbitalTemporalSignalsMode}
 	            onPlannerSettingsChange={(patch) => void handleChangePlannerSettings(patch)}
+	            onClearPlannerData={handleClearPlannerData}
 	            onLanguageChange={(language) => void handleChangeLanguage(language)}
             onSelectLocalVault={(localVaultId) => setSelectedSyncVaultId(localVaultId)}
             onCreateLocalVault={(input) => handleCreateLocalVault(input)}
@@ -3727,6 +3809,7 @@ export default function App() {
         }}
 	        onOpenNote={(noteId) => void handleOpenOrbitalNote(noteId)}
 	        onOpenProjectPlan={handleOpenProjectPlan}
+	        onOpenPlannerView={handleOpenPlannerView}
 	        onToggleNoteChecklistItem={handleToggleChecklistItemForNote}
         onResolveFileUrl={resolveAssetUrl}
         labels={{

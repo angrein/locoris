@@ -78,6 +78,10 @@ interface PlannerSurfaceProps {
   defaultCalendarView: PlannerCalendarDefaultView;
   weekStartsOn: PlannerWeekStartsOn;
   focusProjectId?: string | null;
+  navigationRequest?: {
+    viewId: PlannerViewId;
+    requestId: number;
+  } | null;
   onCreateTask: (input: PlannerTaskCreateInput) => Promise<Task>;
   onUpdateTask: (taskId: string, patch: PlannerTaskUpdateInput) => Promise<Task | null>;
   onToggleTaskDone: (taskId: string, done: boolean) => Promise<Task | null>;
@@ -430,6 +434,7 @@ export default function PlannerSurface({
   defaultCalendarView,
   weekStartsOn,
   focusProjectId = null,
+  navigationRequest = null,
   onCreateTask,
   onUpdateTask,
   onToggleTaskDone,
@@ -470,6 +475,8 @@ export default function PlannerSurface({
   const isHabitView = activeViewId === "habits";
   const isReviewView = activeViewId === "review";
   const isTaskView = !isHabitView && !isReviewView;
+  const requestedPlannerViewId = navigationRequest?.viewId;
+  const requestedPlannerNavigationId = navigationRequest?.requestId;
 
   const labels = getPlannerViewLabels(language);
   const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
@@ -597,6 +604,20 @@ export default function PlannerSurface({
     setActiveViewId("projects");
     setSelectedTaskId(null);
   }, [focusProjectId, projectMap]);
+
+  useEffect(() => {
+    if (!requestedPlannerViewId || requestedPlannerNavigationId === undefined) {
+      return;
+    }
+
+    setActiveViewId(requestedPlannerViewId);
+    setSelectedTaskId(null);
+    setSelectedHabitId(null);
+    setIsComposerOpen(false);
+    setIsHabitComposerOpen(false);
+    setIsComposerDateOpen(false);
+    setIsCalendarOpen(false);
+  }, [requestedPlannerNavigationId, requestedPlannerViewId]);
 
   useEffect(() => {
     if (

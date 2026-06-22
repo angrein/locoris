@@ -58,7 +58,7 @@ const ru = {
       detailPrimary:
         "Это портативный архив для чтения, а не приватный или зашифрованный формат восстановления.",
       detailSecondary:
-        "Внутри могут быть DOCX, Markdown, изображения, файлы и canvas-экспорты с исходным содержимым.",
+        "Внутри могут быть HTML, Markdown, изображения, файлы и canvas-экспорты с исходным содержимым.",
       confirmLabel: "Понятно, создать ZIP"
     }
   },
@@ -782,6 +782,34 @@ const ru = {
     plannerCalendarViewMonthChip: "Обзор",
     plannerCalendarViewMonthDescription:
       "Открывает крупную картину месяца, дедлайны и плотность задач по датам.",
+    plannerClearDataKicker: "Данные",
+    plannerClearDataTitle: "Очистить планер и календарь",
+    plannerClearDataDescription:
+      "Удаляет задачи, привычки, отметки привычек, цели и календарные блоки текущего хранилища.",
+    plannerClearDataStatsLabel: "Данные планера",
+    plannerClearDataTotal: "{{count}} объектов",
+    plannerClearDataEmpty: "Данных нет",
+    plannerClearDataTasks: "Задачи",
+    plannerClearDataHabits: "Привычки",
+    plannerClearDataHabitLogs: "Отметки",
+    plannerClearDataGoals: "Цели",
+    plannerClearDataTimeBlocks: "Блоки",
+    plannerClearDataBoundary:
+      "Заметки, проекты, папки и сами настройки планера останутся на месте. Действие нельзя отменить.",
+    plannerClearDataAction: "Очистить данные",
+    plannerClearDataBusy: "Очищаем...",
+    plannerClearDataSuccess: "Данные планера и календаря очищены.",
+    plannerClearDataError: "Не удалось очистить данные планера.",
+    plannerClearDataConfirmTitle: "Очистить планер и календарь?",
+    plannerClearDataConfirmMessage:
+      "Будет удалено {{count}} объектов планера в текущем хранилище. Это действие нельзя отменить.",
+    plannerClearDataConfirm: "Очистить",
+    plannerClearDataConfirmBoundary: "Заметки, проекты, папки и настройки планера не удаляются.",
+    plannerClearDataDetailTasks: "Задачи: {{count}}",
+    plannerClearDataDetailHabits: "Привычки: {{count}}",
+    plannerClearDataDetailHabitLogs: "Отметки привычек: {{count}}",
+    plannerClearDataDetailGoals: "Цели: {{count}}",
+    plannerClearDataDetailTimeBlocks: "Календарные блоки: {{count}}",
     aiTitle: "AI-интеграция",
     aiDescription: "Подключи Gemini API для улучшения, перевода и форматирования заметок.",
     aiPanelCaption:
@@ -970,7 +998,7 @@ const ru = {
     backupReadableTitle: "Читаемый ZIP",
     backupReadableChip: "Портативно",
     backupReadableDescription:
-      "ZIP-архив с той же иерархией, Markdown и DOCX заметками, вложениями, canvas JSON и PNG-превью canvas, если рендер доступен.",
+      "ZIP-архив с той же иерархией, Markdown и HTML заметками, вложениями, canvas JSON и PNG-превью canvas, если рендер доступен.",
     backupSafetyTitle: "Важно",
     backupSafetyDescription:
       "Точное восстановление заменяет текущее активное хранилище. Читаемый ZIP нужен для доступа вне Locoris и не является полным форматом восстановления.",
@@ -1149,7 +1177,7 @@ const ru = {
     connectionLabelOptional: "Необязательная подпись",
     noConnectionsTitle: "Пока нет способов синхронизации",
     noConnectionsDescription:
-      "Сначала добавь облако или свой сервер, а затем связывай хранилища проводом или обычным тапом.",
+      "Сначала добавь облако или свой сервер, а затем привязывай к нему локальные хранилища.",
     statusUnbound: "Не привязан",
     statusReady: "Готово",
     statusSyncing: "Синхронизация",
@@ -1169,7 +1197,8 @@ const ru = {
     remoteVaultsTitle: "Каталог удаленных хранилищ",
     remoteVaultsDescription:
       "Здесь видны хранилища, которые уже лежат на этом способе синхронизации: их можно импортировать на устройство или переподключить существующее локальное хранилище.",
-    remoteVaultRefresh: "Обновить удаленные хранилища",
+    remoteVaultRefresh: "Обновить список удаленных хранилищ",
+    remoteVaultRefreshShort: "Обновить список",
     remoteVaultExpand: "Показать удаленные хранилища",
     remoteVaultLoading: "Загружаем удаленные хранилища…",
     remoteVaultAvailableCount: "Доступно {{count}} на этом способе синхронизации",
@@ -1182,7 +1211,6 @@ const ru = {
     remoteVaultLocalMatch: "Локальное хранилище: {{vault}}",
     remoteVaultWillAlias: "Чтобы не столкнуть одинаковые имена, будет создан локальный alias.",
     remoteVaultOpenLocal: "Открыть локальный",
-    selectLocalVault: "Выбрать локальное хранилище",
     remoteImportAction: "Импортировать",
     remoteImportLinkLocal: "Подключить локальный",
     remoteImportAll: "Импортировать все",
@@ -1230,7 +1258,36 @@ const ru = {
     localDeleteOnlyAction: "Удалить только локально",
     localDeleteRemoteAction: "Удалить локально + remote",
     bindingHintTitle: "Выбери способ синхронизации",
-    bindingHintDescription: "Тапни или брось на карточку справа, чтобы подключить “{{vault}}”.",
+    bindingHintDescription:
+      "Теперь нажми на карточку способа синхронизации справа, чтобы привязать “{{vault}}”. На телефоне выбери способ в нижнем листе.",
+    bindingNeedsConnectionTitle: "Сначала нужен способ синхронизации",
+    bindingNeedsConnectionDescription:
+      "Чтобы привязать “{{vault}}”, добавь облако, Google Drive или свой сервер. После добавления Locoris вернет тебя к выбору способа.",
+    bindingNeedsConnectionFeedback:
+      "Для “{{vault}}” сначала нужно добавить способ синхронизации.",
+    bindingChooseConnectionFeedback:
+      "Выбери способ синхронизации для “{{vault}}”.",
+    bindingAddConnectionNext:
+      "Добавь способ синхронизации, и затем можно будет сразу привязать выбранное хранилище.",
+    bindingConnectionAddedContinue:
+      "Способ синхронизации добавлен. Теперь выбери его для привязки хранилища.",
+    bindingSheetKicker: "Привязка хранилища",
+    bindingSheetTitle: "Привязать “{{vault}}”",
+    bindingSheetDescription: "Выбери способ синхронизации. Locoris создаст удаленное хранилище или подключит существующее с тем же ID.",
+    bindingSheetEmptyDescription: "Пока нет способов синхронизации. Добавь один, чтобы продолжить привязку.",
+    bindVaultAction: "Привязать",
+    changeBindingAction: "Сменить",
+    unbindVaultAction: "Отвязать",
+    cancelBindingAction: "Отменить",
+    mobileSyncTabsLabel: "Разделы синхронизации",
+    mobileVaultCount: "{{count}} хранилищ",
+    mobileConnectionCount: "{{count}} способов",
+    mobileVaultsHint: "Управляй локальными хранилищами и их привязками.",
+    mobileConnectionsHint: "Проверяй способы синхронизации, каталог и импорт.",
+    mobileConnectionDetails: "Открыть",
+    mobileConnectionSheetKicker: "Способ синхронизации",
+    mobileBoundVaultsTitle: "Привязанные хранилища",
+    mobileNoBoundVaults: "К этому способу пока не привязано ни одно локальное хранилище.",
     openSelectedVault: "Открыть выбранное хранилище",
     rebindTitle: "Заменить привязку",
     rebindDescription:

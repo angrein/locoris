@@ -10,12 +10,12 @@ type InlineRenderResult = {
 };
 
 const FONT_FAMILIES: Record<string, string> = {
-  onest: "Onest, system-ui, sans-serif",
+  onest: "'Onest Variable', Onest, system-ui, sans-serif",
   ibmPlexSans: "'IBM Plex Sans', system-ui, sans-serif",
-  golosText: "'Golos Text', system-ui, sans-serif",
+  golosText: "'Golos Text Variable', 'Golos Text', system-ui, sans-serif",
   ibmPlexSerif: "'IBM Plex Serif', Georgia, serif",
   ibmPlexMono: "'IBM Plex Mono', monospace",
-  unbounded: "Unbounded, system-ui, sans-serif"
+  unbounded: "'Unbounded Variable', Unbounded, system-ui, sans-serif"
 };
 
 export function getNoteExportBaseName(note: Pick<Note, "title" | "plainText" | "excerpt">, language: AppLanguage) {
@@ -280,6 +280,7 @@ export function buildNoteHtmlDocument(input: {
   language: AppLanguage;
   markdown?: string;
   generatedAt?: Date;
+  additionalCss?: string;
 }) {
   const title = getDisplayNoteTitle(input.note, input.language);
   const body = blocksToHtmlBody(input.note.content);
@@ -292,6 +293,7 @@ export function buildNoteHtmlDocument(input: {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)}</title>
   <style>
+    ${input.additionalCss ? `${input.additionalCss}\n` : ""}
     :root { color-scheme: light dark; }
     * { box-sizing: border-box; }
     body {
@@ -299,7 +301,7 @@ export function buildNoteHtmlDocument(input: {
       padding: 48px;
       background: #f7f8fb;
       color: #111827;
-      font-family: Inter, Onest, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: "Golos Text Variable", "Golos Text", "IBM Plex Sans", "Onest Variable", Onest, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.65;
       font-kerning: normal;
       text-rendering: optimizeLegibility;
@@ -315,6 +317,7 @@ export function buildNoteHtmlDocument(input: {
       overflow-wrap: anywhere;
     }
     h1, h2, h3, h4, h5, h6 {
+      font-family: "IBM Plex Sans", "Onest Variable", Onest, system-ui, sans-serif;
       line-height: 1.28;
       letter-spacing: 0;
       break-after: avoid;

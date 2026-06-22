@@ -5,8 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent
+  type CSSProperties
 } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -42,11 +41,8 @@ import type {
   VaultEncryptionSummary
 } from "../types";
 import ConfirmDialog from "./ConfirmDialog";
-import {
-  SyncSettingsDialog,
-  SyncSettingsLayout,
-  type SyncSettingsOverviewItem
-} from "./sync/SyncSettingsLayout";
+import { SyncSettingsDialog, SyncSettingsLayout } from "./sync/SyncSettingsLayout";
+import SyncSettingsMobile from "./sync/SyncSettingsMobile";
 import "./SyncSettingsPanel.css";
 
 type SyncFeedbackState = {
@@ -169,13 +165,6 @@ type ConfirmState = {
 } | null;
 
 type HostedMode = "login" | "register";
-
-type DraftLink = {
-  vaultId: string;
-  x: number;
-  y: number;
-  moved: boolean;
-} | null;
 
 type LinkMetric = {
   id: string;
@@ -300,12 +289,13 @@ function LinkGlyph() {
   );
 }
 
-function UnlinkGlyph() {
+function RemoteVaultCatalogGlyph() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      <path d="M7.1 12.9 5.5 14.5a2.5 2.5 0 1 1-3.5-3.5L3.7 9.4" />
-      <path d="M12.9 7.1 14.5 5.5a2.5 2.5 0 1 1 3.5 3.5l-1.6 1.6" />
-      <path d="M7 7l6 6" className="sync-settings-icon-accent" />
+      <rect x="3.4" y="4.4" width="13.2" height="11.2" rx="2.2" />
+      <path d="M6.2 7.1h5.4M6.2 10h4.2M6.2 12.9h3.2" />
+      <path d="M13.2 10.8a2.6 2.6 0 1 1-.8 1.8" className="sync-settings-icon-accent" />
+      <path d="M12.4 10.6h2.4v2.2" className="sync-settings-icon-accent" />
     </svg>
   );
 }
@@ -314,17 +304,6 @@ function CloseGlyph() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
       <path d="M5.4 5.4 14.6 14.6M14.6 5.4 5.4 14.6" />
-    </svg>
-  );
-}
-
-function RefreshGlyph() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      <path d="M15.6 7.7A6.1 6.1 0 0 0 5.4 5.6" />
-      <path d="M5.4 5.6h3.4v3.2" className="sync-settings-icon-accent" />
-      <path d="M4.4 12.3a6.1 6.1 0 0 0 10.2 2.1" />
-      <path d="M14.6 14.4h-3.4v-3.2" className="sync-settings-icon-accent" />
     </svg>
   );
 }
@@ -529,22 +508,6 @@ export default function SyncSettingsPanel({
     () => new Map(syncConnections.map((connection) => [connection.id, connection])),
     [syncConnections]
   );
-  const selectedVault =
-    sortedVaults.find((vault) => vault.id === selectedLocalVaultId) ??
-    sortedVaults.find((vault) => vault.id === activeLocalVaultId) ??
-    null;
-  const selectedVaultEncryption = selectedVault
-    ? vaultEncryptionById[selectedVault.id] ?? {
-        enabled: false,
-        state: "disabled" as const,
-        keyId: null,
-        updatedAt: null
-      }
-    : null;
-  const selectedVaultBinding = selectedVault ? bindingsByVaultId.get(selectedVault.id) ?? null : null;
-  const selectedVaultConnection = selectedVaultBinding
-    ? connectionsById.get(selectedVaultBinding.connectionId) ?? null
-    : null;
   const hostedConnectionExists = syncConnections.some((connection) => connection.provider === "hosted");
   const googleDriveConfigured = googleDriveClientConfigured();
   const googleDriveClientId = getConfiguredGoogleDriveClientId();
@@ -571,8 +534,7 @@ export default function SyncSettingsPanel({
   const [encryptionNextPassphraseDraft, setEncryptionNextPassphraseDraft] = useState("");
   const [encryptionNextPassphraseConfirmDraft, setEncryptionNextPassphraseConfirmDraft] = useState("");
   const [pendingBindVaultId, setPendingBindVaultId] = useState<string | null>(null);
-  const [draftLink, setDraftLink] = useState<DraftLink>(null);
-  const [hoverConnectionId, setHoverConnectionId] = useState<string | null>(null);
+  const [bindingSheetVaultId, setBindingSheetVaultId] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [linkMetrics, setLinkMetrics] = useState<LinkMetric[]>([]);
   const [connectionAvailability, setConnectionAvailability] = useState<Record<string, ConnectionAvailabilityState>>({});
@@ -589,6 +551,7 @@ export default function SyncSettingsPanel({
   const stageRef = useRef<HTMLDivElement | null>(null);
   const vaultListRef = useRef<HTMLDivElement | null>(null);
   const connectionListRef = useRef<HTMLDivElement | null>(null);
+  const previousConnectionCountRef = useRef(syncConnections.length);
   const pendingVaultEncryptionContinuationRef = useRef<(() => Promise<void>) | null>(null);
   const vaultRefs = useRef(new Map<string, HTMLElement>());
   const connectionRefs = useRef(new Map<string, HTMLElement>());
@@ -770,24 +733,6 @@ export default function SyncSettingsPanel({
     connectionRefs.current.delete(connectionId);
   };
 
-  const findConnectionAtPoint = (clientX: number, clientY: number) => {
-    for (const [connectionId, node] of connectionRefs.current.entries()) {
-      const rect = node.getBoundingClientRect();
-      const hitSlop = 10;
-      const isWithinBounds =
-        clientX >= rect.left - hitSlop &&
-        clientX <= rect.right + hitSlop &&
-        clientY >= rect.top - hitSlop &&
-        clientY <= rect.bottom + hitSlop;
-
-      if (isWithinBounds) {
-        return connectionId;
-      }
-    }
-
-    return null;
-  };
-
   useLayoutEffect(() => {
     const stage = stageRef.current;
     const vaultList = vaultListRef.current;
@@ -923,67 +868,6 @@ export default function SyncSettingsPanel({
   }, [googleDriveConfigured, t]);
 
   useEffect(() => {
-    if (!draftLink) {
-      return;
-    }
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const stageRect = stageRef.current?.getBoundingClientRect();
-
-      if (!stageRect) {
-        return;
-      }
-
-      const connectionId = findConnectionAtPoint(event.clientX, event.clientY);
-
-      setDraftLink((current) =>
-        current
-          ? {
-              ...current,
-              x: event.clientX - stageRect.left,
-              y: event.clientY - stageRect.top,
-              moved: true
-            }
-          : null
-      );
-      setHoverConnectionId((current) => (current === connectionId ? current : connectionId));
-    };
-
-    const handlePointerUp = (event: PointerEvent) => {
-      const currentDraft = draftLink;
-      const connectionId = findConnectionAtPoint(event.clientX, event.clientY);
-
-      setDraftLink(null);
-      setHoverConnectionId(null);
-
-      if (connectionId) {
-        void requestVaultBinding(currentDraft.vaultId, connectionId);
-        return;
-      }
-
-      if (!currentDraft.moved) {
-        setPendingBindVaultId(currentDraft.vaultId);
-      }
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp, {
-      passive: true
-    });
-
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-  }, [draftLink]);
-
-  useEffect(() => {
-    if (!draftLink) {
-      setHoverConnectionId(null);
-    }
-  }, [draftLink]);
-
-  useEffect(() => {
     setExpandedRemoteConnectionIds((current) => {
       const next: Record<string, boolean> = {};
       let changed = false;
@@ -1103,6 +987,24 @@ export default function SyncSettingsPanel({
       text
     });
   };
+
+  const pendingBindVault = pendingBindVaultId
+    ? sortedVaults.find((vault) => vault.id === pendingBindVaultId) ?? null
+    : null;
+  const bindingSheetVault = bindingSheetVaultId
+    ? sortedVaults.find((vault) => vault.id === bindingSheetVaultId) ?? null
+    : null;
+
+  useEffect(() => {
+    const previousCount = previousConnectionCountRef.current;
+
+    if (pendingBindVaultId && previousCount === 0 && syncConnections.length > 0) {
+      setBindingSheetVaultId(pendingBindVaultId);
+      showFeedback("success", t("settings.bindingConnectionAddedContinue"));
+    }
+
+    previousConnectionCountRef.current = syncConnections.length;
+  }, [pendingBindVaultId, syncConnections.length, t]);
 
   const closeModal = () => {
     setPanelModal(null);
@@ -1937,12 +1839,14 @@ export default function SyncSettingsPanel({
 
     const runBinding = async () => {
       setBusyKey(`bind:${vault.id}:${connection.id}`);
+      setInternalFeedback(null);
 
       try {
         await performVaultBinding(vault, connection, {
           refreshCatalog: true
         });
         setPendingBindVaultId(null);
+        setBindingSheetVaultId(null);
         setConnectionAvailability((current) => ({
           ...current,
           [connection.id]: "available"
@@ -1968,6 +1872,7 @@ export default function SyncSettingsPanel({
     };
 
     if (existingBinding && existingBinding.connectionId !== connection.id) {
+      setBindingSheetVaultId(null);
       setConfirmState({
         title: t("settings.rebindTitle"),
         description: t("settings.rebindDescription", {
@@ -2007,6 +1912,7 @@ export default function SyncSettingsPanel({
           silent: true
         });
         setPendingBindVaultId(null);
+        setBindingSheetVaultId(null);
         setConnectionAvailability((current) => ({
           ...current,
           [connection.id]: "available"
@@ -2051,23 +1957,114 @@ export default function SyncSettingsPanel({
     void runBindingAll();
   };
 
-  const startLinkDraft = (event: ReactPointerEvent<HTMLElement>, vaultId: string) => {
-    const stageRect = stageRef.current?.getBoundingClientRect();
+  const cancelVaultBindingFlow = () => {
+    setPendingBindVaultId(null);
+    setBindingSheetVaultId(null);
+    setInternalFeedback(null);
+  };
 
-    if (!stageRect) {
+  const openAddConnectionCatalog = () => {
+    setPanelModal({ kind: "addConnection" });
+  };
+
+  const openAddConnectionFromBindingFlow = () => {
+    setBindingSheetVaultId(null);
+    openAddConnectionCatalog();
+    showFeedback("success", t("settings.bindingAddConnectionNext"));
+  };
+
+  const startVaultBindingFlow = (vault: LocalVaultProfile) => {
+    onSelectLocalVault(vault.id);
+    setPendingBindVaultId(vault.id);
+    setBindingSheetVaultId(vault.id);
+
+    if (syncConnections.length === 0) {
+      showFeedback(
+        "error",
+        t("settings.bindingNeedsConnectionFeedback", {
+          vault: getVaultLabel(vault)
+        })
+      );
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
+    showFeedback(
+      "success",
+      t("settings.bindingChooseConnectionFeedback", {
+        vault: getVaultLabel(vault)
+      })
+    );
+    if (typeof window === "undefined") {
+      return;
+    }
 
-    setPendingBindVaultId(vaultId);
-    setDraftLink({
-      vaultId,
-      x: event.clientX - stageRect.left,
-      y: event.clientY - stageRect.top,
-      moved: false
+    window.requestAnimationFrame(() => {
+      connectionListRef.current?.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
     });
+  };
+
+  const requestVaultBindingFromSheet = async (vaultId: string, connectionId: string) => {
+    await requestVaultBinding(vaultId, connectionId);
+  };
+
+  const refreshConnectionRemoteVaults = async (connection: SyncConnection) => {
+    let nextConnection = connection;
+    const availability = online ? connectionAvailability[connection.id] ?? "checking" : "offline";
+    const reauthBusyKey = `reauth:${connection.id}`;
+
+    if (connection.provider === "selfHosted" && availability === "authError") {
+      openSelfHostedConnectionModal(connection);
+      return;
+    }
+
+    if (connection.provider === "googleDrive" && availability === "authError") {
+      try {
+        setBusyKey(reauthBusyKey);
+        nextConnection = await reauthorizeGoogleDriveConnection(connection);
+      } catch (error) {
+        const message = getErrorMessage(error);
+        showFeedback("error", translateSyncManagerError(message, t));
+        setBusyKey(null);
+        return;
+      }
+    }
+
+    try {
+      await loadRemoteVaultCatalog(nextConnection, {
+        silent: false
+      });
+    } finally {
+      setBusyKey((current) => (current === reauthBusyKey ? null : current));
+    }
+  };
+
+  const repairConnectionAuth = async (connection: SyncConnection) => {
+    if (connection.provider === "selfHosted") {
+      openSelfHostedConnectionModal(connection);
+      return;
+    }
+
+    if (connection.provider !== "googleDrive") {
+      return;
+    }
+
+    const reauthBusyKey = `reauth:${connection.id}`;
+
+    try {
+      setBusyKey(reauthBusyKey);
+      const nextConnection = await reauthorizeGoogleDriveConnection(connection);
+      await loadRemoteVaultCatalog(nextConnection, {
+        silent: false
+      });
+    } catch (error) {
+      const message = getErrorMessage(error);
+      showFeedback("error", translateSyncManagerError(message, t));
+    } finally {
+      setBusyKey((current) => (current === reauthBusyKey ? null : current));
+    }
   };
 
   const openCreateVaultModal = () => {
@@ -2312,44 +2309,52 @@ export default function SyncSettingsPanel({
       .map((binding) => sortedVaults.find((vault) => vault.id === binding.localVaultId)?.name ?? binding.localVaultId)
       .slice(0, 3);
 
-  const selectedVaultOverviewCaption = selectedVaultBinding
-    ? `${selectedVaultBinding.remoteVaultName} · ${formatTime(selectedVaultBinding.lastSyncAt, i18n.language)}`
-    : t("sync.localVaultUnbound");
-  const overviewItems: SyncSettingsOverviewItem[] = [
-    {
-      id: "vaults",
-      tone: "vaults",
-      icon: <VaultGlyph />,
-      label: t("settings.vaultsTitle"),
-      value: sortedVaults.length,
-      caption: t("settings.vaultsDescription")
-    },
-    {
-      id: "connections",
-      tone: "connections",
-      icon: <LinkGlyph />,
-      label: t("settings.connectionsTitle"),
-      value: syncConnections.length,
-      caption: t("settings.linkedVaultCount", { count: syncBindings.length })
-    },
-    {
-      id: "selected",
-      tone: selectedVaultConnection ? "status" : "selected",
-      icon: selectedVaultConnection ? (
-        <SyncConnectionIcon provider={selectedVaultConnection.provider} />
-      ) : (
-        <VaultGlyph />
-      ),
-      label: selectedVaultConnection
-        ? t("settings.boundToConnection", { connection: selectedVaultConnection.label })
-        : t("sync.localVault"),
-      value: selectedVault ? getVaultLabel(selectedVault) : t("sync.localVault"),
-      caption: selectedVaultOverviewCaption
-    }
-  ];
-
   return (
     <>
+      <SyncSettingsMobile
+        online={online}
+        localVaults={sortedVaults}
+        activeLocalVaultId={activeLocalVaultId}
+        selectedLocalVaultId={selectedLocalVaultId}
+        syncConnections={syncConnections}
+        syncBindings={syncBindings}
+        vaultEncryptionById={vaultEncryptionById}
+        connectionAvailability={connectionAvailability}
+        remoteVaultsByConnectionId={remoteVaultsByConnectionId}
+        remoteVaultErrors={remoteVaultErrors}
+        remoteVaultLoading={remoteVaultLoading}
+        pendingBindVaultId={pendingBindVaultId}
+        bindingSheetVault={bindingSheetVault}
+        busyKey={busyKey}
+        feedback={feedback}
+        getVaultLabel={getVaultLabel}
+        onBack={onBack}
+        onClose={onClose}
+        onSelectLocalVault={onSelectLocalVault}
+        onCreateVault={openCreateVaultModal}
+        onRenameVault={openRenameVaultModal}
+        onDeleteLocalVault={requestDeleteLocalVault}
+        onStartVaultBinding={startVaultBindingFlow}
+        onCancelVaultBinding={cancelVaultBindingFlow}
+        onAddConnection={openAddConnectionCatalog}
+        onAddConnectionFromBinding={openAddConnectionFromBindingFlow}
+        onBindVaultToConnection={requestVaultBindingFromSheet}
+        onClearBinding={onClearBinding}
+        onOpenVaultEncryption={(vault, view) =>
+          openVaultEncryptionModal(vault, {
+            view
+          })
+        }
+        onRefreshRemoteVaults={refreshConnectionRemoteVaults}
+        onImportAllRemoteVaults={requestImportAllRemoteVaults}
+        onImportRemoteVault={requestRemoteVaultImport}
+        onDeleteRemoteVault={requestDeleteRemoteVault}
+        onBindAllVaults={requestBindAllVaults}
+        onDeleteConnection={onDeleteConnection}
+        onRepairConnection={repairConnectionAuth}
+      />
+
+      <div className="sync-settings-desktop-surface">
       <SyncSettingsLayout
         title={t("settings.syncTitle")}
         kicker={online ? t("sync.statusReady") : t("settings.connectionOffline")}
@@ -2358,7 +2363,6 @@ export default function SyncSettingsPanel({
         closeLabel={t("orbit.closeModal")}
         backIcon={<ChevronLeftGlyph />}
         closeIcon={<CloseGlyph />}
-        overviewItems={overviewItems}
         stageRef={stageRef}
         onBack={onBack}
         onClose={onClose}
@@ -2379,62 +2383,52 @@ export default function SyncSettingsPanel({
             </g>
           ))}
 
-          {draftLink ? (
-            (() => {
-              const vaultNode = vaultRefs.current.get(draftLink.vaultId);
-              const stageRect = stageRef.current?.getBoundingClientRect();
-
-              if (!vaultNode || !stageRect) {
-                return null;
-              }
-
-              const vaultRect = vaultNode.getBoundingClientRect();
-              const x1 = vaultRect.right - stageRect.left - 6;
-              const y1 = vaultRect.top - stageRect.top + vaultRect.height / 2;
-              const x2 = draftLink.x;
-              const y2 = draftLink.y;
-
-              return (
-                <>
-                  <path
-                    d={buildLinkPath(x1, y1, x2, y2)}
-                    className="sync-settings-link-wire is-draft"
-                    style={{ "--link-color": "#ffe29b" } as CSSProperties}
-                  />
-                  <path
-                    d={buildLinkPath(x1, y1, x2, y2)}
-                    className="sync-settings-link-stream is-draft"
-                    style={{ "--link-color": "#ffe29b" } as CSSProperties}
-                  />
-                </>
-              );
-            })()
-          ) : null}
           </svg>
         }
         bindingHint={
-          pendingBindVaultId ? (
-            <div className="sync-settings-binding-hint">
+          pendingBindVault ? (
+            <div
+              className={`sync-settings-binding-hint ${
+                syncConnections.length === 0 ? "is-missing-connection" : "is-choosing-connection"
+              }`}
+            >
+              <span className="sync-settings-binding-icon" aria-hidden="true">
+                <LinkGlyph />
+              </span>
               <div className="sync-settings-binding-copy">
-                <strong>{t("settings.bindingHintTitle")}</strong>
+                <strong>
+                  {syncConnections.length === 0
+                    ? t("settings.bindingNeedsConnectionTitle")
+                    : t("settings.bindingHintTitle")}
+                </strong>
                 <span>
-                  {t("settings.bindingHintDescription", {
-                    vault:
-                      sortedVaults.find((vault) => vault.id === pendingBindVaultId)?.name ??
-                      t("sync.localVault")
-                  })}
+                  {syncConnections.length === 0
+                    ? t("settings.bindingNeedsConnectionDescription", {
+                        vault: getVaultLabel(pendingBindVault)
+                      })
+                    : t("settings.bindingHintDescription", {
+                        vault: getVaultLabel(pendingBindVault)
+                      })}
                 </span>
               </div>
-              <button
-                type="button"
-                className="sync-settings-inline-action"
-                onClick={() => {
-                  setPendingBindVaultId(null);
-                  setDraftLink(null);
-                }}
-              >
-                {t("filters.clear")}
-              </button>
+              <div className="sync-settings-binding-actions">
+                {syncConnections.length === 0 ? (
+                  <button
+                    type="button"
+                    className="sync-settings-primary-action"
+                    onClick={openAddConnectionFromBindingFlow}
+                  >
+                    {t("settings.addConnection")}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="sync-settings-inline-action"
+                  onClick={cancelVaultBindingFlow}
+                >
+                  {t("settings.cancelBindingAction")}
+                </button>
+              </div>
             </div>
           ) : undefined
         }
@@ -2597,27 +2591,28 @@ export default function SyncSettingsPanel({
                         ) : null}
                         <button
                           type="button"
-                          className="sync-settings-icon-button sync-settings-link-handle"
-                          title={t("settings.linkVault")}
-                          onPointerDown={(event) => startLinkDraft(event, vault.id)}
+                          className={`sync-settings-vault-action ${
+                            binding ? "is-change-binding" : "is-bind"
+                          }`}
+                          title={binding ? t("settings.changeBindingAction") : t("settings.bindVaultAction")}
                           onClick={(event) => {
                             event.stopPropagation();
-                            setPendingBindVaultId(vault.id);
+                            startVaultBindingFlow(vault);
                           }}
                         >
-                          <LinkGlyph />
+                          {binding ? t("settings.changeBindingAction") : t("settings.bindVaultAction")}
                         </button>
                         {binding ? (
                           <button
                             type="button"
-                            className="sync-settings-icon-button"
-                            title={t("settings.disconnectVault")}
+                            className="sync-settings-vault-action is-unbind"
+                            title={t("settings.unbindVaultAction")}
                             onClick={(event) => {
                               event.stopPropagation();
                               void onClearBinding(vault.id);
                             }}
                           >
-                            <UnlinkGlyph />
+                            {t("settings.unbindVaultAction")}
                           </button>
                         ) : null}
                         <button
@@ -2649,7 +2644,15 @@ export default function SyncSettingsPanel({
               </div>
             </section>
 
-            <section className="sync-settings-column is-connections">
+            <section
+              className={`sync-settings-column is-connections ${
+                pendingBindVault
+                  ? syncConnections.length === 0
+                    ? "is-awaiting-connection"
+                    : "is-awaiting-choice"
+                  : ""
+              }`}
+            >
               <div className="sync-settings-column-head">
                 <div className="sync-settings-column-copy">
                   <span className="setting-label">{t("settings.connectionsTitle")}</span>
@@ -2659,8 +2662,10 @@ export default function SyncSettingsPanel({
                   <span className="sync-settings-column-pill is-connections">{syncConnections.length}</span>
                   <button
                     type="button"
-                    className="sync-settings-icon-button"
-                    onClick={() => setPanelModal({ kind: "addConnection" })}
+                    className={`sync-settings-icon-button sync-settings-add-connection-button ${
+                      pendingBindVault && syncConnections.length === 0 ? "is-guided" : ""
+                    }`}
+                    onClick={openAddConnectionCatalog}
                     title={t("settings.addConnection")}
                   >
                     <PlusGlyph />
@@ -2715,7 +2720,7 @@ export default function SyncSettingsPanel({
                       key={connection.id}
                       data-sync-connection-id={connection.id}
                       ref={(node) => registerConnectionRef(connection.id, node)}
-                      className={`sync-settings-card sync-settings-connection-card ${canBindSelected ? "is-bind-target" : ""} ${hoverConnectionId === connection.id ? "is-bind-hover" : ""}`}
+                      className={`sync-settings-card sync-settings-connection-card ${canBindSelected ? "is-bind-target" : ""}`}
                       style={{ "--connection-accent": providerAccent(connection.provider) } as CSSProperties}
                       onClick={() => {
                         if (pendingBindVaultId) {
@@ -2806,49 +2811,17 @@ export default function SyncSettingsPanel({
                           <div className="sync-settings-remote-actions">
                             <button
                               type="button"
-                              className="sync-settings-icon-button"
+                              className="sync-settings-refresh-action"
                               title={t("settings.remoteVaultRefresh")}
                               disabled={isRemoteLoading || busyKey !== null}
                               onClick={() => {
-                                void (async () => {
-                                  let nextConnection = connection;
-
-                                  if (
-                                    connection.provider === "selfHosted" &&
-                                    availability === "authError"
-                                  ) {
-                                    openSelfHostedConnectionModal(connection);
-                                    return;
-                                  }
-
-                                  if (
-                                    connection.provider === "googleDrive" &&
-                                    availability === "authError"
-                                  ) {
-                                    try {
-                                      setBusyKey(`reauth:${connection.id}`);
-                                      nextConnection = await reauthorizeGoogleDriveConnection(connection);
-                                    } catch (error) {
-                                      const message = getErrorMessage(error);
-                                      showFeedback("error", translateSyncManagerError(message, t));
-                                      setBusyKey(null);
-                                      return;
-                                    }
-                                  }
-
-                                  try {
-                                    await loadRemoteVaultCatalog(nextConnection, {
-                                      silent: false
-                                    });
-                                  } finally {
-                                    setBusyKey((current) =>
-                                      current === `reauth:${connection.id}` ? null : current
-                                    );
-                                  }
-                                })();
+                                void refreshConnectionRemoteVaults(connection);
                               }}
                             >
-                              <RefreshGlyph />
+                              <span className="sync-settings-refresh-icon" aria-hidden="true">
+                                <RemoteVaultCatalogGlyph />
+                              </span>
+                              <span>{t("settings.remoteVaultRefreshShort")}</span>
                             </button>
                             <button
                               type="button"
@@ -2912,23 +2885,7 @@ export default function SyncSettingsPanel({
                                     className="sync-settings-inline-action"
                                     disabled={busyKey !== null}
                                     onClick={() => {
-                                      void (async () => {
-                                        try {
-                                          setBusyKey(`reauth:${connection.id}`);
-                                          const nextConnection = await reauthorizeGoogleDriveConnection(connection);
-                                          await loadRemoteVaultCatalog(nextConnection, {
-                                            silent: false
-                                          });
-                                        } catch (error) {
-                                          const message =
-                                            getErrorMessage(error);
-                                          showFeedback("error", translateSyncManagerError(message, t));
-                                        } finally {
-                                          setBusyKey((current) =>
-                                            current === `reauth:${connection.id}` ? null : current
-                                          );
-                                        }
-                                      })();
+                                      void repairConnectionAuth(connection);
                                     }}
                                   >
                                     {t("settings.googleDriveReconnect")}
@@ -3022,15 +2979,7 @@ export default function SyncSettingsPanel({
                                       </div>
 
                                       <div className="sync-settings-card-actions">
-                                        {isLinkedHere && matchingLocalVault ? (
-                                          <button
-                                            type="button"
-                                            className="sync-settings-inline-action"
-                                            onClick={() => onSelectLocalVault(matchingLocalVault.id)}
-                                          >
-                                            {t("settings.selectLocalVault")}
-                                          </button>
-                                        ) : (
+                                        {!isLinkedHere ? (
                                           <button
                                             type="button"
                                             className="sync-settings-inline-action"
@@ -3043,7 +2992,7 @@ export default function SyncSettingsPanel({
                                               ? t("settings.remoteImportLinkLocal")
                                               : t("settings.remoteImportAction")}
                                           </button>
-                                        )}
+                                        ) : null}
                                         <button
                                           type="button"
                                           className="sync-settings-icon-button is-danger"
@@ -3097,6 +3046,7 @@ export default function SyncSettingsPanel({
           </section>
         </div>
       </SyncSettingsLayout>
+      </div>
 
       <SyncSettingsDialog
         open={Boolean(panelModal)}
