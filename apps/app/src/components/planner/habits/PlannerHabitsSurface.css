@@ -1,6 +1,15 @@
+.planner-habits-surface,
+.planner-habit-detail,
+.planner-habit-detail-content,
+.planner-habit-mobile-detail-sheet,
+.planner-habit-mobile-sheet {
+  --planner-habit-done: color-mix(in srgb, #76f2b8 82%, var(--planner-habit-color, var(--planner-accent, #8edcff)) 18%);
+  --planner-habit-done-strong: color-mix(in srgb, var(--planner-habit-done) 86%, white 14%);
+  --planner-habit-done-soft: color-mix(in srgb, var(--planner-habit-done) 24%, rgba(255, 255, 255, 0.07));
+  --planner-habit-done-ink: #061813;
+}
+
 .planner-habits-surface {
-  --planner-habit-done: color-mix(in srgb, #76f2b8 84%, var(--planner-accent) 16%);
-  --planner-habit-done-ink: rgba(4, 18, 13, 0.86);
   position: relative;
   z-index: 1;
   flex: 1 1 0;
@@ -504,7 +513,10 @@
 }
 
 .planner-habit-legend i.is-complete {
-  background: var(--planner-habit-done);
+  background: linear-gradient(135deg, var(--planner-habit-done-strong), var(--planner-habit-done));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--planner-habit-done) 70%, rgba(255, 255, 255, 0.28)),
+    0 0 14px color-mix(in srgb, var(--planner-habit-done) 28%, transparent);
 }
 
 .planner-habit-legend i.is-missed {
@@ -781,8 +793,10 @@
 }
 
 .planner-habit-week-strip > span.is-complete {
-  background: var(--planner-habit-done);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--planner-habit-done) 24%, transparent);
+  background: linear-gradient(90deg, var(--planner-habit-done-strong), var(--planner-habit-done));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--planner-habit-done) 72%, rgba(255, 255, 255, 0.2)),
+    0 0 18px color-mix(in srgb, var(--planner-habit-done) 28%, transparent);
 }
 
 .planner-habit-week-strip > span.is-missed {
@@ -809,6 +823,14 @@
 .planner-habit-week-strip > span.is-today {
   outline: 1px solid rgba(255, 255, 255, 0.56);
   outline-offset: 2px;
+}
+
+.planner-habit-week-strip > span.is-today.is-complete {
+  outline-color: color-mix(in srgb, var(--planner-habit-done) 62%, white 38%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--planner-habit-done) 78%, rgba(255, 255, 255, 0.22)),
+    0 0 0 4px color-mix(in srgb, var(--planner-habit-done) 10%, transparent),
+    0 0 20px color-mix(in srgb, var(--planner-habit-done) 32%, transparent);
 }
 
 .planner-habit-detail-head {
@@ -878,6 +900,12 @@
 
 .planner-habit-today-card.is-complete {
   border-color: color-mix(in srgb, #8ef0bf 32%, rgba(255, 255, 255, 0.12));
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--planner-habit-done) 22%, transparent), transparent 48%),
+    linear-gradient(145deg, color-mix(in srgb, var(--planner-habit-done) 14%, rgba(255, 255, 255, 0.05)), rgba(255, 255, 255, 0.035));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 14px 32px color-mix(in srgb, var(--planner-habit-done) 10%, transparent);
 }
 
 .planner-habit-today-card strong {
@@ -1027,8 +1055,10 @@
 }
 
 .planner-habit-history-heatmap > span.is-complete {
-  background: var(--planner-habit-done);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--planner-habit-done) 28%, transparent);
+  background: linear-gradient(90deg, var(--planner-habit-done-strong), var(--planner-habit-done));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--planner-habit-done) 72%, rgba(255, 255, 255, 0.22)),
+    0 0 18px color-mix(in srgb, var(--planner-habit-done) 32%, transparent);
 }
 
 .planner-habit-history-heatmap > span.is-missed {
@@ -1043,6 +1073,14 @@
 .planner-habit-history-heatmap > span.is-today {
   outline: 1px solid rgba(255, 255, 255, 0.54);
   outline-offset: 2px;
+}
+
+.planner-habit-history-heatmap > span.is-today.is-complete {
+  outline-color: color-mix(in srgb, var(--planner-habit-done) 62%, white 38%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--planner-habit-done) 80%, rgba(255, 255, 255, 0.24)),
+    0 0 0 4px color-mix(in srgb, var(--planner-habit-done) 10%, transparent),
+    0 0 22px color-mix(in srgb, var(--planner-habit-done) 34%, transparent);
 }
 
 .planner-habit-recent-row {

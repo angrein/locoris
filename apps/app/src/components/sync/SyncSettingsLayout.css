@@ -29,7 +29,11 @@
   border-radius: 20px;
 }
 
-.sync-settings-panel-heading {
+.sync-settings-panel-header .sync-settings-panel-heading {
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-self: stretch;
+  width: 100%;
   gap: 4px;
 }
 
@@ -44,14 +48,13 @@
   line-height: 1.06;
 }
 
-.sync-settings-panel-caption {
-  max-width: 76ch;
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: clamp(0.68rem, 0.78vw, 0.75rem);
-  line-height: 1.25;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+.sync-settings-panel-header .sync-settings-panel-caption {
+  width: 100%;
+  max-width: none;
+  max-inline-size: none;
+  display: block;
+  overflow: visible;
+  white-space: normal;
 }
 
 .sync-settings-panel-nav-icon svg,
@@ -570,10 +573,6 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 8px;
     padding: 10px;
-  }
-
-  .sync-settings-panel-caption {
-    font-size: 0.68rem;
   }
 
 }

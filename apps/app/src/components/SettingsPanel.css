@@ -1,7 +1,9 @@
 .settings-panel-shell {
-  --settings-accent: var(--accent-theme-primary, var(--utility-modal-accent, var(--gold)));
-  --settings-accent-secondary: var(--accent-theme-secondary, var(--cyan));
-  --settings-accent-contrast: color-mix(in srgb, var(--text) 76%, var(--settings-accent) 24%);
+  --settings-accent: var(--accent-primary, var(--accent-theme-primary, var(--utility-modal-accent, var(--gold))));
+  --settings-accent-secondary: var(--accent-secondary, var(--accent-theme-secondary, var(--cyan)));
+  --settings-accent-warm: var(--accent-warm, var(--accent-theme-tertiary, var(--gold)));
+  --settings-emphasis: var(--text-emphasis, var(--text-heading, var(--settings-accent-warm)));
+  --settings-accent-contrast: color-mix(in srgb, var(--settings-emphasis) 76%, var(--settings-accent) 24%);
   --settings-accent-soft: color-mix(in srgb, var(--settings-accent) 12%, transparent);
   --settings-card: rgba(255, 255, 255, 0.045);
   --settings-card-strong: rgba(255, 255, 255, 0.072);
@@ -185,7 +187,7 @@
 
 .settings-panel-title {
   margin: 0;
-  color: color-mix(in srgb, #fff 84%, var(--settings-accent) 16%);
+  color: color-mix(in srgb, var(--settings-emphasis, #fff) 88%, #fff 12%);
   font-family: var(--font-ui-display);
   font-size: clamp(1.35rem, 2.35vw, 2.1rem);
   font-weight: 780;
@@ -196,7 +198,7 @@
 .settings-panel-caption {
   max-width: 68ch;
   margin: 0;
-  color: color-mix(in srgb, rgba(210, 219, 250, 0.78) 82%, var(--settings-accent-secondary) 18%);
+  color: color-mix(in srgb, var(--text-secondary, rgba(210, 219, 250, 0.78)) 86%, var(--settings-accent-secondary) 14%);
   font-size: clamp(0.76rem, 1.05vw, 0.88rem);
   font-weight: 520;
   line-height: 1.45;
@@ -205,7 +207,7 @@
 .settings-panel-kicker,
 .settings-panel-block-kicker {
   margin: 0;
-  color: color-mix(in srgb, var(--settings-accent) 74%, #fff 26%);
+  color: color-mix(in srgb, var(--settings-emphasis) 72%, var(--settings-accent) 28%);
   font-size: 0.66rem;
   font-weight: 860;
   letter-spacing: 0.16em;
@@ -813,7 +815,7 @@ button.settings-row:focus-visible {
 
 .settings-accent-option {
   min-width: 0;
-  min-height: 92px;
+  min-height: 104px;
   display: grid;
   align-content: center;
   justify-items: center;
@@ -822,7 +824,8 @@ button.settings-row:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 21px;
   background:
-    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent-theme-one) 13%, transparent), transparent 54%),
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--theme-preview-primary, var(--accent-theme-one)) 13%, transparent), transparent 54%),
+    linear-gradient(135deg, color-mix(in srgb, var(--theme-preview-background, transparent) 44%, transparent), transparent 64%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.016)),
     rgba(255, 255, 255, 0.024);
   color: rgba(240, 245, 255, 0.84);
@@ -842,45 +845,61 @@ button.settings-row:focus-visible {
 
 .settings-accent-option:hover,
 .settings-accent-option.is-active {
-  border-color: color-mix(in srgb, var(--accent-theme-one) 46%, rgba(255, 255, 255, 0.14));
+  border-color: color-mix(in srgb, var(--theme-preview-primary, var(--accent-theme-one)) 46%, rgba(255, 255, 255, 0.14));
   background:
-    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent-theme-one) 19%, transparent), transparent 56%),
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--theme-preview-primary, var(--accent-theme-one)) 19%, transparent), transparent 56%),
+    linear-gradient(135deg, color-mix(in srgb, var(--theme-preview-background, transparent) 52%, transparent), transparent 64%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.074), rgba(255, 255, 255, 0.02)),
     rgba(255, 255, 255, 0.032);
   color: #fff;
   transform: translateY(-1px);
   box-shadow:
-    0 18px 34px color-mix(in srgb, var(--accent-theme-one) 10%, transparent),
+    0 18px 34px color-mix(in srgb, var(--theme-preview-primary, var(--accent-theme-one)) 10%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .settings-accent-swatches {
-  display: inline-flex;
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(6, 16px);
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .settings-accent-swatch {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
+  background: var(--theme-swatch-color);
   box-shadow:
     0 8px 18px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
-.settings-accent-swatch.is-one {
-  background: var(--accent-theme-one);
+.settings-accent-swatch.is-background,
+.settings-accent-swatch.is-surface {
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.settings-accent-swatch.is-two {
-  background: var(--accent-theme-two);
+.settings-accent-swatch.is-emphasis {
+  box-shadow:
+    0 8px 18px color-mix(in srgb, var(--theme-swatch-color) 16%, rgba(0, 0, 0, 0.24)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
-.settings-accent-swatch.is-three {
-  background: var(--accent-theme-three);
+.settings-accent-swatch.is-primary,
+.settings-accent-swatch.is-secondary,
+.settings-accent-swatch.is-warm {
+  border-color: color-mix(in srgb, var(--theme-swatch-color) 46%, rgba(255, 255, 255, 0.18));
+  box-shadow:
+    0 8px 18px color-mix(in srgb, var(--theme-swatch-color) 22%, rgba(0, 0, 0, 0.2)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
 }
 
 .settings-interface-motion-block {

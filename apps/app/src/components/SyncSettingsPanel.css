@@ -1290,7 +1290,7 @@
   line-height: 1.4;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(var(--gold-rgb) / 0.76);
+  color: color-mix(in srgb, var(--text-emphasis, #ffe08a) 78%, var(--accent-primary, #73f7ff) 22%);
 }
 
 .sync-settings-encryption-meta strong {

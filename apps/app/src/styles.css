@@ -20,6 +20,11 @@
   --accent-theme-primary: #73f7ff;
   --accent-theme-secondary: #d189ff;
   --accent-theme-tertiary: #ffe08a;
+  --accent-primary: #73f7ff;
+  --accent-secondary: #d189ff;
+  --accent-warm: #ffe08a;
+  --focus-ring: #73f7ff;
+  --surface-glow-rgb: 115 247 255;
   --gold-rgb: 255 224 138;
   --orange-rgb: 255 164 92;
   --red-rgb: 255 103 140;
@@ -27,7 +32,13 @@
   --green-rgb: 102 240 164;
   --violet-rgb: 209 137 255;
   --blue-rgb: 92 162 255;
-  --text: #f6e7b8;
+  --text-heading: #ffe6a3;
+  --text-emphasis: #ffe08a;
+  --text-primary: #f7f2ff;
+  --text-secondary: #ddd5f4;
+  --text-muted: #b7b0d8;
+  --text-faint: #7d749d;
+  --text: #f7f2ff;
   --text-dim: #b7b0d8;
   --gold: #ffe08a;
   --orange: #ffa45c;
@@ -51,7 +62,7 @@
   border-radius: 30px;
   border-color: rgb(var(--line-rgb) / 0.14);
   background:
-    radial-gradient(circle at top right, rgb(var(--gold-rgb) / 0.07), transparent 20%),
+    radial-gradient(circle at top right, rgb(var(--surface-glow-rgb) / 0.08), transparent 20%),
     radial-gradient(circle at bottom left, rgb(var(--cyan-rgb) / 0.08), transparent 24%),
     linear-gradient(180deg, rgb(var(--surface-rgb) / 0.94), rgb(var(--surface-deep-rgb) / 0.96)),
     rgb(var(--surface-deep-rgb) / 0.94);
@@ -621,7 +632,7 @@ button {
 .hud-line,
 .panel-kicker {
   margin: 0;
-  color: var(--gold);
+  color: var(--text-emphasis, var(--text-heading, var(--gold)));
   font-family: var(--font-ui-display);
   font-size: 0.75rem;
   letter-spacing: 0.14em;
@@ -840,7 +851,7 @@ button {
   font-size: 1.08rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--text-emphasis, var(--text-heading, var(--gold)));
 }
 
 .sidebar-panel,
@@ -1187,7 +1198,7 @@ button {
   place-items: center;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--gold);
+  color: var(--text-emphasis, var(--accent-primary, var(--cyan)));
   font-family: var(--font-ui-display);
 }
 
@@ -1248,7 +1259,7 @@ button {
 }
 
 .note-card-pin {
-  color: var(--gold);
+  color: var(--accent-warm, var(--gold));
   font-size: 0.72rem;
 }
 
@@ -1521,7 +1532,7 @@ button {
   font-family: var(--font-ui-display);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--text-emphasis, var(--text-heading, var(--gold)));
 }
 
 .editor-shell .bn-editor p,
@@ -1953,7 +1964,7 @@ button {
   .editor-shell
   .bn-editor
   .bn-block-content[data-content-type="heading"]:not([data-text-color]) {
-  color: color-mix(in srgb, var(--text) 93%, var(--gold) 7%);
+  color: color-mix(in srgb, var(--text-emphasis, #ffe08a) 72%, var(--text) 28%);
   font-family: var(--font-ui-mono);
   letter-spacing: 0;
   text-transform: none;
@@ -3284,7 +3295,7 @@ button {
 }
 
 .orbital-searchbar-mark {
-  color: var(--gold);
+  color: var(--text-emphasis, var(--accent-primary, var(--cyan)));
   font-size: 0.72rem;
   letter-spacing: 0.18em;
 }
@@ -3842,7 +3853,7 @@ button {
 }
 
 .orbital-pinned-signal {
-  fill: #ffe08a;
+  fill: var(--accent-warm, var(--gold));
 }
 
 .orbital-label-group {
@@ -5092,7 +5103,7 @@ button {
   font-size: 0.94rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--text-emphasis, var(--text-heading, var(--gold)));
 }
 
 .app-reborn .zen-library-column .sidebar-panel,
@@ -5582,7 +5593,7 @@ button {
   border-radius: 34px;
   border: 1px solid rgb(var(--line-rgb) / 0.14);
   background:
-    radial-gradient(circle at top left, rgb(var(--gold-rgb) / 0.08), transparent 24%),
+    radial-gradient(circle at top left, rgb(var(--surface-glow-rgb) / 0.09), transparent 24%),
     radial-gradient(circle at right 18%, rgb(var(--cyan-rgb) / 0.1), transparent 22%),
     linear-gradient(180deg, rgba(16, 16, 42, 0.95), rgba(8, 9, 25, 0.98)),
     rgba(8, 9, 24, 0.98);
@@ -5827,7 +5838,7 @@ button {
 }
 
 .app-reborn .zen-searchbar-mark {
-  color: var(--gold);
+  color: var(--text-emphasis, var(--accent-primary, var(--cyan)));
   font-size: 0.74rem;
   letter-spacing: 0.18em;
 }

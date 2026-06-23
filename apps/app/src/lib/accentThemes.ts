@@ -1,26 +1,67 @@
 import { readPersistentString, writePersistentString } from "./persistentClientStorage";
 
-export type AppAccentThemeId = "classic" | "graphite" | "verdant" | "ember";
+export type AppAccentThemeId =
+  | "classic"
+  | "graphite"
+  | "nocturne"
+  | "verdant"
+  | "ember"
+  | "aster";
+
+export type AppAccentThemePreviewRole =
+  | "background"
+  | "surface"
+  | "emphasis"
+  | "primary"
+  | "secondary"
+  | "warm";
+
+type AppAccentThemePreviewSwatch = {
+  role: AppAccentThemePreviewRole;
+  color: string;
+};
 
 type AppAccentTheme = {
   id: AppAccentThemeId;
   labelKey: string;
-  preview: [string, string, string];
+  preview: AppAccentThemePreviewSwatch[];
   cssVars: Record<string, string>;
 };
 
 export const APP_ACCENT_THEME_STORAGE_KEY = "zen-notes.appAccentThemeId";
 export const DEFAULT_APP_ACCENT_THEME_ID: AppAccentThemeId = "classic";
 
+const makeThemePreview = (
+  colors: Record<AppAccentThemePreviewRole, string>
+): AppAccentThemePreviewSwatch[] => [
+  { role: "background", color: colors.background },
+  { role: "surface", color: colors.surface },
+  { role: "emphasis", color: colors.emphasis },
+  { role: "primary", color: colors.primary },
+  { role: "secondary", color: colors.secondary },
+  { role: "warm", color: colors.warm }
+];
+
 export const APP_ACCENT_THEMES: AppAccentTheme[] = [
   {
     id: "classic",
     labelKey: "settings.accentThemeClassic",
-    preview: ["#73f7ff", "#d189ff", "#ffe08a"],
+    preview: makeThemePreview({
+      background: "#161338",
+      surface: "#261f56",
+      emphasis: "#ffe08a",
+      primary: "#73f7ff",
+      secondary: "#d189ff",
+      warm: "#ffe08a"
+    }),
     cssVars: {
       "--accent-theme-primary": "#73f7ff",
       "--accent-theme-secondary": "#d189ff",
       "--accent-theme-tertiary": "#ffe08a",
+      "--accent-primary": "#73f7ff",
+      "--accent-secondary": "#d189ff",
+      "--accent-warm": "#ffe08a",
+      "--focus-ring": "#73f7ff",
       "--bg": "#161338",
       "--bg-deep": "#0d0a24",
       "--panel": "rgba(26, 21, 64, 0.88)",
@@ -32,6 +73,7 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
       "--surface-deep-rgb": "9 10 28",
       "--line-rgb": "147 173 255",
       "--line-strong-rgb": "149 179 255",
+      "--surface-glow-rgb": "115 247 255",
       "--gold-rgb": "255 224 138",
       "--orange-rgb": "255 164 92",
       "--red-rgb": "255 103 140",
@@ -39,7 +81,13 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
       "--green-rgb": "102 240 164",
       "--violet-rgb": "209 137 255",
       "--blue-rgb": "92 162 255",
-      "--text": "#f6e7b8",
+      "--text-heading": "#ffe6a3",
+      "--text-emphasis": "#ffe08a",
+      "--text-primary": "#f7f2ff",
+      "--text-secondary": "#ddd5f4",
+      "--text-muted": "#b7b0d8",
+      "--text-faint": "#7d749d",
+      "--text": "#f7f2ff",
       "--text-dim": "#b7b0d8",
       "--gold": "#ffe08a",
       "--orange": "#ffa45c",
@@ -53,73 +101,164 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
   {
     id: "graphite",
     labelKey: "settings.accentThemeGraphite",
-    preview: ["#e8edf4", "#9aa7b8", "#f0c96a"],
+    preview: makeThemePreview({
+      background: "#101113",
+      surface: "#23262d",
+      emphasis: "#f1d487",
+      primary: "#e7ecf2",
+      secondary: "#8792a3",
+      warm: "#d7b568"
+    }),
     cssVars: {
-      "--accent-theme-primary": "#e8edf4",
-      "--accent-theme-secondary": "#9aa7b8",
-      "--accent-theme-tertiary": "#f0c96a",
-      "--bg": "#111216",
-      "--bg-deep": "#07080b",
-      "--panel": "rgba(22, 24, 29, 0.9)",
+      "--accent-theme-primary": "#e7ecf2",
+      "--accent-theme-secondary": "#8792a3",
+      "--accent-theme-tertiary": "#d7b568",
+      "--accent-primary": "#e7ecf2",
+      "--accent-secondary": "#8792a3",
+      "--accent-warm": "#d7b568",
+      "--focus-ring": "#e7ecf2",
+      "--bg": "#101113",
+      "--bg-deep": "#060708",
+      "--panel": "rgba(24, 26, 31, 0.9)",
       "--panel-strong": "rgba(35, 38, 45, 0.95)",
-      "--line": "rgba(154, 167, 184, 0.24)",
-      "--line-strong": "rgba(220, 226, 236, 0.34)",
-      "--surface-rgb": "22 24 29",
+      "--line": "rgba(135, 146, 163, 0.24)",
+      "--line-strong": "rgba(231, 236, 242, 0.34)",
+      "--surface-rgb": "24 26 31",
       "--surface-strong-rgb": "35 38 45",
-      "--surface-deep-rgb": "7 8 11",
-      "--line-rgb": "154 167 184",
-      "--line-strong-rgb": "220 226 236",
-      "--gold-rgb": "240 201 106",
-      "--orange-rgb": "221 150 85",
+      "--surface-deep-rgb": "6 7 8",
+      "--line-rgb": "135 146 163",
+      "--line-strong-rgb": "231 236 242",
+      "--surface-glow-rgb": "231 236 242",
+      "--gold-rgb": "215 181 104",
+      "--orange-rgb": "203 140 82",
       "--red-rgb": "238 99 122",
-      "--cyan-rgb": "164 214 222",
+      "--cyan-rgb": "166 214 220",
       "--green-rgb": "134 198 155",
-      "--violet-rgb": "178 168 198",
+      "--violet-rgb": "170 164 186",
       "--blue-rgb": "142 166 204",
-      "--text": "#f2eee6",
-      "--text-dim": "#b8bdc7",
-      "--gold": "#f0c96a",
-      "--orange": "#dd9655",
+      "--text-heading": "#f0ebe2",
+      "--text-emphasis": "#f1d487",
+      "--text-primary": "#eef1f5",
+      "--text-secondary": "#ccd2dc",
+      "--text-muted": "#a7afbc",
+      "--text-faint": "#747c89",
+      "--text": "#eef1f5",
+      "--text-dim": "#a7afbc",
+      "--gold": "#d7b568",
+      "--orange": "#cb8c52",
       "--red": "#ee637a",
-      "--cyan": "#a4d6de",
+      "--cyan": "#a6d6dc",
       "--green": "#86c69b",
-      "--violet": "#b2a8c6",
+      "--violet": "#aaa4ba",
       "--blue": "#8ea6cc"
+    }
+  },
+  {
+    id: "nocturne",
+    labelKey: "settings.accentThemeNocturne",
+    preview: makeThemePreview({
+      background: "#081321",
+      surface: "#163150",
+      emphasis: "#a9dbff",
+      primary: "#78b8ff",
+      secondary: "#a7a4ff",
+      warm: "#f1c76f"
+    }),
+    cssVars: {
+      "--accent-theme-primary": "#78b8ff",
+      "--accent-theme-secondary": "#a7a4ff",
+      "--accent-theme-tertiary": "#f1c76f",
+      "--accent-primary": "#78b8ff",
+      "--accent-secondary": "#a7a4ff",
+      "--accent-warm": "#f1c76f",
+      "--focus-ring": "#78b8ff",
+      "--bg": "#081321",
+      "--bg-deep": "#030813",
+      "--panel": "rgba(13, 33, 56, 0.9)",
+      "--panel-strong": "rgba(22, 49, 80, 0.95)",
+      "--line": "rgba(89, 141, 210, 0.25)",
+      "--line-strong": "rgba(167, 216, 255, 0.36)",
+      "--surface-rgb": "13 33 56",
+      "--surface-strong-rgb": "22 49 80",
+      "--surface-deep-rgb": "3 8 19",
+      "--line-rgb": "89 141 210",
+      "--line-strong-rgb": "167 216 255",
+      "--surface-glow-rgb": "120 184 255",
+      "--gold-rgb": "241 199 111",
+      "--orange-rgb": "221 148 82",
+      "--red-rgb": "240 121 141",
+      "--cyan-rgb": "120 184 255",
+      "--green-rgb": "141 230 183",
+      "--violet-rgb": "167 164 255",
+      "--blue-rgb": "100 155 244",
+      "--text-heading": "#dceeff",
+      "--text-emphasis": "#a9dbff",
+      "--text-primary": "#eef6ff",
+      "--text-secondary": "#cfdef1",
+      "--text-muted": "#9fb4cc",
+      "--text-faint": "#667d99",
+      "--text": "#eef6ff",
+      "--text-dim": "#9fb4cc",
+      "--gold": "#f1c76f",
+      "--orange": "#dd9452",
+      "--red": "#f0798d",
+      "--cyan": "#78b8ff",
+      "--green": "#8de6b7",
+      "--violet": "#a7a4ff",
+      "--blue": "#649bf4"
     }
   },
   {
     id: "verdant",
     labelKey: "settings.accentThemeVerdant",
-    preview: ["#55d8b0", "#91f29a", "#d9c47b"],
+    preview: makeThemePreview({
+      background: "#0b2119",
+      surface: "#183d2f",
+      emphasis: "#c8f596",
+      primary: "#57ddb5",
+      secondary: "#a7ef93",
+      warm: "#d5c16f"
+    }),
     cssVars: {
-      "--accent-theme-primary": "#55d8b0",
-      "--accent-theme-secondary": "#91f29a",
-      "--accent-theme-tertiary": "#d9c47b",
-      "--bg": "#0e221b",
-      "--bg-deep": "#06110d",
+      "--accent-theme-primary": "#57ddb5",
+      "--accent-theme-secondary": "#a7ef93",
+      "--accent-theme-tertiary": "#d5c16f",
+      "--accent-primary": "#57ddb5",
+      "--accent-secondary": "#a7ef93",
+      "--accent-warm": "#d5c16f",
+      "--focus-ring": "#57ddb5",
+      "--bg": "#0b2119",
+      "--bg-deep": "#04100b",
       "--panel": "rgba(16, 43, 33, 0.9)",
       "--panel-strong": "rgba(24, 61, 47, 0.95)",
       "--line": "rgba(96, 210, 168, 0.24)",
       "--line-strong": "rgba(152, 238, 193, 0.36)",
       "--surface-rgb": "16 43 33",
       "--surface-strong-rgb": "24 61 47",
-      "--surface-deep-rgb": "6 17 13",
+      "--surface-deep-rgb": "4 16 11",
       "--line-rgb": "96 210 168",
       "--line-strong-rgb": "152 238 193",
-      "--gold-rgb": "217 196 123",
+      "--surface-glow-rgb": "87 221 181",
+      "--gold-rgb": "213 193 111",
       "--orange-rgb": "213 143 83",
       "--red-rgb": "241 103 116",
-      "--cyan-rgb": "85 216 176",
-      "--green-rgb": "145 242 154",
+      "--cyan-rgb": "87 221 181",
+      "--green-rgb": "167 239 147",
       "--violet-rgb": "160 176 221",
       "--blue-rgb": "93 166 220",
-      "--text": "#f1ead6",
-      "--text-dim": "#accdc1",
-      "--gold": "#d9c47b",
+      "--text-heading": "#e4f7dc",
+      "--text-emphasis": "#c8f596",
+      "--text-primary": "#eef5e7",
+      "--text-secondary": "#cfdfd3",
+      "--text-muted": "#a6cabd",
+      "--text-faint": "#638577",
+      "--text": "#eef5e7",
+      "--text-dim": "#a6cabd",
+      "--gold": "#d5c16f",
       "--orange": "#d58f53",
       "--red": "#f16774",
-      "--cyan": "#55d8b0",
-      "--green": "#91f29a",
+      "--cyan": "#57ddb5",
+      "--green": "#a7ef93",
       "--violet": "#a0b0dd",
       "--blue": "#5da6dc"
     }
@@ -127,13 +266,24 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
   {
     id: "ember",
     labelKey: "settings.accentThemeEmber",
-    preview: ["#ff6f91", "#d6a2ff", "#ffb36b"],
+    preview: makeThemePreview({
+      background: "#2a1118",
+      surface: "#451e2f",
+      emphasis: "#ffba87",
+      primary: "#ff7890",
+      secondary: "#d49aff",
+      warm: "#f2a45f"
+    }),
     cssVars: {
-      "--accent-theme-primary": "#ff6f91",
-      "--accent-theme-secondary": "#d6a2ff",
-      "--accent-theme-tertiary": "#ffb36b",
-      "--bg": "#28131c",
-      "--bg-deep": "#12070d",
+      "--accent-theme-primary": "#ff7890",
+      "--accent-theme-secondary": "#d49aff",
+      "--accent-theme-tertiary": "#f2a45f",
+      "--accent-primary": "#ff7890",
+      "--accent-secondary": "#d49aff",
+      "--accent-warm": "#f2a45f",
+      "--focus-ring": "#ff7890",
+      "--bg": "#2a1118",
+      "--bg-deep": "#11060a",
       "--panel": "rgba(48, 22, 34, 0.9)",
       "--panel-strong": "rgba(69, 30, 47, 0.95)",
       "--line": "rgba(255, 116, 147, 0.25)",
@@ -143,22 +293,84 @@ export const APP_ACCENT_THEMES: AppAccentTheme[] = [
       "--surface-deep-rgb": "18 7 13",
       "--line-rgb": "255 116 147",
       "--line-strong-rgb": "255 186 131",
-      "--gold-rgb": "255 179 107",
+      "--surface-glow-rgb": "255 120 144",
+      "--gold-rgb": "242 164 95",
       "--orange-rgb": "255 145 89",
-      "--red-rgb": "255 111 145",
+      "--red-rgb": "255 120 144",
       "--cyan-rgb": "133 218 207",
       "--green-rgb": "165 214 133",
-      "--violet-rgb": "214 162 255",
+      "--violet-rgb": "212 154 255",
       "--blue-rgb": "141 173 255",
-      "--text": "#faeadf",
-      "--text-dim": "#d6b9c4",
-      "--gold": "#ffb36b",
+      "--text-heading": "#ffdfc8",
+      "--text-emphasis": "#ffba87",
+      "--text-primary": "#fff0e8",
+      "--text-secondary": "#e7c8c1",
+      "--text-muted": "#d4adb8",
+      "--text-faint": "#956f7b",
+      "--text": "#fff0e8",
+      "--text-dim": "#d4adb8",
+      "--gold": "#f2a45f",
       "--orange": "#ff9159",
-      "--red": "#ff6f91",
+      "--red": "#ff7890",
       "--cyan": "#85dacf",
       "--green": "#a5d685",
-      "--violet": "#d6a2ff",
+      "--violet": "#d49aff",
       "--blue": "#8dadff"
+    }
+  },
+  {
+    id: "aster",
+    labelKey: "settings.accentThemeAster",
+    preview: makeThemePreview({
+      background: "#210c30",
+      surface: "#331746",
+      emphasis: "#f6a6d3",
+      primary: "#ce8cff",
+      secondary: "#76e7d5",
+      warm: "#f4a7ca"
+    }),
+    cssVars: {
+      "--accent-theme-primary": "#ce8cff",
+      "--accent-theme-secondary": "#76e7d5",
+      "--accent-theme-tertiary": "#f4a7ca",
+      "--accent-primary": "#ce8cff",
+      "--accent-secondary": "#76e7d5",
+      "--accent-warm": "#f4a7ca",
+      "--focus-ring": "#ce8cff",
+      "--bg": "#210c30",
+      "--bg-deep": "#0c0615",
+      "--panel": "rgba(38, 15, 54, 0.9)",
+      "--panel-strong": "rgba(51, 23, 70, 0.95)",
+      "--line": "rgba(206, 140, 255, 0.25)",
+      "--line-strong": "rgba(118, 231, 213, 0.34)",
+      "--surface-rgb": "38 15 54",
+      "--surface-strong-rgb": "51 23 70",
+      "--surface-deep-rgb": "12 6 21",
+      "--line-rgb": "206 140 255",
+      "--line-strong-rgb": "118 231 213",
+      "--surface-glow-rgb": "206 140 255",
+      "--gold-rgb": "244 167 202",
+      "--orange-rgb": "223 157 115",
+      "--red-rgb": "244 167 202",
+      "--cyan-rgb": "118 231 213",
+      "--green-rgb": "157 226 168",
+      "--violet-rgb": "206 140 255",
+      "--blue-rgb": "143 184 255",
+      "--text-heading": "#f0d7ff",
+      "--text-emphasis": "#f6a6d3",
+      "--text-primary": "#f8efff",
+      "--text-secondary": "#dfcdf0",
+      "--text-muted": "#c4b3d2",
+      "--text-faint": "#846d99",
+      "--text": "#f8efff",
+      "--text-dim": "#c4b3d2",
+      "--gold": "#f4a7ca",
+      "--orange": "#df9d73",
+      "--red": "#f4a7ca",
+      "--cyan": "#76e7d5",
+      "--green": "#9de2a8",
+      "--violet": "#ce8cff",
+      "--blue": "#8fb8ff"
     }
   }
 ];

@@ -75,7 +75,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgb(var(--gold-rgb) / 0.76);
+  color: color-mix(in srgb, var(--text-emphasis, #ffe08a) 78%, var(--text-heading, #fff) 22%);
   font-size: 1.05rem;
   line-height: 1;
   transform: rotate(90deg);

@@ -555,7 +555,7 @@
 
 .canvas-stage-shell .excalidraw .dropdown-menu.fonts .dropdown-menu-group-title {
   margin: 0 4px 2px;
-  color: color-mix(in srgb, var(--text-dim) 92%, rgb(var(--gold-rgb) / 0.26));
+  color: color-mix(in srgb, var(--text-muted, #b7b0d8) 70%, var(--text-emphasis, #ffe08a) 30%);
   font-size: 0.64rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;

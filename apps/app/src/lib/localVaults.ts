@@ -30,6 +30,10 @@ interface LocalVaultRegistryState {
 
 const REGISTRY_STORAGE_KEY = "zen-notes.local-vaults";
 const DEFAULT_LOCAL_VAULT_ID = "local-default";
+const DEFAULT_LOCAL_VAULT_NAMES = {
+  en: "Locoris Demo Vault",
+  ru: "Демо-хранилище Locoris"
+} as const;
 
 function now() {
   return Date.now();
@@ -51,13 +55,27 @@ function createVaultGuid() {
   return crypto.randomUUID();
 }
 
+function getDefaultLocalVaultName() {
+  if (typeof navigator === "undefined") {
+    return DEFAULT_LOCAL_VAULT_NAMES.en;
+  }
+
+  const languages = [navigator.language, ...(navigator.languages ?? [])]
+    .filter(Boolean)
+    .map((language) => language.toLowerCase());
+
+  return languages.some((language) => language.startsWith("ru"))
+    ? DEFAULT_LOCAL_VAULT_NAMES.ru
+    : DEFAULT_LOCAL_VAULT_NAMES.en;
+}
+
 function createDefaultVaultProfile(): LocalVaultProfile {
   const timestamp = now();
 
   return {
     id: DEFAULT_LOCAL_VAULT_ID,
     vaultGuid: createVaultGuid(),
-    name: "",
+    name: getDefaultLocalVaultName(),
     vaultKind: "regular",
     createdAt: timestamp,
     updatedAt: timestamp
@@ -88,7 +106,8 @@ function normalizeRegistryState(value: unknown): LocalVaultRegistryState {
 
           const vault = entry as Record<string, unknown>;
           const id = typeof vault.id === "string" ? vault.id : "";
-          const name = typeof vault.name === "string" ? sanitizeLocalVaultName(vault.name) : "";
+          const storedName = typeof vault.name === "string" ? sanitizeLocalVaultName(vault.name) : "";
+          const name = storedName || (id === DEFAULT_LOCAL_VAULT_ID ? getDefaultLocalVaultName() : "");
           const vaultGuid =
             typeof vault.vaultGuid === "string" ? sanitizeVaultGuid(vault.vaultGuid) : createVaultGuid();
 

@@ -649,10 +649,19 @@ export default function SettingsPanel({
     >
       {APP_ACCENT_THEMES.map((theme) => {
         const active = currentAccentThemeId === theme.id;
+        const previewByRole = Object.fromEntries(
+          theme.preview.map((swatch) => [swatch.role, swatch.color])
+        );
         const style = {
-          "--accent-theme-one": theme.preview[0],
-          "--accent-theme-two": theme.preview[1],
-          "--accent-theme-three": theme.preview[2]
+          "--accent-theme-one": previewByRole.primary,
+          "--accent-theme-two": previewByRole.secondary,
+          "--accent-theme-three": previewByRole.warm,
+          "--theme-preview-background": previewByRole.background,
+          "--theme-preview-surface": previewByRole.surface,
+          "--theme-preview-emphasis": previewByRole.emphasis,
+          "--theme-preview-primary": previewByRole.primary,
+          "--theme-preview-secondary": previewByRole.secondary,
+          "--theme-preview-warm": previewByRole.warm
         } as CSSProperties;
 
         return (
@@ -667,9 +676,13 @@ export default function SettingsPanel({
             title={t(theme.labelKey)}
           >
             <span className="settings-accent-swatches" aria-hidden="true">
-              <span className="settings-accent-swatch is-one" />
-              <span className="settings-accent-swatch is-two" />
-              <span className="settings-accent-swatch is-three" />
+              {theme.preview.map((swatch) => (
+                <span
+                  key={swatch.role}
+                  className={`settings-accent-swatch is-${swatch.role}`}
+                  style={{ "--theme-swatch-color": swatch.color } as CSSProperties}
+                />
+              ))}
             </span>
             <span>{t(theme.labelKey)}</span>
           </button>

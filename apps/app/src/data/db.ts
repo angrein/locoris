@@ -8,7 +8,6 @@ import {
 } from "../lib/palette";
 import {
   buildExcerpt,
-  createStarterContent,
   extractPlainText,
   extractReferencedAssetIds,
   getFolderCascade,
@@ -23,6 +22,7 @@ import {
   normalizeCanvasContent,
   remapCanvasFileIds
 } from "../lib/canvas";
+import { buildInitialDemoVault } from "./demoSeed";
 import { normalizeTagLookup, normalizeTagName } from "../lib/tags";
 import { buildLocalVaultDatabaseName, getStoredActiveLocalVaultId } from "../lib/localVaults";
 import {
@@ -1645,116 +1645,48 @@ export async function ensureSeedData() {
 
   const language = detectLanguage();
   const timestamp = now();
-  const project: Project = {
-    id: crypto.randomUUID(),
-    name: language === "ru" ? "Проект 1" : "Project 1",
-    color: DEFAULT_PROJECT_COLOR,
-    x: 0,
-    y: 0,
-    sortOrder: SORT_ORDER_STEP,
-    createdAt: timestamp,
-    updatedAt: timestamp
-  };
-
-  const folders: Folder[] = [
-    {
-      id: crypto.randomUUID(),
-      projectId: project.id,
-      name: language === "ru" ? "Входящие" : "Inbox",
-      parentId: null,
-      color: createColor(NODE_COLORS, 0),
-      sortOrder: SORT_ORDER_STEP,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    },
-    {
-      id: crypto.randomUUID(),
-      projectId: project.id,
-      name: language === "ru" ? "Исследования" : "Research",
-      parentId: null,
-      color: createColor(NODE_COLORS, 1),
-      sortOrder: SORT_ORDER_STEP * 2,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    },
-    {
-      id: crypto.randomUUID(),
-      projectId: project.id,
-      name: language === "ru" ? "Прототипы" : "Prototypes",
-      parentId: null,
-      color: createColor(NODE_COLORS, 2),
-      sortOrder: SORT_ORDER_STEP * 3,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    }
-  ];
-
-  const tags: Tag[] = [
-    {
-      id: crypto.randomUUID(),
-      name: language === "ru" ? "идея" : "idea",
-      color: "",
-      createdAt: timestamp,
-      updatedAt: timestamp
-    },
-    {
-      id: crypto.randomUUID(),
-      name: language === "ru" ? "дизайн" : "design",
-      color: "",
-      createdAt: timestamp,
-      updatedAt: timestamp
-    },
-    {
-      id: crypto.randomUUID(),
-      name: language === "ru" ? "локально" : "offline",
-      color: "",
-      createdAt: timestamp,
-      updatedAt: timestamp
-    }
-  ];
-
-  const starterContent = createStarterContent(language);
-  const note: Note = {
-    id: crypto.randomUUID(),
-    title: language === "ru" ? "Стартовая заметка" : "Starter note",
-    contentType: "note",
-    projectId: project.id,
-    folderId: folders[0].id,
-    color: DEFAULT_NOTE_COLOR,
-    sortOrder: SORT_ORDER_STEP,
-    tagIds: [tags[0].id, tags[2].id],
-    content: starterContent,
-    canvasContent: null,
-    excerpt: buildExcerpt(starterContent),
-    plainText: extractPlainText(starterContent),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    pinned: true,
-    favorite: false,
-    archived: false,
-    trashedAt: null,
-    syncState: "local",
-    conflictOriginId: null
-  };
+  const demoSeed = buildInitialDemoVault(language, timestamp);
 
   await db.transaction(
     "rw",
-    [db.projects, db.folders, db.tags, db.notes, db.settings, db.syncDirtyEntries],
+    [
+      db.projects,
+      db.folders,
+      db.tags,
+      db.notes,
+      db.tasks,
+      db.habits,
+      db.habitLogs,
+      db.goals,
+      db.timeBlocks,
+      db.settings,
+      db.syncDirtyEntries
+    ],
     async () => {
-    await db.projects.add(project);
-    await db.folders.bulkAdd(folders);
-    await db.tags.bulkAdd(tags);
-    await db.notes.add(note);
+      await db.projects.add(demoSeed.project);
+      await db.folders.bulkAdd(demoSeed.folders);
+      await db.tags.bulkAdd(demoSeed.tags);
+      await db.notes.bulkAdd(demoSeed.notes);
+      await db.tasks.bulkAdd(demoSeed.tasks);
+      await db.habits.bulkAdd(demoSeed.habits);
+      await db.habitLogs.bulkAdd(demoSeed.habitLogs);
+      await db.goals.bulkAdd(demoSeed.goals);
+      await db.timeBlocks.bulkAdd(demoSeed.timeBlocks);
       await putSyncDirtyEntries([
-        createSyncDirtyEntry("project", project.id, project.updatedAt),
-        ...folders.map((folder) => createSyncDirtyEntry("folder", folder.id, folder.updatedAt)),
-        ...tags.map((tag) => createSyncDirtyEntry("tag", tag.id, tag.updatedAt)),
-        createSyncDirtyEntry("note", note.id, note.updatedAt)
+        createSyncDirtyEntry("project", demoSeed.project.id, demoSeed.project.updatedAt),
+        ...demoSeed.folders.map((folder) => createSyncDirtyEntry("folder", folder.id, folder.updatedAt)),
+        ...demoSeed.tags.map((tag) => createSyncDirtyEntry("tag", tag.id, tag.updatedAt)),
+        ...demoSeed.notes.map((note) => createSyncDirtyEntry("note", note.id, note.updatedAt)),
+        ...demoSeed.tasks.map((task) => createSyncDirtyEntry("task", task.id, task.updatedAt)),
+        ...demoSeed.habits.map((habit) => createSyncDirtyEntry("habit", habit.id, habit.updatedAt)),
+        ...demoSeed.habitLogs.map((habitLog) => createSyncDirtyEntry("habitLog", habitLog.id, habitLog.updatedAt)),
+        ...demoSeed.goals.map((goal) => createSyncDirtyEntry("goal", goal.id, goal.updatedAt)),
+        ...demoSeed.timeBlocks.map((timeBlock) => createSyncDirtyEntry("timeBlock", timeBlock.id, timeBlock.updatedAt))
       ]);
-    await db.settings.add({
-      ...stripAppSettingsSecrets(buildDefaultAppSettings(language, note.id))!,
-      syncStatus: "disabled"
-    });
+      await db.settings.add({
+        ...stripAppSettingsSecrets(buildDefaultAppSettings(language, demoSeed.activeNoteId))!,
+        syncStatus: "disabled"
+      });
     }
   );
 

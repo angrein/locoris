@@ -241,7 +241,7 @@
 }
 
 .orbital-overlay .orbital-filter-dock .orbital-searchbar-mark {
-  color: rgb(var(--gold-rgb) / 0.76);
+  color: color-mix(in srgb, var(--text-emphasis, #ffe08a) 82%, var(--text-heading, #fff) 18%);
   font-size: 0.66rem;
   letter-spacing: 0.16em;
 }
