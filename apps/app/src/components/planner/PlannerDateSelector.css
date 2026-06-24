@@ -1,6 +1,8 @@
 .planner-date-selector {
   --planner-date-accent: var(--planner-accent, var(--accent-theme-primary, #8edcff));
   --planner-date-accent-2: var(--planner-accent-2, var(--accent-theme-secondary, #b896ff));
+  --planner-date-heading: var(--text-heading, #fff);
+  --planner-date-emphasis: var(--text-emphasis, var(--planner-date-heading));
   position: relative;
   display: grid;
   gap: 12px;
@@ -45,7 +47,7 @@
 .planner-date-selector-time span,
 .planner-date-selector-repeat > span,
 .planner-date-selector-custom-repeat > span {
-  color: color-mix(in srgb, var(--planner-date-accent) 56%, rgba(230, 239, 255, 0.68));
+  color: color-mix(in srgb, var(--planner-date-emphasis) 50%, rgba(230, 239, 255, 0.7) 50%);
   font-size: 0.66rem;
   font-weight: 900;
   letter-spacing: 0.07em;
@@ -55,7 +57,7 @@
 .planner-date-selector-head strong {
   min-width: 0;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.92);
+  color: color-mix(in srgb, var(--planner-date-heading) 38%, rgba(255, 255, 255, 0.94) 62%);
   font-size: 0.94rem;
   font-weight: 900;
   text-overflow: ellipsis;

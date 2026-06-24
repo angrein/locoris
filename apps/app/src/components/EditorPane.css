@@ -691,7 +691,7 @@
 }
 
 .editor-ai-preview-kicker {
-  color: color-mix(in srgb, var(--editor-accent) 72%, var(--text) 28%);
+  color: color-mix(in srgb, var(--text-emphasis, var(--editor-accent)) 72%, var(--text) 28%);
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0;
@@ -700,7 +700,7 @@
 
 .editor-ai-preview-header h3 {
   margin-top: 4px;
-  color: var(--text);
+  color: color-mix(in srgb, var(--text-heading, var(--text)) 82%, #fff 18%);
   font-size: 1.02rem;
   font-weight: 780;
   letter-spacing: 0;

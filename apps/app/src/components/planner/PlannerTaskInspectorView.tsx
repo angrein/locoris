@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import type { AppLanguage, Folder, Note, PlannerTaskPriority, Project, Reminder, Tag, Task } from "../../types";
 import { getDisplayNoteTitle } from "../../lib/displayNames";
 import {
+  formatPlannerFullDateTime,
   getPlannerPriorityLabel,
   getPlannerStatusLabel
 } from "../../lib/planner";
@@ -380,6 +381,12 @@ export default function PlannerTaskInspectorView({
   const reminderPreset = getReminderPreset(task);
   const hasAnyDate = Boolean(task.scheduledStartAt || task.dueAt || task.recurrenceRule);
   const primaryOccurrence = getPlannerTaskPrimaryOccurrence(task);
+  const createdAtLabel =
+    task.createdAt > 0
+      ? formatPlannerFullDateTime(task.createdAt, language)
+      : language === "ru"
+        ? "Неизвестно"
+        : "Unknown";
 
   const commitTitle = () => {
     const nextTitle = titleDraft.trim();
@@ -598,6 +605,10 @@ export default function PlannerTaskInspectorView({
           <button type="button" onClick={() => shiftDate(1)} disabled={!hasAnyDate}>
             {language === "ru" ? "+ день" : "+ day"}
           </button>
+        </div>
+        <div className="planner-task-date-meta">
+          <span>{language === "ru" ? "Создано" : "Created"}</span>
+          <strong>{createdAtLabel}</strong>
         </div>
       </section>
 

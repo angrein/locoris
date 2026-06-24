@@ -1,4 +1,3 @@
-import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import type {
   AppLanguage,
   CanvasContent,
@@ -493,7 +492,7 @@ function buildDailyReviewContent(language: AppLanguage): NoteContent {
   ];
 }
 
-function buildDemoCanvasContent(strings: DemoStrings): CanvasContent {
+async function buildDemoCanvasContent(strings: DemoStrings): Promise<CanvasContent> {
   const cardStyle = {
     fillStyle: "solid",
     roughness: 0,
@@ -649,6 +648,8 @@ function buildDemoCanvasContent(strings: DemoStrings): CanvasContent {
       endArrowhead: "arrow"
     }
   ];
+
+  const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
 
   return {
     elements: convertToExcalidrawElements(skeletonElements as any, {
@@ -842,10 +843,10 @@ function getTimeZone() {
   }
 }
 
-export function buildInitialDemoVault(
+export async function buildInitialDemoVault(
   language: AppLanguage,
   timestamp = Date.now()
-): InitialDemoVaultSeed {
+): Promise<InitialDemoVaultSeed> {
   const strings = DEMO_STRINGS[language];
   const project: Project = {
     id: crypto.randomUUID(),
@@ -948,7 +949,7 @@ export function buildInitialDemoVault(
     content: buildDailyReviewContent(language),
     timestamp
   });
-  const canvasContent = buildDemoCanvasContent(strings);
+  const canvasContent = await buildDemoCanvasContent(strings);
   const canvasNote = createCanvasNote({
     title: strings.notes.canvas,
     projectId: project.id,

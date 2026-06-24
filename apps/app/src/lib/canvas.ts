@@ -1,5 +1,3 @@
-import { FONT_FAMILY, getTextFromElements } from "@excalidraw/excalidraw";
-import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppLanguage, CanvasContent, CanvasSceneAppState, CanvasSceneElement } from "../types";
 
 const UNTITLED_CANVAS_TITLE: Record<AppLanguage, string> = {
@@ -12,7 +10,7 @@ export const DEFAULT_CANVAS_STROKE_LIGHT = "#f8fafc";
 export const DEFAULT_CANVAS_STROKE_DARK = "#1e1e1e";
 export const DEFAULT_CANVAS_ELEMENT_BACKGROUND = "transparent";
 export const DEFAULT_CANVAS_THEME = "light";
-export const DEFAULT_CANVAS_FONT_FAMILY = FONT_FAMILY.Nunito;
+export const DEFAULT_CANVAS_FONT_FAMILY = 6;
 
 function normalizeCanvasColorInput(color: unknown) {
   return typeof color === "string" ? color.trim().toLowerCase() : "";
@@ -253,7 +251,13 @@ export function extractCanvasPlainText(content: CanvasContent | null | undefined
     return "";
   }
 
-  return getTextFromElements(activeElements as unknown as readonly ExcalidrawElement[])
+  return activeElements
+    .map((element) => {
+      const textValue = (element as unknown as { text?: unknown }).text;
+      return typeof textValue === "string" ? textValue : "";
+    })
+    .filter(Boolean)
+    .join(" ")
     .replace(/\s+/g, " ")
     .trim();
 }

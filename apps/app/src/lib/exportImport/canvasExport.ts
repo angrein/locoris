@@ -1,18 +1,14 @@
-import {
-  exportToBlob,
-  exportToSvg,
-  serializeAsJSON
-} from "@excalidraw/excalidraw";
 import type {
   AppState as ExcalidrawAppState,
   BinaryFiles
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { jsPDF } from "jspdf";
 
 import { blobToDataUrl, textBlob } from "./blob";
 
 export type CanvasExportFormat = "json" | "pdf";
+
+type ExcalidrawExportApi = typeof import("@excalidraw/excalidraw");
 
 type CanvasExportInput = {
   elements: readonly ExcalidrawElement[];
@@ -33,7 +29,12 @@ function getExportAppState(appState: Partial<ExcalidrawAppState>) {
   };
 }
 
-export function createCanvasJsonBlob(input: CanvasExportInput) {
+async function loadExcalidrawExportApi(): Promise<ExcalidrawExportApi> {
+  return import("@excalidraw/excalidraw");
+}
+
+export async function createCanvasJsonBlob(input: CanvasExportInput) {
+  const { serializeAsJSON } = await loadExcalidrawExportApi();
   const json = serializeAsJSON(
     getExportableElements(input.elements),
     getExportAppState(input.appState) as ExcalidrawAppState,
@@ -45,6 +46,7 @@ export function createCanvasJsonBlob(input: CanvasExportInput) {
 }
 
 export async function createCanvasSvgBlob(input: CanvasExportInput) {
+  const { exportToSvg } = await loadExcalidrawExportApi();
   const svg = await exportToSvg({
     elements: getExportableElements(input.elements),
     appState: getExportAppState(input.appState),
@@ -56,6 +58,10 @@ export async function createCanvasSvgBlob(input: CanvasExportInput) {
 }
 
 export async function createCanvasPdfBlob(input: CanvasExportInput) {
+  const [{ exportToBlob }, { jsPDF }] = await Promise.all([
+    loadExcalidrawExportApi(),
+    import("jspdf")
+  ]);
   const pngBlob = await exportToBlob({
     elements: getExportableElements(input.elements),
     appState: getExportAppState(input.appState),
@@ -93,4 +99,3 @@ export async function createCanvasPdfBlob(input: CanvasExportInput) {
 
   return doc.output("blob");
 }
-

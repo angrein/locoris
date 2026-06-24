@@ -97,6 +97,7 @@
 
 .header-title-group h1 {
   margin: 0;
+  color: color-mix(in srgb, var(--text-heading, var(--text)) 88%, #fff 12%);
   font-size: clamp(1.2rem, 1.8vw, 1.9rem);
   letter-spacing: 0.08em;
 }
@@ -2004,7 +2005,7 @@ button {
 
 .editor-section-title {
   margin: 0;
-  color: var(--text-dim);
+  color: color-mix(in srgb, var(--text-emphasis, var(--text-heading, var(--text))) 54%, var(--text-dim) 46%);
   font-family: var(--font-ui-mono);
   font-size: 0.72rem;
   letter-spacing: 0.12em;
@@ -4223,6 +4224,8 @@ button {
 .orbital-modal-window.orbital-utility-modal-window.is-settings-mode {
   --utility-modal-accent: var(--accent-theme-primary, var(--gold));
   width: min(860px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
+  height: min(760px, calc(100dvh - 48px));
 }
 
 .orbital-modal-window.orbital-utility-modal-window.is-trash-mode {
@@ -4235,6 +4238,14 @@ button {
 .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-shell),
 .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-panel-shell) {
   width: min(1240px, calc(100vw - 40px));
+}
+
+@media (min-width: 721px) {
+  .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.settings-panel-shell.is-backup-settings) {
+    height: auto;
+    align-self: start;
+    margin-top: max(0px, calc((100dvh - 56px - min(760px, calc(100dvh - 48px))) / 2));
+  }
 }
 
 .orbital-utility-modal-close {
@@ -4620,6 +4631,8 @@ button {
 
   .orbital-modal-window.orbital-utility-modal-window.is-settings-mode {
     width: min(820px, calc(100vw - 32px));
+    height: min(760px, calc(100vh - 32px));
+    height: min(760px, calc(100dvh - 32px));
   }
 
   .orbital-modal-window.orbital-utility-modal-window.is-settings-mode:has(.sync-settings-shell),
@@ -4756,6 +4769,11 @@ button {
     max-height: calc(100vh - 24px);
     padding-top: 0;
     border-radius: 24px;
+  }
+
+  .orbital-modal-window.orbital-utility-modal-window.is-settings-mode {
+    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
   }
 
   .orbital-modal-content {

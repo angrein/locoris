@@ -277,6 +277,20 @@ export function formatPlannerDateTime(value: number | null | undefined, language
   }).format(value);
 }
 
+export function formatPlannerFullDateTime(value: number | null | undefined, language: AppLanguage) {
+  if (!value) {
+    return language === "ru" ? "Без времени" : "No time";
+  }
+
+  return new Intl.DateTimeFormat(language === "ru" ? "ru-RU" : "en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(value);
+}
+
 export function formatPlannerDateTimeInput(value: number | null | undefined) {
   if (!value) {
     return "";

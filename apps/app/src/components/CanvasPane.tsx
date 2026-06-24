@@ -1904,7 +1904,7 @@ export default function CanvasPane({
         previewMethod = "canvas-json";
         previewTitle = spec.title;
         diagramCode = JSON.stringify(spec, null, 2);
-        styledElements = buildCanvasAiSpecElements(
+        styledElements = await buildCanvasAiSpecElements(
           spec,
           note.color || DEFAULT_NOTE_COLOR,
           activeCanvasBackground
@@ -2307,7 +2307,7 @@ export default function CanvasPane({
               filterName: "Excalidraw JSON",
               extensions: ["json", "excalidraw"],
               preferredExtension: "json",
-              blob: createCanvasJsonBlob({ elements, appState, files, name })
+              blob: await createCanvasJsonBlob({ elements, appState, files, name })
             };
       const didSave = await saveBlobFileWithDialog({
         defaultPath: exportConfig.defaultPath,

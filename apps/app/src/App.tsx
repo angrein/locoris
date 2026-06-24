@@ -8,8 +8,6 @@ import "./components/AndroidEditorCanvas.css";
 import FolderPanel from "./components/FolderPanel";
 import KnowledgeMap from "./components/KnowledgeMap";
 import NotesPanel from "./components/NotesPanel";
-import SettingsPanel from "./components/SettingsPanel";
-import TrashPanel from "./components/TrashPanel";
 import {
   createCanvas,
   clearTrash,
@@ -194,6 +192,8 @@ const EditorPane = lazy(() => import("./components/EditorPane"));
 const CanvasPane = lazy(() => import("./components/CanvasPane"));
 const OrbitalMapView = lazy(() => import("./components/OrbitalMapView"));
 const PlannerSurface = lazy(() => import("./components/planner/PlannerSurface"));
+const SettingsPanel = lazy(() => import("./components/SettingsPanel"));
+const TrashPanel = lazy(() => import("./components/TrashPanel"));
 
 interface ConfirmDialogState {
   title: string;

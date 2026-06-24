@@ -1,6 +1,8 @@
 .planner-surface {
   --planner-accent: var(--accent-theme-primary, #8edcff);
   --planner-accent-2: var(--accent-theme-secondary, #b896ff);
+  --planner-heading: var(--text-heading, #fff);
+  --planner-emphasis: var(--text-emphasis, var(--planner-heading));
   --planner-panel: color-mix(in srgb, #08111f 74%, var(--planner-accent) 8%);
   --planner-border: color-mix(in srgb, var(--planner-accent) 32%, rgba(255, 255, 255, 0.16));
   width: 100%;
@@ -54,7 +56,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: color-mix(in srgb, var(--planner-accent) 76%, white);
+  color: color-mix(in srgb, var(--planner-emphasis) 52%, rgba(236, 245, 255, 0.74) 48%);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -79,7 +81,7 @@
 .planner-rail h2,
 .planner-main-head h1 {
   margin: 4px 0 0;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-heading) 38%, #fff 62%);
   font-family: var(--display-font, inherit);
   font-size: clamp(1.25rem, 2vw, 2rem);
   letter-spacing: 0;
@@ -766,7 +768,7 @@
   padding: 0 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--planner-project-filter-color, var(--planner-accent)) 14%, rgba(255, 255, 255, 0.08));
-  color: color-mix(in srgb, var(--planner-project-filter-color, var(--planner-accent)) 58%, white);
+  color: color-mix(in srgb, var(--planner-emphasis) 42%, rgba(245, 249, 255, 0.84) 58%);
   font-style: normal;
   font-size: 0.68rem;
 }
@@ -1027,7 +1029,7 @@
 .planner-task-chip.is-project {
   border: 1px solid color-mix(in srgb, var(--planner-accent) 22%, rgba(255, 255, 255, 0.08));
   background: color-mix(in srgb, var(--planner-accent) 12%, rgba(255, 255, 255, 0.05));
-  color: color-mix(in srgb, var(--planner-accent) 44%, rgba(240, 245, 255, 0.78));
+  color: color-mix(in srgb, var(--planner-emphasis) 34%, rgba(240, 245, 255, 0.78) 66%);
 }
 
 .planner-task-chip.is-tag,
@@ -1053,7 +1055,7 @@
 .planner-task-chip.is-recurring-status {
   border: 1px solid color-mix(in srgb, var(--planner-accent-2) 34%, rgba(255, 255, 255, 0.1));
   background: color-mix(in srgb, var(--planner-accent-2) 14%, rgba(255, 255, 255, 0.052));
-  color: color-mix(in srgb, var(--planner-accent-2) 58%, white);
+  color: color-mix(in srgb, var(--planner-emphasis) 42%, rgba(245, 249, 255, 0.86) 58%);
 }
 
 .planner-priority-chip.is-urgent,
@@ -1100,7 +1102,7 @@
 
 .planner-empty-state h2 {
   margin: 14px 0 4px;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-heading) 38%, #fff 62%);
 }
 
 .planner-empty-state p {
@@ -1224,7 +1226,7 @@
 }
 
 .planner-mobile-view-tabs strong {
-  color: color-mix(in srgb, var(--planner-accent) 72%, white);
+  color: color-mix(in srgb, var(--planner-heading) 38%, #fff 62%);
 }
 
 .planner-mobile-create-fab {

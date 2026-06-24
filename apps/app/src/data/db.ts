@@ -1645,7 +1645,7 @@ export async function ensureSeedData() {
 
   const language = detectLanguage();
   const timestamp = now();
-  const demoSeed = buildInitialDemoVault(language, timestamp);
+  const demoSeed = await buildInitialDemoVault(language, timestamp);
 
   await db.transaction(
     "rw",

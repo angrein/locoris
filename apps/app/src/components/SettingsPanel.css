@@ -47,6 +47,13 @@
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+@media (min-width: 721px) {
+  .settings-panel-shell.is-backup-settings {
+    height: auto;
+    grid-template-rows: auto auto;
+  }
+}
+
 .settings-panel-nav-button {
   width: 34px;
   height: 34px;
@@ -185,14 +192,15 @@
   gap: 7px;
 }
 
-.settings-panel-title {
+.settings-panel-header .settings-panel-title {
   margin: 0;
   color: color-mix(in srgb, var(--settings-emphasis, #fff) 88%, #fff 12%);
   font-family: var(--font-ui-display);
-  font-size: clamp(1.35rem, 2.35vw, 2.1rem);
+  font-size: clamp(1.22rem, 1.55vw, 1.58rem);
   font-weight: 780;
   letter-spacing: 0;
   line-height: 1.02;
+  text-transform: uppercase;
 }
 
 .settings-panel-caption {
@@ -1241,13 +1249,6 @@ button.settings-row:focus-visible {
   color: rgba(255, 222, 230, 0.96);
 }
 
-.backup-settings-layout {
-  min-width: 0;
-  overflow: auto;
-  padding: 1px 4px 8px 1px;
-}
-
-.backup-settings-hero,
 .backup-settings-card,
 .backup-settings-note,
 .sync-settings-column,
@@ -1329,8 +1330,8 @@ button.settings-row:focus-visible {
     border-radius: 22px;
   }
 
-  .settings-panel-title {
-    font-size: clamp(1.28rem, 7vw, 1.8rem);
+  .settings-panel-header .settings-panel-title {
+    font-size: clamp(1.12rem, 5.2vw, 1.42rem);
   }
 
   .settings-panel-caption {
@@ -1531,8 +1532,8 @@ button.settings-row:focus-visible {
     padding-block: 16px;
   }
 
-  .settings-panel-title {
-    font-size: clamp(1.35rem, 2.5vw, 2rem);
+  .settings-panel-header .settings-panel-title {
+    font-size: clamp(1.16rem, 1.7vw, 1.48rem);
   }
 
   .settings-row {

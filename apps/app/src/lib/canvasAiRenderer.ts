@@ -1,4 +1,3 @@
-import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { BinaryFileData, BinaryFiles, DataURL } from "@excalidraw/excalidraw/types";
 
@@ -2268,11 +2267,11 @@ function renderCanvasAiSemanticIslandsSpec(
   return skeletonElements;
 }
 
-export function buildCanvasAiSpecElements(
+export async function buildCanvasAiSpecElements(
   spec: CanvasDiagramSpec,
   accentColor: string,
   canvasBackgroundColor?: string
-) {
+): Promise<ExcalidrawElement[]> {
   const palette = getCanvasAiVisualPalette(accentColor, canvasBackgroundColor);
   const prefix = crypto.randomUUID();
   const skeletonElements =
@@ -2291,6 +2290,8 @@ export function buildCanvasAiSpecElements(
                 : spec.kind === "kanban"
                   ? renderCanvasAiKanbanSpec(spec, prefix, palette)
                   : renderCanvasAiSemanticIslandsSpec(spec, prefix, palette);
+
+  const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
 
   return (convertToExcalidrawElements(skeletonElements as any, {
     regenerateIds: true

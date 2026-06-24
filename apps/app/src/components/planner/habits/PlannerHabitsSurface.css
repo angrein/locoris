@@ -3,6 +3,8 @@
 .planner-habit-detail-content,
 .planner-habit-mobile-detail-sheet,
 .planner-habit-mobile-sheet {
+  --planner-habit-heading: var(--text-heading, #fff);
+  --planner-habit-emphasis: var(--text-emphasis, var(--planner-habit-heading));
   --planner-habit-done: color-mix(in srgb, #76f2b8 82%, var(--planner-habit-color, var(--planner-accent, #8edcff)) 18%);
   --planner-habit-done-strong: color-mix(in srgb, var(--planner-habit-done) 86%, white 14%);
   --planner-habit-done-soft: color-mix(in srgb, var(--planner-habit-done) 24%, rgba(255, 255, 255, 0.07));
@@ -103,7 +105,7 @@
   display: block;
   min-width: 0;
   overflow: hidden;
-  color: rgba(224, 235, 250, 0.6);
+  color: color-mix(in srgb, var(--planner-habit-emphasis) 34%, rgba(224, 235, 250, 0.62));
   font-size: 0.64rem;
   font-weight: 900;
   letter-spacing: 0.06em;
@@ -117,7 +119,7 @@
   display: block;
   margin-top: 5px;
   overflow: hidden;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-habit-heading) 42%, #fff 58%);
   font-size: 1.15rem;
   line-height: 1.08;
   text-overflow: ellipsis;
@@ -261,7 +263,7 @@
   display: block;
   margin-top: 3px;
   overflow: hidden;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-habit-heading) 42%, #fff 58%);
   font-size: 0.96rem;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -706,7 +708,7 @@
   min-width: 0;
   max-width: 122px;
   overflow: hidden;
-  color: color-mix(in srgb, var(--planner-accent) 42%, rgba(240, 246, 255, 0.74));
+  color: color-mix(in srgb, var(--planner-habit-emphasis) 34%, rgba(240, 246, 255, 0.74) 66%);
   font-size: 0.72rem;
   font-style: normal;
   font-weight: 820;
@@ -745,7 +747,7 @@
 .planner-habit-card-meta span.is-progress {
   border: 1px solid color-mix(in srgb, var(--planner-accent) 26%, rgba(255, 255, 255, 0.08));
   background: color-mix(in srgb, var(--planner-accent) 11%, rgba(255, 255, 255, 0.052));
-  color: color-mix(in srgb, var(--planner-accent) 52%, white);
+  color: color-mix(in srgb, var(--planner-habit-emphasis) 42%, rgba(245, 249, 255, 0.84) 58%);
 }
 
 .planner-habit-card-meta span.is-health {
@@ -760,7 +762,7 @@
 
 .planner-habit-card-meta span.is-health.is-watch {
   background: color-mix(in srgb, var(--planner-accent) 10%, rgba(255, 255, 255, 0.052));
-  color: color-mix(in srgb, var(--planner-accent) 36%, rgba(235, 243, 255, 0.78));
+  color: color-mix(in srgb, var(--planner-habit-emphasis) 34%, rgba(235, 243, 255, 0.78) 66%);
 }
 
 .planner-habit-card-meta span.is-health.is-risk {
@@ -868,7 +870,7 @@
 }
 
 .planner-habit-detail-head strong {
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-habit-heading) 42%, #fff 58%);
   font-size: 1.05rem;
   line-height: 1.18;
   white-space: nowrap;
@@ -995,7 +997,7 @@
   display: block;
   margin-top: 3px;
   overflow: hidden;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-habit-heading) 42%, #fff 58%);
   font-size: 0.94rem;
   line-height: 1.18;
   text-overflow: ellipsis;
@@ -1027,7 +1029,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--planner-accent) 12%, rgba(255, 255, 255, 0.052));
-  color: color-mix(in srgb, var(--planner-accent) 46%, white);
+  color: color-mix(in srgb, var(--planner-habit-emphasis) 42%, rgba(245, 249, 255, 0.84) 58%);
   font-size: 0.68rem;
   font-style: normal;
   font-weight: 850;

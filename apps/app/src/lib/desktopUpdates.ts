@@ -1,4 +1,5 @@
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
+import { getVersion } from "@tauri-apps/api/app";
 import {
   readPersistentString,
   removePersistentString,
@@ -307,7 +308,6 @@ export async function getDesktopAppVersion() {
     return null;
   }
 
-  const { getVersion } = await import("@tauri-apps/api/app");
   return getVersion();
 }
 

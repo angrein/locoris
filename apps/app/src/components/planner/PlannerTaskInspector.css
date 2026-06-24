@@ -1,6 +1,8 @@
 .planner-task-panel {
   --planner-task-accent: var(--planner-accent, var(--accent-theme-primary, #8edcff));
   --planner-task-accent-2: var(--planner-accent-2, var(--accent-theme-secondary, #b896ff));
+  --planner-task-heading: var(--text-heading, #fff);
+  --planner-task-emphasis: var(--text-emphasis, var(--planner-task-heading));
   position: relative;
   display: flex;
   flex-direction: column;
@@ -74,7 +76,7 @@
 }
 
 .planner-task-panel-empty h2 {
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-task-heading) 38%, #fff 62%);
   font-family: var(--display-font, inherit);
   font-size: 1.4rem;
 }
@@ -102,7 +104,7 @@
 
 .planner-task-panel-kicker,
 .planner-task-section-title span {
-  color: color-mix(in srgb, var(--planner-task-accent) 56%, rgba(230, 239, 255, 0.68));
+  color: color-mix(in srgb, var(--planner-task-emphasis) 50%, rgba(230, 239, 255, 0.7) 50%);
   font-size: 0.66rem;
   font-weight: 940;
   letter-spacing: 0.075em;
@@ -520,7 +522,7 @@
 }
 
 .planner-task-date-summary small {
-  color: color-mix(in srgb, var(--planner-task-accent) 52%, rgba(225, 235, 249, 0.62));
+  color: color-mix(in srgb, var(--planner-task-emphasis) 46%, rgba(225, 235, 249, 0.66) 54%);
   font-size: 0.66rem;
   font-weight: 900;
   letter-spacing: 0.06em;
@@ -563,7 +565,7 @@
 }
 
 .planner-task-tag-row button.is-more {
-  color: color-mix(in srgb, var(--planner-task-accent) 72%, white);
+  color: color-mix(in srgb, var(--planner-task-emphasis) 48%, rgba(245, 249, 255, 0.86) 52%);
 }
 
 .planner-task-links-section {
@@ -736,7 +738,7 @@
   padding: 0;
   border-radius: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.95);
+  color: color-mix(in srgb, var(--planner-task-heading) 20%, rgba(255, 255, 255, 0.96) 80%);
   font-family: var(--display-font, inherit);
   font-size: clamp(1.05rem, 1.5vw, 1.32rem);
   font-weight: 940;
@@ -1023,12 +1025,52 @@
 }
 
 .planner-task-date-card {
+  display: grid;
+  gap: 7px;
   padding: 1px 0;
 }
 
 .planner-task-date-summary {
   min-height: 52px;
   border-radius: 17px;
+}
+
+.planner-task-date-meta {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--planner-task-accent) 14%, rgba(255, 255, 255, 0.075));
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.036), rgba(255, 255, 255, 0.012)),
+    color-mix(in srgb, var(--planner-task-accent) 5%, rgba(255, 255, 255, 0.022));
+}
+
+.planner-task-date-meta span,
+.planner-task-date-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-task-date-meta span {
+  color: color-mix(in srgb, var(--planner-task-emphasis) 44%, rgba(225, 235, 249, 0.66) 56%);
+  font-size: 0.63rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.planner-task-date-meta strong {
+  justify-self: end;
+  max-width: 100%;
+  color: rgba(241, 247, 255, 0.82);
+  font-size: 0.75rem;
+  font-weight: 820;
 }
 
 .planner-task-reminder-card {
@@ -1108,7 +1150,7 @@
 }
 
 .planner-task-reminder-card small {
-  color: color-mix(in srgb, var(--planner-task-accent) 54%, rgba(225, 235, 249, 0.62));
+  color: color-mix(in srgb, var(--planner-task-emphasis) 46%, rgba(225, 235, 249, 0.66) 54%);
   font-size: 0.64rem;
   font-weight: 900;
   letter-spacing: 0.06em;
@@ -1231,7 +1273,7 @@
 }
 
 .planner-task-scope-dialog h3 {
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-task-heading) 38%, #fff 62%);
   font-family: var(--display-font, inherit);
   font-size: 1.35rem;
   font-weight: 940;

@@ -1,6 +1,8 @@
 .planner-calendar-layer {
   --planner-calendar-accent: var(--accent-theme-primary, #8edcff);
   --planner-calendar-accent-2: var(--accent-theme-secondary, #b896ff);
+  --planner-calendar-heading: var(--text-heading, #fff);
+  --planner-calendar-emphasis: var(--text-emphasis, var(--planner-calendar-heading));
   --planner-calendar-inbox-color: color-mix(in srgb, var(--planner-calendar-accent) 54%, #dce6f4);
   position: fixed;
   inset: 0;
@@ -72,7 +74,7 @@
 
 .planner-calendar-title h2 {
   margin: 5px 0 0;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-calendar-heading) 38%, #fff 62%);
   font-family: var(--display-font, inherit);
   font-size: 1.8rem;
   line-height: 1.08;
@@ -332,7 +334,7 @@
 }
 
 .planner-calendar-side-title span {
-  color: rgba(255, 255, 255, 0.9);
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 52%, rgba(255, 255, 255, 0.84) 48%);
   font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0.06em;
@@ -342,7 +344,7 @@
 .planner-calendar-side-title em {
   min-width: 0;
   overflow: hidden;
-  color: color-mix(in srgb, var(--planner-calendar-accent) 68%, rgba(224, 234, 247, 0.62));
+  color: color-mix(in srgb, var(--planner-calendar-heading) 28%, rgba(224, 234, 247, 0.66) 72%);
   font-size: 0.76rem;
   font-style: normal;
   font-weight: 820;
@@ -358,7 +360,7 @@
   padding: 0 7px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.075);
-  color: color-mix(in srgb, var(--planner-calendar-accent) 66%, white);
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 58%, white 42%);
   font-size: 0.72rem;
   font-weight: 900;
 }
@@ -1093,7 +1095,7 @@
 
 .planner-calendar-quick-create h3 {
   margin: 4px 0 0;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-calendar-heading) 38%, #fff 62%);
   font-family: var(--display-font, inherit);
   font-size: 1.05rem;
 }
@@ -1104,7 +1106,7 @@
 }
 
 .planner-calendar-quick-create label span {
-  color: color-mix(in srgb, var(--planner-calendar-accent) 60%, rgba(230, 239, 255, 0.66));
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 48%, rgba(230, 239, 255, 0.68) 52%);
   font-size: 0.66rem;
   font-weight: 900;
   letter-spacing: 0.07em;
@@ -1118,7 +1120,7 @@
 }
 
 .planner-calendar-quick-duration > span {
-  color: color-mix(in srgb, var(--planner-calendar-accent) 60%, rgba(230, 239, 255, 0.66));
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 48%, rgba(230, 239, 255, 0.68) 52%);
   font-size: 0.66rem;
   font-weight: 900;
   letter-spacing: 0.07em;
@@ -1282,7 +1284,7 @@
 .planner-calendar-inspector-head h3,
 .planner-calendar-scope-dialog h3 {
   margin: 3px 0 0;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-calendar-heading) 38%, #fff 62%);
   font-family: var(--display-font, inherit);
   font-size: 1.12rem;
   line-height: 1.12;
@@ -1439,7 +1441,7 @@
 }
 
 .planner-calendar-inspector-label {
-  color: color-mix(in srgb, var(--planner-calendar-accent) 62%, rgba(230, 239, 255, 0.66));
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 48%, rgba(230, 239, 255, 0.68) 52%);
   font-size: 0.66rem;
   font-weight: 920;
   letter-spacing: 0.07em;
@@ -1496,7 +1498,7 @@
 }
 
 .planner-calendar-date-mode-button small {
-  color: color-mix(in srgb, var(--planner-calendar-accent) 66%, rgba(224, 234, 247, 0.62));
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 46%, rgba(224, 234, 247, 0.66) 54%);
   font-size: 0.64rem;
   font-weight: 900;
   letter-spacing: 0.05em;
@@ -1620,7 +1622,7 @@
 .planner-calendar-time-editor-summary span {
   min-width: 0;
   overflow: hidden;
-  color: color-mix(in srgb, var(--planner-calendar-accent) 72%, white);
+  color: color-mix(in srgb, var(--planner-calendar-heading) 36%, rgba(255, 255, 255, 0.92) 64%);
   font-size: 0.78rem;
   font-weight: 900;
   text-overflow: ellipsis;
@@ -2271,7 +2273,7 @@
 }
 
 .planner-calendar-layer.is-mobile .planner-calendar-mobile-dock small {
-  color: color-mix(in srgb, var(--planner-calendar-accent) 68%, white);
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 50%, rgba(245, 249, 255, 0.86) 50%);
   font-size: 0.76rem;
   font-weight: 900;
 }
@@ -2333,14 +2335,14 @@
 
 .planner-calendar-layer.is-mobile .planner-calendar-mobile-sheet h3 {
   margin: 3px 0 0;
-  color: #fff;
+  color: color-mix(in srgb, var(--planner-calendar-heading) 38%, #fff 62%);
   font-size: 1.05rem;
   line-height: 1.16;
 }
 
 .planner-calendar-layer.is-mobile .planner-calendar-mobile-sheet header p {
   margin: 3px 0 0;
-  color: color-mix(in srgb, var(--planner-calendar-accent) 68%, rgba(224, 234, 247, 0.64));
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 44%, rgba(224, 234, 247, 0.66) 56%);
   font-size: 0.78rem;
   font-weight: 820;
   line-height: 1.2;
@@ -2354,7 +2356,7 @@
   padding: 0 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  color: color-mix(in srgb, var(--planner-calendar-accent) 70%, white);
+  color: color-mix(in srgb, var(--planner-calendar-emphasis) 52%, white 48%);
   font-size: 0.78rem;
   font-weight: 900;
 }

@@ -1,3 +1,11 @@
+import {
+  exists as fileExists,
+  open as openDesktopFile,
+  readFile as readDesktopFile,
+  readTextFile as readDesktopTextFile,
+  remove as removeDesktopFile
+} from "@tauri-apps/plugin-fs";
+
 import { isDesktopRuntime } from "./runtime";
 
 export type NativeDialogFilter = {
@@ -138,10 +146,7 @@ export async function openTextFileWithDialog(options: {
   filters: NativeDialogFilter[];
 }): Promise<OpenTextFileResult | null> {
   if (isDesktopRuntime()) {
-    const [{ open }, { readTextFile }] = await Promise.all([
-      import("@tauri-apps/plugin-dialog"),
-      import("@tauri-apps/plugin-fs")
-    ]);
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const selectedPath = await open({
       multiple: false,
       directory: false,
@@ -152,7 +157,7 @@ export async function openTextFileWithDialog(options: {
       return null;
     }
 
-    const text = await readTextFile(selectedPath);
+    const text = await readDesktopTextFile(selectedPath);
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
 
     return {
@@ -181,10 +186,7 @@ export async function openBlobFileWithDialog(options: {
   filters: NativeDialogFilter[];
 }): Promise<OpenFileResult | null> {
   if (isDesktopRuntime()) {
-    const [{ open }, { readFile }] = await Promise.all([
-      import("@tauri-apps/plugin-dialog"),
-      import("@tauri-apps/plugin-fs")
-    ]);
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const selectedPath = await open({
       multiple: false,
       directory: false,
@@ -195,7 +197,7 @@ export async function openBlobFileWithDialog(options: {
       return null;
     }
 
-    const bytes = await readFile(selectedPath);
+    const bytes = await readDesktopFile(selectedPath);
     const blob = new Blob([bytes]);
 
     return {
@@ -225,10 +227,7 @@ export async function saveTextFileWithDialog(options: {
   preferredExtension: string;
 }) {
   if (isDesktopRuntime()) {
-    const [{ save }, fs] = await Promise.all([
-      import("@tauri-apps/plugin-dialog"),
-      import("@tauri-apps/plugin-fs")
-    ]);
+    const { save } = await import("@tauri-apps/plugin-dialog");
     const selectedPath = await save({
       defaultPath: options.defaultPath,
       filters: options.filters
@@ -241,7 +240,7 @@ export async function saveTextFileWithDialog(options: {
     await writeDesktopFileReplacingExisting(
       ensureFileExtension(selectedPath, options.preferredExtension),
       new TextEncoder().encode(options.content),
-      fs
+      { exists: fileExists, open: openDesktopFile, remove: removeDesktopFile }
     );
     return true;
   }
@@ -260,10 +259,7 @@ export async function saveBlobFileWithDialog(options: {
   preferredExtension: string;
 }) {
   if (isDesktopRuntime()) {
-    const [{ save }, fs] = await Promise.all([
-      import("@tauri-apps/plugin-dialog"),
-      import("@tauri-apps/plugin-fs")
-    ]);
+    const { save } = await import("@tauri-apps/plugin-dialog");
     const selectedPath = await save({
       defaultPath: options.defaultPath,
       filters: options.filters
@@ -277,7 +273,7 @@ export async function saveBlobFileWithDialog(options: {
     await writeDesktopFileReplacingExisting(
       ensureFileExtension(selectedPath, options.preferredExtension),
       bytes,
-      fs
+      { exists: fileExists, open: openDesktopFile, remove: removeDesktopFile }
     );
     return true;
   }

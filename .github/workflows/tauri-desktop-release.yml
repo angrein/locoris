@@ -12,8 +12,13 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_VERSION: "24"
   JAVA_VERSION: "17"
   ANDROID_NDK_VERSION: "27.0.12077973"
+  NPM_CONFIG_FETCH_RETRIES: "5"
+  NPM_CONFIG_FETCH_RETRY_FACTOR: "2"
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "20000"
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
   VITE_GOOGLE_DRIVE_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_CLIENT_ID }}
   VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID }}
 
@@ -37,12 +42,12 @@ jobs:
       VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET: ${{ secrets.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -55,7 +60,18 @@ jobs:
           workspaces: apps/app/src-tauri -> apps/app/src-tauri/target
 
       - name: Install deps
-        run: npm ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm ci --prefer-offline --no-audit; then
+              exit 0
+            fi
+            if [ "${attempt}" = "3" ]; then
+              exit 1
+            fi
+            sleep $((attempt * 20))
+          done
 
       - name: Validate Google Drive OAuth env
         run: >
@@ -92,23 +108,23 @@ jobs:
       LOCORIS_ANDROID_BUILD: "true"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android NDK
         run: sdkmanager "ndk;${ANDROID_NDK_VERSION}"
@@ -124,7 +140,18 @@ jobs:
           workspaces: apps/app/src-tauri -> apps/app/src-tauri/target
 
       - name: Install deps
-        run: npm ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm ci --prefer-offline --no-audit; then
+              exit 0
+            fi
+            if [ "${attempt}" = "3" ]; then
+              exit 1
+            fi
+            sleep $((attempt * 20))
+          done
 
       - name: Typecheck
         run: npm run typecheck --workspace @locoris/app
@@ -200,7 +227,7 @@ jobs:
           echo "apk_name=${APK_NAME}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload Android release assets artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: locoris-android-release-assets
           path: dist/android-release/*
@@ -215,7 +242,7 @@ jobs:
 
     steps:
       - name: Download Android release assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: locoris-android-release-assets
           path: dist/android-release
@@ -234,12 +261,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Resolve release version
         id: release-version

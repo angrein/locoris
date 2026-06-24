@@ -1,4 +1,3 @@
-import { exportToBlob } from "@excalidraw/excalidraw";
 import type { BinaryFileData, BinaryFiles, DataURL } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement, FileId } from "@excalidraw/excalidraw/element/types";
 import JSZip from "jszip";
@@ -487,6 +486,7 @@ async function addCanvasReadableFiles(input: {
   }
 
   try {
+    const { exportToBlob } = await import("@excalidraw/excalidraw");
     const blob = await exportToBlob({
       elements: content.elements.filter((element) => !element.isDeleted) as unknown as ExcalidrawElement[],
       appState: {

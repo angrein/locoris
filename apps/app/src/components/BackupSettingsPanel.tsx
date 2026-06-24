@@ -36,16 +36,6 @@ interface BackupSettingsPanelProps {
   language: AppLanguage;
 }
 
-function BackupIcon() {
-  return (
-    <svg viewBox="0 0 22 22" aria-hidden="true" focusable="false">
-      <path d="M6.2 7.2a5.3 5.3 0 0 1 9.7 2.8h.3a2.9 2.9 0 0 1 0 5.8H6.1a3.5 3.5 0 0 1 .1-7Z" />
-      <path d="M11 8.4v5.2" className="backup-card-icon-accent" />
-      <path d="m8.7 11.2 2.3 2.4 2.3-2.4" className="backup-card-icon-accent" />
-    </svg>
-  );
-}
-
 export default function BackupSettingsPanel({
   activeLocalVaultId,
   vaultName,
@@ -205,19 +195,6 @@ export default function BackupSettingsPanel({
   return (
     <>
       <div className="backup-settings-layout">
-        <section className="settings-panel-block settings-panel-block-primary backup-settings-hero">
-          <div className="backup-settings-hero-copy">
-            <span className="backup-settings-hero-icon" aria-hidden="true">
-              <BackupIcon />
-            </span>
-            <div>
-              <p className="panel-kicker settings-panel-block-kicker">{t("settings.backupKicker")}</p>
-              <h3>{t("settings.backupHeroTitle")}</h3>
-              <p>{t("settings.backupHeroDescription")}</p>
-            </div>
-          </div>
-        </section>
-
         <section className="settings-panel-block backup-settings-card-grid">
           <button
             type="button"

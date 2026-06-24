@@ -1,65 +1,12 @@
 .backup-settings-layout {
   min-width: 0;
+  min-height: 0;
   display: grid;
+  align-self: start;
+  align-content: start;
   gap: 14px;
-}
-
-.backup-settings-hero {
-  overflow: hidden;
-}
-
-.backup-settings-hero-copy {
-  min-width: 0;
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.backup-settings-hero-icon {
-  flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 18px;
-  color: color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 68%, rgba(248, 250, 255, 0.9));
-  border: 1px solid color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 28%, rgb(var(--line-rgb) / 0.12));
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--utility-modal-accent, var(--gold)) 16%, transparent), rgba(255, 255, 255, 0.025)),
-    rgba(255, 255, 255, 0.032);
-}
-
-.backup-settings-hero-icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.backup-settings-hero-icon svg * {
-  fill: rgba(255, 255, 255, 0.04);
-  stroke: currentColor;
-  stroke-width: 1.45;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.backup-settings-hero-icon .backup-card-icon-accent {
-  fill: none;
-  stroke: color-mix(in srgb, var(--text) 72%, var(--utility-modal-accent, var(--gold)) 28%);
-}
-
-.backup-settings-hero h3 {
-  margin: 3px 0 0;
-  color: rgba(248, 250, 255, 0.96);
-  font-size: 1.05rem;
-  line-height: 1.2;
-  letter-spacing: 0;
-}
-
-.backup-settings-hero p:not(.panel-kicker) {
-  margin: 7px 0 0;
-  color: rgba(192, 201, 231, 0.76);
-  font-size: 0.76rem;
-  line-height: 1.55;
+  overflow: auto;
+  padding: 1px 4px 8px 1px;
 }
 
 .backup-settings-card-grid {
@@ -171,4 +118,3 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-
