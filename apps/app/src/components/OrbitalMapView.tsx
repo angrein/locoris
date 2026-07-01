@@ -2481,6 +2481,21 @@ export default function OrbitalMapView({
     setSurfaceMode("planner");
     setMobileSection("planner");
   };
+
+  useEffect(() => {
+    if (!isAndroidMobileShell) {
+      return;
+    }
+
+    if (surfaceMode === "planner" && plannerSlot && mobileSection !== "planner") {
+      setMobileSection("planner");
+    }
+
+    if (surfaceMode === "map" && mobileSection === "planner") {
+      setMobileSection("map");
+    }
+  }, [isAndroidMobileShell, mobileSection, plannerSlot, surfaceMode]);
+
   useEffect(() => {
     setIsTemporalLayerQuickHidden(false);
   }, [activeLocalVaultId, orbitalTemporalSignalsMode]);
@@ -5314,17 +5329,20 @@ export default function OrbitalMapView({
     setIsMobileMenuOpen(false);
 
     if (section === "vault") {
+      setSurfaceMode("map");
       setInspectorHierarchyScope("vault");
       openInspectorMenu("folders");
       return;
     }
 
     if (section === "documents") {
+      setSurfaceMode("map");
       openInspectorMenu("notes");
       return;
     }
 
     if (section === "planner") {
+      setSurfaceMode("planner");
       setActiveModal(null);
       setIsMobileSelectionMode(false);
       setMobileMoveItems([]);
@@ -5333,7 +5351,13 @@ export default function OrbitalMapView({
       return;
     }
 
+    if (section === "map") {
+      setSurfaceMode("map");
+      return;
+    }
+
     if (section === "pinned") {
+      setSurfaceMode("map");
       openInspectorMenu("pinned");
       return;
     }

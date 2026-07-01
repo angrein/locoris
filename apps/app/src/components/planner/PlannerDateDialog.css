@@ -41,13 +41,23 @@
 }
 
 .planner-date-dialog-layer.is-mobile {
+  --planner-date-dialog-top-chrome-offset: clamp(92px, 11dvh, 124px);
+  --planner-date-dialog-bottom-nav-offset: clamp(86px, 10dvh, 106px);
+  inset:
+    calc(var(--planner-date-dialog-top-chrome-offset) + env(safe-area-inset-top, 0px))
+    0
+    calc(var(--planner-date-dialog-bottom-nav-offset) + env(safe-area-inset-bottom, 0px))
+    0;
   align-items: flex-end;
   justify-content: center;
-  padding: 10px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  padding:
+    8px
+    max(10px, env(safe-area-inset-right, 0px))
+    8px
+    max(10px, env(safe-area-inset-left, 0px));
 }
 
 .planner-date-dialog-layer.is-mobile .planner-date-dialog-sheet {
   width: min(100%, 620px);
-  max-height: min(86vh, 720px);
+  max-height: 100%;
 }

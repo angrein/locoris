@@ -22,7 +22,7 @@ Locoris now separates desktop runtime state into explicit buckets:
 
 - user content is stored outside the bundled app
 - the webview profile is versioned, so UI/runtime changes always land after an upgrade
-- uninstall always removes disposable `webview`, `cache`, and `logs` runtime state through [`installer-hooks.nsh`](/Users/dzen/bots/locoris/apps/app/src-tauri/windows/installer-hooks.nsh)
+- uninstall always removes disposable `webview`, `cache`, and `logs` runtime state through [`installer-hooks.nsh`](../../apps/app/src-tauri/windows/installer-hooks.nsh)
 - NSIS uninstall keeps app data by default
 - the built-in `Remove application data` checkbox wipes user data too
 
@@ -31,7 +31,7 @@ Locoris now separates desktop runtime state into explicit buckets:
 - user content is stored outside `Locoris.app`
 - the webview data store is versioned per app release
 - uninstalling `Locoris.app` preserves user data by default
-- use [`scripts/macos/uninstall-locoris.sh`](/Users/dzen/bots/locoris/scripts/macos/uninstall-locoris.sh) with `--wipe-data` for a full wipe
+- use [`scripts/macos/uninstall-locoris.sh`](../../scripts/macos/uninstall-locoris.sh) with `--wipe-data` for a full wipe
 - shortcut scripts:
   - `npm run desktop:uninstall:macos`
   - `npm run desktop:uninstall:macos:wipe`

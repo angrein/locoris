@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 
 import type { AppLanguage } from "../../types";
 import {
-  addPlannerMinutesToDay,
   DEFAULT_PLANNER_END_TIME_MINUTES,
   DEFAULT_PLANNER_START_TIME_MINUTES,
   formatPlannerTimeMinutes,
@@ -11,6 +10,7 @@ import {
   type PlannerTaskDateRepeat
 } from "../../lib/plannerTaskSchedule";
 import { formatPlannerDate, getEndOfLocalDay, getStartOfLocalDay } from "../../lib/planner";
+import PlannerTimeField from "./PlannerTimeField";
 import "./PlannerDateSelector.css";
 
 interface PlannerDateSelectorProps {
@@ -30,7 +30,10 @@ interface PlannerCalendarDay {
 }
 
 const REPEAT_OPTIONS: PlannerTaskDateRepeat[] = ["none", "daily", "weekly", "monthly", "customDaily"];
-const TIME_STEP_MINUTES = 15;
+const MIN_TIME_DURATION_MINUTES = 15;
+const MAX_TIME_MINUTES = 23 * 60 + 59;
+const MAX_START_TIME_MINUTES = MAX_TIME_MINUTES - MIN_TIME_DURATION_MINUTES;
+const QUICK_TIME_OPTIONS = [9 * 60, 12 * 60, 15 * 60, 18 * 60] as const;
 
 function addDays(value: number, days: number) {
   const date = new Date(value);
@@ -131,8 +134,8 @@ function getQuickDateOptions(language: AppLanguage) {
   ];
 }
 
-function shiftMinutes(value: number, direction: -1 | 1) {
-  return Math.max(0, Math.min(23 * 60 + 45, value + direction * TIME_STEP_MINUTES));
+function clampTimeInputMinutes(value: number, max = MAX_TIME_MINUTES) {
+  return Math.max(0, Math.min(max, Math.round(value)));
 }
 
 function shiftRepeatIntervalDays(value: number, direction: -1 | 1) {
@@ -157,6 +160,23 @@ export default function PlannerDateSelector({
 
   const updateDraft = (patch: Partial<PlannerTaskDateDraft>) => {
     setDraft((current) => normalizePlannerTaskDateDraft({ ...current, ...patch }));
+  };
+
+  const updateStartTime = (minutes: number) => {
+    const nextStartTimeMinutes = clampTimeInputMinutes(minutes, MAX_START_TIME_MINUTES);
+    const currentDuration = Math.max(MIN_TIME_DURATION_MINUTES, draft.endTimeMinutes - draft.startTimeMinutes);
+    const nextEndTimeMinutes = Math.min(MAX_TIME_MINUTES, Math.max(nextStartTimeMinutes + MIN_TIME_DURATION_MINUTES, nextStartTimeMinutes + currentDuration));
+
+    updateDraft({
+      startTimeMinutes: nextStartTimeMinutes,
+      endTimeMinutes: nextEndTimeMinutes
+    });
+  };
+
+  const updateEndTime = (minutes: number) => {
+    updateDraft({
+      endTimeMinutes: Math.max(draft.startTimeMinutes + MIN_TIME_DURATION_MINUTES, clampTimeInputMinutes(minutes))
+    });
   };
 
   const selectDay = (dayAt: number) => {
@@ -311,22 +331,42 @@ export default function PlannerDateSelector({
       </div>
 
       {draft.hasTime ? (
-        <div className="planner-date-selector-time">
-          <div>
-            <span>{language === "ru" ? "Начало" : "Starts"}</span>
-            <div>
-              <button type="button" onClick={() => updateDraft({ startTimeMinutes: shiftMinutes(draft.startTimeMinutes, -1) })}>−</button>
-              <strong>{formatPlannerTimeMinutes(draft.startTimeMinutes)}</strong>
-              <button type="button" onClick={() => updateDraft({ startTimeMinutes: shiftMinutes(draft.startTimeMinutes, 1) })}>+</button>
-            </div>
+        <div className="planner-date-selector-time-block">
+          <div className="planner-date-selector-time">
+            <label>
+              <span>{language === "ru" ? "Начало" : "Starts"}</span>
+              <PlannerTimeField
+                valueMinutes={draft.startTimeMinutes}
+                language={language}
+                ariaLabel={language === "ru" ? "Время начала" : "Start time"}
+                minMinutes={0}
+                maxMinutes={MAX_START_TIME_MINUTES}
+                onChange={updateStartTime}
+              />
+            </label>
+            <label>
+              <span>{language === "ru" ? "Конец" : "Ends"}</span>
+              <PlannerTimeField
+                valueMinutes={draft.endTimeMinutes}
+                language={language}
+                ariaLabel={language === "ru" ? "Время окончания" : "End time"}
+                minMinutes={Math.min(MAX_TIME_MINUTES, draft.startTimeMinutes + MIN_TIME_DURATION_MINUTES)}
+                maxMinutes={MAX_TIME_MINUTES}
+                onChange={updateEndTime}
+              />
+            </label>
           </div>
-          <div>
-            <span>{language === "ru" ? "Конец" : "Ends"}</span>
-            <div>
-              <button type="button" onClick={() => updateDraft({ endTimeMinutes: shiftMinutes(draft.endTimeMinutes, -1) })}>−</button>
-              <strong>{formatPlannerTimeMinutes(draft.endTimeMinutes)}</strong>
-              <button type="button" onClick={() => updateDraft({ endTimeMinutes: shiftMinutes(draft.endTimeMinutes, 1) })}>+</button>
-            </div>
+          <div className="planner-date-selector-time-presets" aria-label={language === "ru" ? "Быстрый выбор времени" : "Quick time presets"}>
+            {QUICK_TIME_OPTIONS.map((minutes) => (
+              <button
+                key={minutes}
+                type="button"
+                className={draft.startTimeMinutes === minutes ? "is-active" : ""}
+                onClick={() => updateStartTime(minutes)}
+              >
+                {formatPlannerTimeMinutes(minutes)}
+              </button>
+            ))}
           </div>
         </div>
       ) : null}

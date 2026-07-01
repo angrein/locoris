@@ -43,6 +43,7 @@ import {
   isPlannerHabitDueOnDay
 } from "../../lib/plannerHabits";
 import TagInputField from "../TagInputField";
+import PlannerTimeField from "./PlannerTimeField";
 import PlannerUndoSnackbar, { type PlannerUndoSnackbarAction } from "./PlannerUndoSnackbar";
 import "./PlannerCalendarSurface.css";
 
@@ -188,6 +189,9 @@ const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
 const MINUTE_MS = 60_000;
 const SNAP_MINUTES = 15;
+const MIN_TIME_INPUT_DURATION_MINUTES = 15;
+const MAX_TIME_INPUT_MINUTES = 23 * 60 + 59;
+const MAX_TIME_INPUT_START_MINUTES = MAX_TIME_INPUT_MINUTES - MIN_TIME_INPUT_DURATION_MINUTES;
 const MIN_EVENT_DURATION_MS = 15 * MINUTE_MS;
 const MANUAL_DRAG_THRESHOLD_PX = 8;
 const TOUCH_LONG_PRESS_DRAG_MS = 420;
@@ -330,14 +334,11 @@ function getCalendarEventTimedDuration(event: CalendarEvent) {
 
 function getTimeEditorDraftForEvent(event: CalendarEvent): CalendarTimeEditorDraft {
   const startMinutes = event.isAllDay ? 9 * 60 : getMinutesOfDay(event.startAt);
-  const durationMinutes = Math.max(
-    SNAP_MINUTES,
-    Math.round(getCalendarEventTimedDuration(event) / MINUTE_MS / SNAP_MINUTES) * SNAP_MINUTES
-  );
+  const durationMinutes = Math.max(MIN_TIME_INPUT_DURATION_MINUTES, Math.round(getCalendarEventTimedDuration(event) / MINUTE_MS));
 
   return {
-    startMinutes: clampNumber(startMinutes, 0, 23 * 60 + 45),
-    durationMinutes: clampNumber(durationMinutes, SNAP_MINUTES, getTimeEditorMaxDuration(startMinutes))
+    startMinutes: clampNumber(startMinutes, 0, MAX_TIME_INPUT_START_MINUTES),
+    durationMinutes: clampNumber(durationMinutes, MIN_TIME_INPUT_DURATION_MINUTES, getTimeEditorMaxDuration(startMinutes))
   };
 }
 
@@ -364,7 +365,7 @@ function formatDurationMinutes(minutes: number, language: AppLanguage) {
 }
 
 function getTimeEditorMaxDuration(startMinutes: number) {
-  return Math.max(SNAP_MINUTES, Math.min(12 * 60, 24 * 60 - startMinutes));
+  return Math.max(MIN_TIME_INPUT_DURATION_MINUTES, Math.min(12 * 60, MAX_TIME_INPUT_MINUTES - startMinutes));
 }
 
 function getTaskUndoPatch(task: Task): PlannerTaskUpdateInput {
@@ -2976,25 +2977,28 @@ export default function PlannerCalendarSurface({
       setTimeEditorEventId(null);
       setTimeEditorDraft(null);
     };
-    const changeTimeEditorStart = (deltaMinutes: number) => {
+    const setTimeEditorStart = (minutes: number) => {
       setTimeEditorDraft((current) => {
         const draft = current ?? getTimeEditorDraftForEvent(calendarEvent);
-        const nextStartMinutes = clampNumber(draft.startMinutes + deltaMinutes, 0, 23 * 60 + 45);
+        const nextStartMinutes = clampNumber(minutes, 0, MAX_TIME_INPUT_START_MINUTES);
+        const currentEndMinutes = Math.min(MAX_TIME_INPUT_MINUTES, draft.startMinutes + draft.durationMinutes);
+        const nextEndMinutes = Math.max(nextStartMinutes + MIN_TIME_INPUT_DURATION_MINUTES, currentEndMinutes);
 
         return {
           ...draft,
           startMinutes: nextStartMinutes,
-          durationMinutes: clampNumber(draft.durationMinutes, SNAP_MINUTES, getTimeEditorMaxDuration(nextStartMinutes))
+          durationMinutes: clampNumber(nextEndMinutes - nextStartMinutes, MIN_TIME_INPUT_DURATION_MINUTES, getTimeEditorMaxDuration(nextStartMinutes))
         };
       });
     };
-    const changeTimeEditorDuration = (deltaMinutes: number) => {
+    const setTimeEditorEnd = (minutes: number) => {
       setTimeEditorDraft((current) => {
         const draft = current ?? getTimeEditorDraftForEvent(calendarEvent);
+        const nextEndMinutes = clampNumber(minutes, draft.startMinutes + MIN_TIME_INPUT_DURATION_MINUTES, MAX_TIME_INPUT_MINUTES);
 
         return {
           ...draft,
-          durationMinutes: clampNumber(draft.durationMinutes + deltaMinutes, SNAP_MINUTES, getTimeEditorMaxDuration(draft.startMinutes))
+          durationMinutes: clampNumber(nextEndMinutes - draft.startMinutes, MIN_TIME_INPUT_DURATION_MINUTES, getTimeEditorMaxDuration(draft.startMinutes))
         };
       });
     };
@@ -3002,7 +3006,7 @@ export default function PlannerCalendarSurface({
       const draft = timeEditorEventId === calendarEvent.id && timeEditorDraft ? timeEditorDraft : getTimeEditorDraftForEvent(calendarEvent);
       const dayStartAt = getStartOfLocalDay(calendarEvent.startAt);
       const nextStartAt = getTimestampOnDay(dayStartAt, draft.startMinutes);
-      const nextDurationMinutes = clampNumber(draft.durationMinutes, SNAP_MINUTES, getTimeEditorMaxDuration(draft.startMinutes));
+      const nextDurationMinutes = clampNumber(draft.durationMinutes, MIN_TIME_INPUT_DURATION_MINUTES, getTimeEditorMaxDuration(draft.startMinutes));
       const nextEndAt = nextStartAt + nextDurationMinutes * MINUTE_MS;
       requestInspectorReschedule(nextStartAt, nextEndAt);
       closeTimeEditor();
@@ -3012,7 +3016,8 @@ export default function PlannerCalendarSurface({
     const canMakeAllDay = calendarEvent.kind === "occurrence" || (calendarEvent.kind === "timeBlock" && Boolean(calendarEvent.timeBlock.taskId));
     const canEditTime = calendarEvent.kind === "occurrence" || calendarEvent.kind === "timeBlock";
     const timeEditorStartLabel = formatTimeEditorMinutes(activeTimeEditorDraft.startMinutes);
-    const timeEditorEndLabel = formatTimeEditorMinutes(activeTimeEditorDraft.startMinutes + activeTimeEditorDraft.durationMinutes);
+    const timeEditorEndMinutes = Math.min(MAX_TIME_INPUT_MINUTES, activeTimeEditorDraft.startMinutes + activeTimeEditorDraft.durationMinutes);
+    const timeEditorEndLabel = formatTimeEditorMinutes(timeEditorEndMinutes);
     const commitTitle = async () => {
       const normalizedTitle = inspectorTitleDraft.trim();
 
@@ -3131,31 +3136,41 @@ export default function PlannerCalendarSurface({
                   <div className="planner-calendar-time-editor">
                     <div className="planner-calendar-time-editor-row">
                       <span>{language === "ru" ? "Начало" : "Start"}</span>
-                      <div>
-                        <button type="button" onClick={() => changeTimeEditorStart(-SNAP_MINUTES)} aria-label={language === "ru" ? "Раньше" : "Earlier"}>
-                          −
-                        </button>
-                        <strong>{timeEditorStartLabel}</strong>
-                        <button type="button" onClick={() => changeTimeEditorStart(SNAP_MINUTES)} aria-label={language === "ru" ? "Позже" : "Later"}>
-                          +
-                        </button>
-                      </div>
+                      <PlannerTimeField
+                        valueMinutes={activeTimeEditorDraft.startMinutes}
+                        language={language}
+                        ariaLabel={language === "ru" ? "Время начала" : "Start time"}
+                        minMinutes={0}
+                        maxMinutes={MAX_TIME_INPUT_START_MINUTES}
+                        onChange={setTimeEditorStart}
+                      />
                     </div>
                     <div className="planner-calendar-time-editor-row">
-                      <span>{language === "ru" ? "Длительность" : "Duration"}</span>
-                      <div>
-                        <button type="button" onClick={() => changeTimeEditorDuration(-SNAP_MINUTES)} aria-label={language === "ru" ? "Короче" : "Shorter"}>
-                          −
+                      <span>{language === "ru" ? "Конец" : "End"}</span>
+                      <PlannerTimeField
+                        valueMinutes={timeEditorEndMinutes}
+                        language={language}
+                        ariaLabel={language === "ru" ? "Время окончания" : "End time"}
+                        minMinutes={Math.min(MAX_TIME_INPUT_MINUTES, activeTimeEditorDraft.startMinutes + MIN_TIME_INPUT_DURATION_MINUTES)}
+                        maxMinutes={MAX_TIME_INPUT_MINUTES}
+                        onChange={setTimeEditorEnd}
+                      />
+                    </div>
+                    <div className="planner-calendar-time-editor-presets" aria-label={language === "ru" ? "Быстрая длительность" : "Quick duration"}>
+                      {QUICK_CREATE_DURATIONS.map((duration) => (
+                        <button
+                          key={duration}
+                          type="button"
+                          className={activeTimeEditorDraft.durationMinutes === duration ? "is-active" : ""}
+                          onClick={() => setTimeEditorEnd(Math.min(MAX_TIME_INPUT_MINUTES, activeTimeEditorDraft.startMinutes + duration))}
+                        >
+                          {formatDurationMinutes(duration, language)}
                         </button>
-                        <strong>{formatDurationMinutes(activeTimeEditorDraft.durationMinutes, language)}</strong>
-                        <button type="button" onClick={() => changeTimeEditorDuration(SNAP_MINUTES)} aria-label={language === "ru" ? "Дольше" : "Longer"}>
-                          +
-                        </button>
-                      </div>
+                      ))}
                     </div>
                     <div className="planner-calendar-time-editor-summary">
                       <span>
-                        {timeEditorStartLabel} - {timeEditorEndLabel}
+                        {timeEditorStartLabel} - {timeEditorEndLabel} · {formatDurationMinutes(activeTimeEditorDraft.durationMinutes, language)}
                       </span>
                       <button type="button" onClick={applyTimeEditor}>
                         {language === "ru" ? "Применить" : "Apply"}
@@ -3565,7 +3580,7 @@ export default function PlannerCalendarSurface({
                 ? "Планируй задачи как блоки времени: сроки остаются сроками, расписание становится видимым."
                 : "Plan tasks as time blocks: due dates stay due dates, scheduled work becomes visible."}
             </p>
-            {renderCalendarFilters()}
+            {!isMobile ? renderCalendarFilters() : null}
           </div>
 
           <div className="planner-calendar-head-actions">
@@ -3627,6 +3642,8 @@ export default function PlannerCalendarSurface({
               ×
             </button>
           </div>
+
+          {isMobile ? <div className="planner-calendar-mobile-filters">{renderCalendarFilters()}</div> : null}
         </header>
 
         <div className="planner-calendar-workspace">

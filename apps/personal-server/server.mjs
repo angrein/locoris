@@ -636,13 +636,13 @@ function renderSetupPage(config, registry) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Zen Sync Personal</title>
+    <title>Locoris Personal Sync</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="shell">
       <section class="hero">
-        <span class="eyebrow">Zen Sync Personal</span>
+        <span class="eyebrow">Locoris Personal Sync</span>
         <h1>Personal self-hosted sync for one owner with many vaults.</h1>
         <p>
           This runtime stays minimal and local-first, but it can now host multiple remote vaults on
@@ -728,7 +728,7 @@ const server = createServer(async (request, response) => {
     if (pathname === "/v1/capabilities" && request.method === "GET") {
       sendJson(response, 200, {
         mode: "personal",
-        product: "Zen Sync Personal",
+        product: "Locoris Personal Sync",
         features: {
           selfHosted: true,
           hostedAccounts: false,
@@ -1166,7 +1166,7 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Zen Sync Personal listening on http://localhost:${PORT}`);
+  console.log(`Locoris Personal Sync listening on http://localhost:${PORT}`);
   console.log(`Data dir: ${DATA_DIR}`);
   console.log(`Default vault: ${bootstrap.config.defaultVaultId || "none"}`);
   console.log(`Management token: ${bootstrap.config.managementToken}`);

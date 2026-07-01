@@ -3,6 +3,7 @@ import { readPersistentString, writePersistentString } from "./persistentClientS
 export type OrbitalAnimationMode = "full" | "reduced";
 export type OrbitalTemporalSignalsMode = "enabled" | "disabled";
 
+// Legacy preference keys. Rename only with a compatibility migration.
 export const ORBITAL_ANIMATION_MODE_STORAGE_KEY = "zen-notes.orbitalAnimationMode";
 export const ORBITAL_TEMPORAL_SIGNALS_STORAGE_KEY = "zen-notes.orbitalTemporalSignals";
 export const DEFAULT_ORBITAL_ANIMATION_MODE: OrbitalAnimationMode = "full";

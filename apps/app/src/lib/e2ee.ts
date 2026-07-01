@@ -13,6 +13,7 @@ const IV_LENGTH = 12;
 const ENCRYPTION_VERSION = 1 as const;
 const KDF = "pbkdf2-sha256" as const;
 const CIPHER: SyncEncryptionCipher = "aes-gcm-256";
+// Legacy key-check prefix. Changing it would break validation for existing private vaults.
 const KEY_CHECK_PREFIX = "zen-sync-key-check:v1";
 
 type DerivedKeyBundle = {

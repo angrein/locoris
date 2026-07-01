@@ -45,6 +45,7 @@
 
 .planner-date-selector-kicker,
 .planner-date-selector-time span,
+.planner-date-selector-time-presets,
 .planner-date-selector-repeat > span,
 .planner-date-selector-custom-repeat > span {
   color: color-mix(in srgb, var(--planner-date-emphasis) 50%, rgba(230, 239, 255, 0.7) 50%);
@@ -66,7 +67,6 @@
 
 .planner-date-selector-head > button,
 .planner-date-selector-monthbar button,
-.planner-date-selector-time button,
 .planner-date-selector-custom-repeat button,
 .planner-date-selector-actions button {
   display: inline-grid;
@@ -83,7 +83,6 @@
 
 .planner-date-selector-head > button:hover,
 .planner-date-selector-monthbar button:hover,
-.planner-date-selector-time button:hover,
 .planner-date-selector-custom-repeat button:hover,
 .planner-date-selector-actions button:hover {
   transform: translateY(-1px);
@@ -93,7 +92,8 @@
 
 .planner-date-selector-quick,
 .planner-date-selector-options,
-.planner-date-selector-repeat > div {
+.planner-date-selector-repeat > div,
+.planner-date-selector-time-presets {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
@@ -102,7 +102,8 @@
 
 .planner-date-selector-quick button,
 .planner-date-selector-options button,
-.planner-date-selector-repeat button {
+.planner-date-selector-repeat button,
+.planner-date-selector-time-presets button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -119,7 +120,8 @@
 
 .planner-date-selector-quick button.is-active,
 .planner-date-selector-options button.is-active,
-.planner-date-selector-repeat button.is-active {
+.planner-date-selector-repeat button.is-active,
+.planner-date-selector-time-presets button.is-active {
   border-color: color-mix(in srgb, var(--planner-date-accent) 52%, rgba(255, 255, 255, 0.16));
   background: color-mix(in srgb, var(--planner-date-accent) 18%, rgba(255, 255, 255, 0.06));
   color: #fff;
@@ -231,6 +233,18 @@
   border-bottom: 2px solid currentColor;
 }
 
+.planner-date-selector-time-block {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--planner-date-accent) 22%, rgba(255, 255, 255, 0.08));
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--planner-date-accent) 10%, transparent), transparent 58%),
+    rgba(255, 255, 255, 0.034);
+}
+
 .planner-date-selector-time {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -257,7 +271,7 @@
   gap: 6px;
 }
 
-.planner-date-selector-time > div {
+.planner-date-selector-time label {
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -267,14 +281,6 @@
   background: rgba(255, 255, 255, 0.034);
 }
 
-.planner-date-selector-time > div > div {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 34px;
-  align-items: center;
-  gap: 6px;
-}
-
-.planner-date-selector-time strong,
 .planner-date-selector-custom-repeat strong {
   display: inline-grid;
   place-items: center;

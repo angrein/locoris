@@ -310,6 +310,7 @@ interface PlannerHabitInspectorPanelProps {
   variant?: "aside" | "sheet";
   onClose?: () => void;
   onToggleToday: (habitId: string) => void;
+  onRename?: (summary: PlannerHabitSummary, title: string) => Promise<void> | void;
   onTogglePaused: (summary: PlannerHabitSummary) => void;
   onArchive: (summary: PlannerHabitSummary) => void;
   onDelete: (summary: PlannerHabitSummary) => void;
@@ -321,10 +322,37 @@ export function PlannerHabitInspectorPanel({
   variant = "aside",
   onClose,
   onToggleToday,
+  onRename,
   onTogglePaused,
   onArchive,
   onDelete
 }: PlannerHabitInspectorPanelProps) {
+  const [titleDraft, setTitleDraft] = useState(summary?.habit.title ?? "");
+
+  useEffect(() => {
+    setTitleDraft(summary?.habit.title ?? "");
+  }, [summary?.habit.id, summary?.habit.title]);
+
+  const commitTitle = () => {
+    if (!summary || !onRename) {
+      return;
+    }
+
+    const nextTitle = titleDraft.trim();
+
+    if (!nextTitle) {
+      setTitleDraft(summary.habit.title);
+      return;
+    }
+
+    if (nextTitle !== summary.habit.title) {
+      setTitleDraft(nextTitle);
+      void Promise.resolve(onRename(summary, nextTitle)).catch(() => setTitleDraft(summary.habit.title));
+    } else {
+      setTitleDraft(summary.habit.title);
+    }
+  };
+
   const content = summary ? (
     <>
       {variant === "sheet" ? <div className="planner-habit-mobile-sheet-handle" aria-hidden="true" /> : null}
@@ -332,7 +360,31 @@ export function PlannerHabitInspectorPanel({
         <div className="planner-habit-detail-head" style={{ "--planner-habit-color": summary.habit.color } as CSSProperties}>
           <span />
           <div>
-            <strong>{summary.habit.title}</strong>
+            {onRename ? (
+              <input
+                className="planner-habit-title-input"
+                type="text"
+                value={titleDraft}
+                onChange={(event) => setTitleDraft(event.target.value)}
+                onBlur={commitTitle}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
+
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setTitleDraft(summary.habit.title);
+                    event.currentTarget.blur();
+                  }
+                }}
+                aria-label={language === "ru" ? "Название привычки" : "Habit title"}
+                placeholder={language === "ru" ? "Название привычки" : "Habit title"}
+              />
+            ) : (
+              <strong>{summary.habit.title}</strong>
+            )}
             <em>{getPlannerHabitCadenceLabel(summary.habit.frequencyRule, language)}</em>
           </div>
           {variant === "sheet" ? (
@@ -733,6 +785,14 @@ export default function PlannerHabitsSurface({
     void handleDeleteHabitWithUndo(summary.habit);
   };
 
+  const handleRenameHabit = async (summary: PlannerHabitSummary, title: string) => {
+    await handleUpdateHabitWithUndo(
+      summary.habit,
+      { title },
+      language === "ru" ? "Привычка переименована" : "Habit renamed"
+    );
+  };
+
   const renderComposer = (variant: "inline" | "sheet") => (
     <form
       className={`planner-habit-composer is-${variant}`}
@@ -897,6 +957,7 @@ export default function PlannerHabitsSurface({
           summary={selectedSummary}
           language={language}
           onToggleToday={(habitId) => void handleToggleHabitToday(habitId)}
+          onRename={handleRenameHabit}
           onTogglePaused={handleToggleHabitPaused}
           onArchive={handleArchiveHabit}
           onDelete={handleDeleteHabitSummary}
@@ -918,33 +979,6 @@ export default function PlannerHabitsSurface({
         </div>
       ) : null}
 
-      {isMobile && selectedSummary ? (
-        <div
-          className="planner-habit-mobile-sheet-layer"
-          role="dialog"
-          aria-modal="true"
-          style={{ "--planner-keyboard-inset": `${keyboardInset}px` } as CSSProperties}
-        >
-          <button
-            type="button"
-            className="planner-habit-mobile-sheet-backdrop"
-            onClick={() => onSelectHabit(null)}
-            aria-label={language === "ru" ? "Закрыть" : "Close"}
-          />
-          <section key={selectedSummary.habit.id} className="planner-habit-mobile-detail-sheet">
-            <PlannerHabitInspectorPanel
-              summary={selectedSummary}
-              language={language}
-              variant="sheet"
-              onClose={() => onSelectHabit(null)}
-              onToggleToday={(habitId) => void handleToggleHabitToday(habitId)}
-              onTogglePaused={handleToggleHabitPaused}
-              onArchive={handleArchiveHabit}
-              onDelete={handleDeleteHabitSummary}
-            />
-          </section>
-        </div>
-      ) : null}
     </section>
   );
 }

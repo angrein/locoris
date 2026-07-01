@@ -126,8 +126,8 @@ import {
   primeRemoteVaultEncryptionMetadata,
   refreshGoogleDriveAccountSession,
   issueGoogleDriveVaultToken,
-  issueHostedVaultToken,
   issuePersonalServerVaultToken,
+  registerHostedVaultDevice,
   renameGoogleDriveVault,
   renameHostedVault,
   renamePersonalServerVault,
@@ -137,6 +137,7 @@ import { computePendingSyncSummaryFromDirtyEntries } from "./lib/syncStatus";
 import {
   clearSyncBinding,
   createSyncConnection,
+  initializeSecureSyncRegistryState,
   listSyncBindings,
   listSyncConnections,
   migrateSyncRegistryFromLegacyVaultSettings,
@@ -185,6 +186,7 @@ import type {
   SyncConnection,
   SyncConnectionProvider,
   SyncEncryptionDescriptor,
+  SyncVaultBinding,
   VaultEncryptionSummary
 } from "./types";
 
@@ -222,6 +224,38 @@ function useOnlineStatus() {
   }, []);
 
   return online;
+}
+
+function getHostedDevicePlatform() {
+  const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
+
+  if (/android/i.test(userAgent)) {
+    return "Android";
+  }
+
+  if (/iphone|ipad|ipod/i.test(userAgent)) {
+    return "iOS";
+  }
+
+  if (/macintosh|mac os x/i.test(userAgent)) {
+    return "macOS";
+  }
+
+  if (/windows/i.test(userAgent)) {
+    return "Windows";
+  }
+
+  if (/linux/i.test(userAgent)) {
+    return "Linux";
+  }
+
+  return "Locoris app";
+}
+
+function getHostedDeviceName(settings: AppSettings) {
+  const shortDeviceId = settings.localDeviceId.replace(/^device-/, "").slice(0, 6);
+
+  return `${getHostedDevicePlatform()} · ${shortDeviceId || "device"}`;
 }
 
 export default function App() {
@@ -404,6 +438,22 @@ export default function App() {
     setSyncConnections(listSyncConnections());
     setSyncBindings(listSyncBindings());
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void initializeSecureSyncRegistryState()
+      .then(() => {
+        if (!cancelled) {
+          refreshSyncRegistryState();
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     refreshSyncRegistryState();
@@ -783,6 +833,22 @@ export default function App() {
           return provider === "hosted"
             ? t("sync.hostedUnauthorized")
             : t("sync.unauthorized");
+        case "PLAN_REQUIRED":
+          return t("sync.cloudPlanRequired");
+        case "TRIAL_EXPIRED":
+          return t("sync.cloudTrialExpired");
+        case "SUBSCRIPTION_PAST_DUE":
+          return t("sync.cloudSubscriptionPastDue");
+        case "SUBSCRIPTION_EXPIRED_READ_ONLY":
+          return t("sync.cloudReadOnly");
+        case "OVER_STORAGE_LIMIT":
+          return t("sync.cloudStorageLimit");
+        case "OVER_VAULT_LIMIT":
+          return t("sync.cloudVaultLimit");
+        case "OVER_DEVICE_LIMIT":
+          return t("sync.cloudDeviceLimit");
+        case "PAYLOAD_TOO_LARGE":
+          return t("sync.cloudPayloadTooLarge");
         case "VAULT_NOT_FOUND":
           return t("sync.vaultNotFound");
         case "LAST_VAULT_REQUIRED":
@@ -1223,13 +1289,18 @@ export default function App() {
     async (
       localVaultId: string,
       {
-        showFeedback = false
+        showFeedback = false,
+        bindingOverride,
+        connectionOverride
       }: {
         showFeedback?: boolean;
+        bindingOverride?: SyncVaultBinding;
+        connectionOverride?: SyncConnection;
       } = {}
     ) => {
-      const binding = syncBindingsByVaultId.get(localVaultId) ?? null;
-      const connection = binding ? syncConnectionsById.get(binding.connectionId) ?? null : null;
+      const binding = bindingOverride ?? syncBindingsByVaultId.get(localVaultId) ?? null;
+      const connection =
+        connectionOverride ?? (binding ? syncConnectionsById.get(binding.connectionId) ?? null : null);
       const isActiveVaultSync = localVaultId === activeLocalVaultId;
 
       if (!binding || !connection) {
@@ -2890,11 +2961,19 @@ export default function App() {
     }
 
     if (connection.provider === "hosted") {
-      const response = await issueHostedVaultToken(
+      if (!settings) {
+        throw new Error("APP_SETTINGS_NOT_READY");
+      }
+
+      const response = await registerHostedVaultDevice(
         connection.serverUrl,
         connection.sessionToken,
         remoteVaultId,
-        label
+        {
+          deviceName: getHostedDeviceName(settings),
+          deviceId: settings.localDeviceId,
+          clientPlatform: getHostedDevicePlatform()
+        }
       );
 
       return {
@@ -2997,6 +3076,71 @@ export default function App() {
       successMessage: t("sync.bindingUpdated"),
       scheduleSync: true
     });
+  };
+
+  const handleRefreshHostedConnectionCredentials = async (connection: SyncConnection) => {
+    if (connection.provider !== "hosted") {
+      return;
+    }
+
+    if (!settings) {
+      throw new Error("APP_SETTINGS_NOT_READY");
+    }
+
+    const hostedBindings = syncBindings.filter((binding) => binding.connectionId === connection.id);
+
+    if (hostedBindings.length === 0) {
+      return;
+    }
+
+    const refreshedBindings: SyncVaultBinding[] = [];
+
+    for (const binding of hostedBindings) {
+      const response = await registerHostedVaultDevice(
+        connection.serverUrl,
+        connection.sessionToken,
+        binding.remoteVaultId,
+        {
+          deviceName: getHostedDeviceName(settings),
+          deviceId: settings.localDeviceId,
+          clientPlatform: getHostedDevicePlatform()
+        }
+      );
+      const refreshedBinding = {
+        ...binding,
+        syncToken: response.token,
+        syncStatus: "idle",
+        lastError: null,
+        updatedAt: Date.now()
+      } satisfies SyncVaultBinding;
+
+      await applyVaultBinding(
+        {
+          localVaultId: binding.localVaultId,
+          connectionId: binding.connectionId,
+          remoteVaultId: binding.remoteVaultId,
+          remoteVaultName: binding.remoteVaultName,
+          syncToken: response.token
+        },
+        {
+          resetLocalSyncState: false,
+          keepBindingMetadata: true,
+          successMessage: null,
+          scheduleSync: false
+        }
+      );
+
+      if (binding.lastError || binding.syncStatus === "error") {
+        refreshedBindings.push(refreshedBinding);
+      }
+    }
+
+    for (const binding of refreshedBindings) {
+      await runBoundVaultSync(binding.localVaultId, {
+        bindingOverride: binding,
+        connectionOverride: connection
+      });
+    }
   };
 
   const handleImportRemoteVault = async (input: {
@@ -3708,6 +3852,7 @@ export default function App() {
             onCreateConnection={handleCreateSyncConnection}
             onDeleteConnection={(connectionId) => void handleDeleteSyncConnection(connectionId)}
             onUpdateConnection={handleUpdateSyncConnection}
+            onRefreshHostedConnectionCredentials={handleRefreshHostedConnectionCredentials}
             onBindVault={(input) => void handleBindVaultToConnection(input)}
             onImportRemoteVault={(input) => handleImportRemoteVault(input)}
             onDeleteRemoteVault={(input) => handleDeleteRemoteVault(input)}

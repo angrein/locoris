@@ -28,9 +28,11 @@ export interface PlannerTaskDateDraft {
 
 export const DEFAULT_PLANNER_START_TIME_MINUTES = 9 * 60;
 export const DEFAULT_PLANNER_END_TIME_MINUTES = 10 * 60;
+const MIN_TIMED_TASK_DURATION_MINUTES = 15;
+const MAX_PLANNER_TIME_MINUTES = 23 * 60 + 59;
 
-function clampTimeMinutes(value: number) {
-  return Math.max(0, Math.min(23 * 60 + 45, Math.round(value / 15) * 15));
+function clampTimeMinutes(value: number, max = MAX_PLANNER_TIME_MINUTES) {
+  return Math.max(0, Math.min(max, Math.round(value)));
 }
 
 function getMinutesOfDay(value: number | null | undefined, fallback: number) {
@@ -73,7 +75,7 @@ export function getPlannerTaskDateDraft(task: Task | null | undefined): PlannerT
   const startTimeMinutes = getMinutesOfDay(task?.scheduledStartAt, DEFAULT_PLANNER_START_TIME_MINUTES);
   const fallbackEndMinutes = Math.max(startTimeMinutes + 45, DEFAULT_PLANNER_END_TIME_MINUTES);
   const endTimeMinutes = Math.max(
-    startTimeMinutes + 15,
+    startTimeMinutes + MIN_TIMED_TASK_DURATION_MINUTES,
     getMinutesOfDay(task?.scheduledEndAt, fallbackEndMinutes)
   );
 
@@ -126,8 +128,8 @@ export function normalizePlannerTaskDateDraft(draft: PlannerTaskDateDraft): Plan
   const startDateAt = draft.startDateAt ? getStartOfLocalDay(draft.startDateAt) : null;
   const rawEndDateAt = draft.endDateAt ? getStartOfLocalDay(draft.endDateAt) : null;
   const endDateAt = startDateAt && rawEndDateAt && rawEndDateAt > startDateAt ? rawEndDateAt : null;
-  const startTimeMinutes = clampTimeMinutes(draft.startTimeMinutes);
-  const endTimeMinutes = Math.max(startTimeMinutes + 15, clampTimeMinutes(draft.endTimeMinutes));
+  const startTimeMinutes = clampTimeMinutes(draft.startTimeMinutes, MAX_PLANNER_TIME_MINUTES - MIN_TIMED_TASK_DURATION_MINUTES);
+  const endTimeMinutes = Math.max(startTimeMinutes + MIN_TIMED_TASK_DURATION_MINUTES, clampTimeMinutes(draft.endTimeMinutes));
   const repeatIntervalDays = Math.max(2, Math.min(365, Math.round(draft.repeatIntervalDays || 2)));
 
   return {
@@ -201,7 +203,7 @@ export function buildPlannerTaskScheduleFields(
   const scheduledEndAt = scheduledStartAt
     ? addPlannerMinutesToDay(
         shouldCreateDateRange ? draft.endDateAt ?? draft.startDateAt : draft.startDateAt,
-        draft.hasTime ? draft.endTimeMinutes : 23 * 60 + 45
+        draft.hasTime ? draft.endTimeMinutes : MAX_PLANNER_TIME_MINUTES
       )
     : null;
   const dueAt = scheduledStartAt ? null : draft.startDateAt;
@@ -231,7 +233,7 @@ export function buildPlannerTaskScheduleFields(
     recurrenceOverrides: [],
     estimateMinutes:
       scheduledStartAt && scheduledEndAt && draft.hasTime
-        ? Math.max(15, Math.round((scheduledEndAt - scheduledStartAt) / 60_000))
+        ? Math.max(MIN_TIMED_TASK_DURATION_MINUTES, Math.round((scheduledEndAt - scheduledStartAt) / 60_000))
         : null,
     status: scheduledStartAt && (baseStatus === "inbox" || baseStatus === "todo") ? "scheduled" : baseStatus
   };

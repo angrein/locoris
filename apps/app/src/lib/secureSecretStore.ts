@@ -19,6 +19,7 @@ import type {
 const secureSecretCache = new Map<string, string>();
 const loadedSecureSecretKeys = new Set<string>();
 const secureSecretListeners = new Set<() => void>();
+// Legacy fallback prefix. Native secure storage should remain preferred when available.
 const SECURE_SECRET_FALLBACK_PREFIX = "zen-notes.secure-secret-fallback:";
 
 export const APP_SETTINGS_SECRET_FIELDS = [
@@ -50,7 +51,19 @@ function buildSecureSecretFallbackKey(key: string) {
 }
 
 function canUseDesktopSecretFallback() {
-  return isDesktopPersistentStorageActive();
+  if (isDesktopPersistentStorageActive()) {
+    return true;
+  }
+
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return typeof window.localStorage !== "undefined";
+  } catch {
+    return false;
+  }
 }
 
 function readDesktopSecretFallback(key: string) {

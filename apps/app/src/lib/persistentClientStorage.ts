@@ -1,6 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 
 const STORE_FILE_NAME = "settings/locoris-client.store.json";
+// Legacy Locoris client storage prefixes kept for existing installations.
 const MIGRATION_PREFIXES = ["zen-notes.", "zen:"];
 
 const memoryStorage = new Map<string, string>();

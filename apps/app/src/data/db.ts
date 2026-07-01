@@ -703,7 +703,7 @@ function buildSyncDirtyEntriesFromState(input: {
 }
 
 export async function rebuildSyncDirtyEntriesFromCurrentState(
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   const [projects, folders, tags, notes, assets, tasks, habits, habitLogs, goals, timeBlocks, shadows, tombstones] =
     await Promise.all([
@@ -746,7 +746,7 @@ export async function rebuildSyncDirtyEntriesFromCurrentState(
   return dirtyEntries;
 }
 
-export class ZenNotesDatabase extends Dexie {
+export class LocorisDatabase extends Dexie {
   projects!: EntityTable<Project, "id">;
   folders!: EntityTable<Folder, "id">;
   tags!: EntityTable<Tag, "id">;
@@ -1221,7 +1221,7 @@ export class ZenNotesDatabase extends Dexie {
 }
 
 function createDatabaseForLocalVault(localVaultId: string) {
-  return new ZenNotesDatabase(buildLocalVaultDatabaseName(localVaultId));
+  return new LocorisDatabase(buildLocalVaultDatabaseName(localVaultId));
 }
 
 export let db = createDatabaseForLocalVault(getStoredActiveLocalVaultId());
@@ -1233,7 +1233,7 @@ export function switchActiveLocalVaultDatabase(localVaultId: string) {
 
 export async function withLocalVaultDatabase<T>(
   localVaultId: string,
-  callback: (database: ZenNotesDatabase) => Promise<T>
+  callback: (database: LocorisDatabase) => Promise<T>
 ) {
   const activeLocalVaultId = getStoredActiveLocalVaultId();
   const isActive = localVaultId === activeLocalVaultId;

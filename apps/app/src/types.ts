@@ -427,6 +427,22 @@ export interface HostedAccountVault {
   lastRevision: string | null;
   lastSyncAt: number | null;
   tokenCount: number;
+  deviceCount?: number;
+}
+
+export interface HostedAccountDevice {
+  id: string;
+  credentialId: string;
+  vaultId: string;
+  vaultName: string;
+  deviceId: string | null;
+  deviceName: string;
+  clientPlatform: string | null;
+  createdAt: number;
+  lastUsedAt: number | null;
+  revokedAt: number | null;
+  expiresAt: number | null;
+  active: boolean;
 }
 
 export interface SyncShadow {

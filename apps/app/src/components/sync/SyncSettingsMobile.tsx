@@ -797,7 +797,9 @@ export default function SyncSettingsMobile({
         vault: localVaults.find((vault) => vault.id === binding.localVaultId) ?? null
       }));
     const canRepair =
-      (detailConnection.provider === "selfHosted" || detailConnection.provider === "googleDrive") &&
+      (detailConnection.provider === "selfHosted" ||
+        detailConnection.provider === "hosted" ||
+        detailConnection.provider === "googleDrive") &&
       availability === "authError";
 
     return (
@@ -841,6 +843,8 @@ export default function SyncSettingsMobile({
                   <button type="button" className="sync-mobile-primary-action" disabled={busyKey !== null} onClick={() => void onRepairConnection(detailConnection)}>
                     {detailConnection.provider === "googleDrive"
                       ? t("settings.googleDriveReconnect")
+                      : detailConnection.provider === "hosted"
+                        ? t("settings.hostedReconnect")
                       : t("settings.selfHostedReconnect")}
                   </button>
                 ) : null}
@@ -918,6 +922,8 @@ export default function SyncSettingsMobile({
                     <button type="button" className="sync-mobile-secondary-action" disabled={busyKey !== null} onClick={() => void onRepairConnection(detailConnection)}>
                       {detailConnection.provider === "googleDrive"
                         ? t("settings.googleDriveReconnect")
+                        : detailConnection.provider === "hosted"
+                          ? t("settings.hostedReconnect")
                         : t("settings.selfHostedReconnect")}
                     </button>
                   ) : null}

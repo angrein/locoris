@@ -646,8 +646,11 @@
 
 .planner-task-panel.is-mobile-sheet {
   width: min(100%, 620px);
-  max-height: calc(100% - 28px);
-  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  max-height: 100%;
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 16px;
   border-radius: 24px;
 }
 

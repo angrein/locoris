@@ -1,43 +1,74 @@
 # Locoris
 
-Locoris is an offline-first knowledge workspace with an orbital map interface.
+Locoris is a local-first workspace for structured knowledge, visual thinking, planning, and private sync.
 
-## Repositories
+It combines:
 
-This repository is the public product surface:
+- rich notes;
+- canvas documents;
+- orbital map navigation;
+- projects, folders, tags, and backlinks;
+- planner, calendar, recurring tasks, habits, goals, and review;
+- AI tools for editor and canvas workflows;
+- readable backups and exports;
+- Locoris Cloud, self-hosted sync, and Google Drive sync;
+- client-side encrypted sync for private/encrypted vault flows.
 
-- web client
-- future native shell entrypoint
-- personal self-hosted sync server
-- shared sync core used by the public runtimes
-
-The managed cloud runtime lives in a separate private repository.
+The app must remain useful without an account. Hosted cloud is the convenience layer, not the owner of the user's local data.
 
 ## Workspace Layout
 
 ```text
 apps/
-  app/               # Locoris web app
-  personal-server/   # free self-hosted server
+  app/               # Locoris app: web, desktop through Tauri, Android through Tauri
+  personal-server/   # self-hosted personal sync runtime
+  site/              # premium marketing website
 
 packages/
-  sync-core/         # shared sync protocol/runtime helpers
+  sync-core/         # public sync helpers shared by public runtimes
 
 docs/
-  architecture/
-  design/
-  setup/
-
-infra/
-  docker/
+  product/           # current product, sync, privacy, and export docs
+  setup/             # setup, development, and release notes
 ```
 
-## Local Run
+The managed hosted cloud runtime lives in the separate private `locoris-cloud` repository.
+
+## Product Docs
+
+- [Product overview](docs/product/overview.md)
+- [Sync](docs/product/sync.md)
+- [Client-side encryption](docs/product/e2ee.md)
+- [Backups and export](docs/product/backups-and-export.md)
+- [Glossary](docs/product/glossary.md)
+- [Security terminology](docs/product/security-terminology.md)
+- [Storage compatibility](docs/product/storage-compatibility.md)
+
+## Local App
 
 ```bash
 npm install
 npm run dev
 ```
+
+Useful checks:
+
+```bash
+npm run typecheck
+npm run build
+git diff --check
+```
+
+## Marketing Site
+
+```bash
+npm run site:dev
+npm run site:build
+```
+
+Site media slots live in:
+
+- [apps/site/public/media](apps/site/public/media)
 
 ## Personal Sync Server
 
@@ -51,29 +82,26 @@ By default the personal server stores runtime data in an OS-appropriate app data
 - Windows: `%LOCALAPPDATA%\\Locoris\\Personal Server`
 - Linux: `$XDG_DATA_HOME/locoris/personal-server` or `~/.local/share/locoris/personal-server`
 
-Override it with `SYNC_DATA_DIR=/absolute/path`.
+Override it with:
+
+```bash
+SYNC_DATA_DIR=/absolute/path
+```
 
 ## Google Drive Setup
 
 Google Drive sync stores remote vaults in the hidden `appDataFolder`.
 
-1. Copy the env template:
-
-```bash
-cp apps/app/.env.example apps/app/.env
-```
-
-2. Set your Google OAuth client ids in `apps/app/.env`:
-
-```env
-VITE_GOOGLE_DRIVE_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
-VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID=your-desktop-client-id.apps.googleusercontent.com
-```
-
-Desktop builds prefer `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID` and fall back to `VITE_GOOGLE_DRIVE_CLIENT_ID` if needed.
-
-3. Start the app and connect Google Drive from `Settings → Synchronization → Add connection → Google Drive`.
-
 Detailed guide:
 
 - [docs/setup/google-drive.md](docs/setup/google-drive.md)
+
+## Desktop And Android
+
+Locoris uses Tauri 2 for desktop and Android builds.
+
+Useful docs:
+
+- [Desktop development](docs/setup/desktop-development.md)
+- [Desktop data lifecycle](docs/setup/desktop-data-lifecycle.md)
+- [Release flow](docs/setup/desktop-release.md)

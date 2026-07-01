@@ -656,6 +656,14 @@ const en = {
     hostedLoggedOut: "Hosted account signed out on this device.",
     hostedVaultCreated: "Hosted vault created.",
     hostedVaultBound: "Local vault bound to the hosted vault.",
+    cloudPlanRequired: "An active Locoris Cloud plan is required for this action.",
+    cloudTrialExpired: "Your Locoris Cloud trial has expired. Sign in and update the plan to continue syncing.",
+    cloudSubscriptionPastDue: "Cloud payment is past due. Update the plan to resume sync.",
+    cloudReadOnly: "Cloud sync is read-only until the subscription is restored.",
+    cloudStorageLimit: "Cloud storage limit reached. Free space or upgrade the plan.",
+    cloudVaultLimit: "Cloud vault limit reached for the current plan.",
+    cloudDeviceLimit: "Cloud device limit reached. Disconnect an old device or upgrade the plan.",
+    cloudPayloadTooLarge: "This sync payload is larger than the current plan allows.",
     selfHostedVaultCreated: "Remote vault created on the self-hosted server.",
     selfHostedVaultBound: "Local vault bound to the self-hosted remote vault.",
     selfHostedManageFailed:
@@ -1142,7 +1150,12 @@ const en = {
     connectionCatalogDescription:
       "Choose which sync path to add. Cloud is single-instance, self-hosted can be added many times, and Google Drive stores vaults in a hidden app folder.",
     hostedConnectionTitle: "Connect cloud",
-    hostedConnectionDescription: "Managed account-based sync for your hosted Zen space.",
+    hostedConnectionDescription: "Managed account-based sync for your hosted Locoris space.",
+    hostedReconnect: "Sign in again",
+    hostedReconnectSave: "Update sign-in",
+    hostedReconnectSuccess: "Cloud sign-in updated.",
+    hostedReconnectDescription:
+      "Sign in again to refresh this cloud sync method without deleting its vault bindings.",
     selfHostedConnectionTitle: "Connect self-hosted server",
     selfHostedConnectionDescription: "Single-user personal server with multi-vault support.",
     selfHostedReconnectTitle: "Refresh self-hosted access",

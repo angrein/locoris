@@ -48,7 +48,7 @@ import {
   resetResolvedAssetCache,
   withLocalVaultDatabase,
   writeImportedVaultSnapshot,
-  type ZenNotesDatabase
+  type LocorisDatabase
 } from "../data/db";
 import type {
   AppLanguage,
@@ -60,6 +60,7 @@ import type {
   HabitLog,
   HostedAccountSession,
   HostedAccountUser,
+  HostedAccountDevice,
   HostedAccountVault,
   Note,
   Project,
@@ -271,7 +272,7 @@ function buildEncryptionDescriptorFromSettings(settings: AppSettings): SyncEncry
 
 async function hydrateVaultEncryptionFromMetadata(
   metadata: SyncEnvelopeMetadata | null | undefined,
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   if (metadata?.payloadMode !== "encrypted" || !metadata.encryption) {
     return;
@@ -298,7 +299,7 @@ async function hydrateVaultEncryptionFromMetadata(
 async function resolveRemoteEnvelopeRecord(
   envelope: RemoteEnvelopeRecord,
   remote: RemoteSyncConfig,
-  database: ZenNotesDatabase = db,
+  database: LocorisDatabase = db,
   options?: ResolveRemoteEnvelopeOptions
 ): Promise<ResolvedRemoteEnvelope> {
   const metadata = envelope.metadata ?? createPlainSyncDescriptor(buildRemoteVaultDescriptor(remote));
@@ -1758,11 +1759,15 @@ export async function renameHostedVault(
   });
 }
 
-export async function issueHostedVaultToken(
+export async function registerHostedVaultDevice(
   serverUrl: string,
   sessionToken: string,
   vaultId: string,
-  label: string
+  payload: {
+    deviceName: string;
+    deviceId?: string | null;
+    clientPlatform?: string | null;
+  }
 ) {
   return requestJson<{
     token: string;
@@ -1770,15 +1775,17 @@ export async function issueHostedVaultToken(
       id: string;
       vaultId: string;
       label: string;
+      deviceId: string | null;
+      deviceName: string;
+      clientPlatform: string | null;
       createdAt: number;
       lastUsedAt: number | null;
     };
-  }>(buildAccountUrl(serverUrl, `/v1/account/vaults/${encodeURIComponent(vaultId)}/tokens`), {
+    device: HostedAccountDevice;
+  }>(buildAccountUrl(serverUrl, `/v1/account/vaults/${encodeURIComponent(vaultId)}/devices/register`), {
     method: "POST",
     headers: createBearerHeaders(sessionToken, true),
-    body: JSON.stringify({
-      label
-    })
+    body: JSON.stringify(payload)
   });
 }
 
@@ -2305,7 +2312,7 @@ export async function migrateRemoteVaultEncryption(
         mode: "disable";
         currentPassphrase: string;
       },
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   const settings = await database.settings.get("app");
 
@@ -2382,7 +2389,7 @@ export async function migrateRemoteVaultEncryption(
   throw new Error("SYNC_REVISION_CONFLICT");
 }
 
-export async function exportLocalSyncSnapshot(database: ZenNotesDatabase = db): Promise<SyncSnapshot> {
+export async function exportLocalSyncSnapshot(database: LocorisDatabase = db): Promise<SyncSnapshot> {
   const [projects, folders, tags, notes, assets, tasks, habits, habitLogs, goals, timeBlocks, settings, tombstones] =
     await Promise.all([
       database.projects.toArray(),
@@ -3066,7 +3073,7 @@ function mergeSnapshots(
 async function replaceLocalDataFromSnapshot(
   snapshot: SyncSnapshot,
   settings: AppSettings,
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   const normalizedSnapshot = normalizeSyncSnapshotPayload(snapshot, settings.localDeviceId);
   const notes = sortById(normalizedSnapshot.notes).map((note) => hydrateNote(note));
@@ -3160,7 +3167,7 @@ async function replaceLocalDataFromSnapshot(
 
 async function applySyncChangeSetToLocalData(
   changeSet: SyncChangeSet,
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   if (isChangeSetEmpty(changeSet)) {
     return;
@@ -3345,7 +3352,7 @@ async function applySyncChangeSetToLocalData(
 async function persistSyncShadows(
   snapshot: SyncSnapshot,
   revision: string | null,
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   const syncedAt = Date.now();
   const shadows = buildShadowEntries(snapshot, syncedAt, revision);
@@ -3362,7 +3369,7 @@ async function persistSyncShadows(
 async function persistSyncShadowChanges(
   changeSet: SyncChangeSet,
   revision: string | null,
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   if (isChangeSetEmpty(changeSet)) {
     return;
@@ -3379,7 +3386,7 @@ async function persistSyncShadowChanges(
 
 async function clearSyncDirtyEntriesByKeys(
   keys: readonly string[],
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   if (keys.length === 0) {
     return;
@@ -3447,7 +3454,7 @@ async function runSnapshotSyncCycle(
     provider?: "selfHosted" | "hosted";
   },
   providedEnvelope?: RemoteEnvelopeRecord | null,
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   const remoteConfig = {
     provider: options?.provider ?? "selfHosted",
@@ -3515,7 +3522,7 @@ async function runGoogleDriveSyncCycle(
     localVaultName?: string | null;
   },
   providedEnvelope?: RemoteEnvelopeRecord | null,
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   const remoteConfig = {
     provider: "googleDrive" as const,
@@ -3614,7 +3621,7 @@ async function runGoogleDriveDeltaSyncCycle(
     localVaultId?: string | null;
     localVaultName?: string | null;
   },
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   let [settings, shadows] = await Promise.all([
     database.settings.get("app"),
@@ -3847,7 +3854,7 @@ async function runDeltaSyncCycle(
     localVaultName?: string | null;
     provider?: "selfHosted" | "hosted";
   },
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ) {
   let [settings, shadows] = await Promise.all([
     database.settings.get("app"),
@@ -4049,7 +4056,7 @@ async function runConfiguredSyncInternal(
     onStatusChange?: (status: SyncStatus) => Promise<void> | void;
     localPendingCount?: number;
   },
-  database: ZenNotesDatabase = db
+  database: LocorisDatabase = db
 ): Promise<SyncExecutionResult> {
   const serverUrl = normalizeBaseUrl(remote.serverUrl);
   const vaultId = normalizeVaultId(remote.vaultId);

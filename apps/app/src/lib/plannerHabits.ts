@@ -147,12 +147,20 @@ function createHabitRule(habit: Habit) {
 }
 
 export function isPlannerHabitPausedOnDay(habit: Habit, dayAt: number) {
-  if (habit.status === "paused") {
-    return true;
+  const { startAt } = getDayRange(dayAt);
+  const ranges = habit.pauseRanges ?? [];
+
+  if (habit.status === "paused" && ranges.every((range) => range.endAt !== null)) {
+    const pausedFrom = habit.pausedAt ?? ranges.at(-1)?.startAt ?? habit.updatedAt;
+    return getStartOfLocalDay(pausedFrom) <= startAt;
   }
 
-  const { startAt, endAt } = getDayRange(dayAt);
-  return (habit.pauseRanges ?? []).some((range) => range.startAt <= endAt && (range.endAt ?? Number.POSITIVE_INFINITY) >= startAt);
+  return ranges.some((range) => {
+    const rangeStartDay = getStartOfLocalDay(range.startAt);
+    const rangeEndDay = range.endAt === null ? Number.POSITIVE_INFINITY : getStartOfLocalDay(range.endAt);
+
+    return rangeStartDay <= startAt && rangeEndDay > startAt;
+  });
 }
 
 export function isPlannerHabitDueOnDay(habit: Habit, dayAt: number) {

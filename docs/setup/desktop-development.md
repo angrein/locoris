@@ -12,8 +12,7 @@
 
 - macOS
 - Windows
-
-Android stays in the same codebase path later, but is not part of the first desktop phase.
+- Android through the Tauri Android target
 
 ## Prerequisites
 
@@ -37,7 +36,6 @@ Android stays in the same codebase path later, but is not part of the first desk
 From repo root:
 
 ```bash
-cd /Users/dzen/bots/locoris
 npm run desktop:info
 npm run desktop:dev
 npm run desktop:build:debug
@@ -46,7 +44,7 @@ npm run desktop:build:debug
 Or directly from app workspace:
 
 ```bash
-cd /Users/dzen/bots/locoris/apps/app
+cd apps/app
 npm run desktop:info
 npm run desktop:dev
 npm run desktop:build:debug
@@ -58,10 +56,8 @@ npm run desktop:build:debug
 - `desktop:build` runs the web build first and then bundles the desktop app.
 - Tauri config lives in `apps/app/src-tauri/tauri.conf.json`.
 - The bundle identifier is `com.locoris.app`.
-
-## Next integration steps
-
-1. Replace browser-only storage for vault/sync registries with a native desktop-backed store.
-2. Add a native Google OAuth callback flow through the system browser and local loopback listener.
-3. Move sensitive secrets to a native secure storage strategy.
-4. Add updater, signing and notarization for release builds.
+- Desktop and Android share the same React application surface.
+- Desktop runtime state is separated from the bundled app and documented in [desktop-data-lifecycle.md](desktop-data-lifecycle.md).
+- Google Drive desktop OAuth uses a native flow through the system browser and local loopback callback.
+- Sensitive sync secrets should use native secure storage when available and a compatibility fallback only when necessary.
+- Release signing/notarization is separate from Tauri updater signing.

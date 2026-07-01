@@ -20,6 +20,7 @@ import {
   writePersistentString
 } from "./persistentClientStorage";
 
+// Legacy storage key. Rename only with a migration that preserves existing sync bindings.
 const SYNC_REGISTRY_STORAGE_KEY = "zen-notes.sync-registry";
 const SYNC_REGISTRY_VERSION = 1;
 
@@ -184,7 +185,7 @@ function buildConnectionLabel(provider: SyncConnectionProvider, serverUrl: strin
     const hostname = new URL(serverUrl).hostname;
 
     if (provider === "hosted") {
-      return `Zen Cloud · ${hostname}`;
+      return `Locoris Cloud · ${hostname}`;
     }
 
     if (provider === "selfHosted") {
@@ -193,7 +194,7 @@ function buildConnectionLabel(provider: SyncConnectionProvider, serverUrl: strin
 
     return `Google Drive · ${hostname}`;
   } catch {
-    return provider === "hosted" ? "Zen Cloud" : provider === "selfHosted" ? "Self-hosted" : "Google Drive";
+    return provider === "hosted" ? "Locoris Cloud" : provider === "selfHosted" ? "Self-hosted" : "Google Drive";
   }
 }
 

@@ -93,7 +93,6 @@ Locoris release workflows inject these variables into Vite at build time. If eit
 ### Web
 
 ```bash
-cd /Users/dzen/bots/locoris
 npm install
 npm run dev
 ```
@@ -101,7 +100,6 @@ npm run dev
 ### Desktop
 
 ```bash
-cd /Users/dzen/bots/locoris
 npm install
 npm run desktop:dev
 ```

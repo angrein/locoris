@@ -4987,7 +4987,7 @@ button {
     radial-gradient(circle at 54% 100%, rgba(209, 137, 255, 0.09), transparent 28%);
 }
 
-.app-reborn .zen-topbar {
+.app-reborn .locoris-topbar {
   position: sticky;
   top: 0;
   z-index: 9;
@@ -5006,23 +5006,23 @@ button {
   box-shadow: 0 20px 50px rgba(5, 6, 18, 0.26);
 }
 
-.app-reborn .zen-topbar-main {
+.app-reborn .locoris-topbar-main {
   min-width: 0;
   display: grid;
   gap: 12px;
 }
 
-.app-reborn .zen-brand {
+.app-reborn .locoris-brand {
   display: grid;
   gap: 8px;
 }
 
-.app-reborn .zen-brand-copy {
+.app-reborn .locoris-brand-copy {
   display: grid;
   gap: 8px;
 }
 
-.app-reborn .zen-brand-copy h1 {
+.app-reborn .locoris-brand-copy h1 {
   margin: 0;
   font-family: var(--font-ui-display);
   font-size: clamp(1.28rem, 1.8vw, 2rem);
@@ -5030,7 +5030,7 @@ button {
   text-transform: uppercase;
 }
 
-.app-reborn .zen-brand-tagline {
+.app-reborn .locoris-brand-tagline {
   margin: 0;
   max-width: 860px;
   color: var(--text-dim);
@@ -5038,44 +5038,44 @@ button {
   line-height: 1.65;
 }
 
-.app-reborn .zen-context-strip {
+.app-reborn .locoris-context-strip {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.app-reborn .zen-context-chip {
+.app-reborn .locoris-context-chip {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.app-reborn .zen-topbar-actions {
+.app-reborn .locoris-topbar-actions {
   display: grid;
   gap: 10px;
   justify-items: end;
 }
 
-.app-reborn .zen-status-group,
-.app-reborn .zen-quick-actions {
+.app-reborn .locoris-status-group,
+.app-reborn .locoris-quick-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
 }
 
-.app-reborn .zen-quick-actions .toolbar-action,
-.app-reborn .zen-quick-actions .primary-action {
+.app-reborn .locoris-quick-actions .toolbar-action,
+.app-reborn .locoris-quick-actions .primary-action {
   min-height: 44px;
 }
 
-.app-reborn .zen-secondary-cta {
+.app-reborn .locoris-secondary-cta {
   padding-inline: 14px;
 }
 
-.app-reborn .zen-primary-cta {
+.app-reborn .locoris-primary-cta {
   min-width: 154px;
 }
 
-.app-reborn .zen-workbench {
+.app-reborn .locoris-workbench {
   display: grid;
   grid-template-columns: minmax(292px, 340px) minmax(360px, 430px) minmax(0, 1fr);
   gap: 14px;
@@ -5083,13 +5083,13 @@ button {
   min-height: calc(100vh - 164px);
 }
 
-.app-reborn .zen-library-column,
-.app-reborn .zen-notes-column,
-.app-reborn .zen-editor-column {
+.app-reborn .locoris-library-column,
+.app-reborn .locoris-notes-column,
+.app-reborn .locoris-editor-column {
   min-height: 0;
 }
 
-.app-reborn .zen-library-stack {
+.app-reborn .locoris-library-stack {
   display: grid;
   gap: 12px;
   max-height: calc(100vh - 182px);
@@ -5097,7 +5097,7 @@ button {
   padding-right: 2px;
 }
 
-.app-reborn .zen-workbench .panel {
+.app-reborn .locoris-workbench .panel {
   border-radius: 24px;
   border: 1px solid rgb(var(--line-rgb) / 0.16);
   background:
@@ -5107,7 +5107,7 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 14px 40px rgba(4, 5, 16, 0.22);
 }
 
-.app-reborn .zen-workbench .panel-head {
+.app-reborn .locoris-workbench .panel-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -5115,7 +5115,7 @@ button {
   padding: 16px 16px 0;
 }
 
-.app-reborn .zen-workbench .panel-title {
+.app-reborn .locoris-workbench .panel-title {
   margin: 6px 0 0;
   font-family: var(--font-ui-display);
   font-size: 0.94rem;
@@ -5124,10 +5124,10 @@ button {
   color: var(--text-emphasis, var(--text-heading, var(--gold)));
 }
 
-.app-reborn .zen-library-column .sidebar-panel,
-.app-reborn .zen-library-column .topology-panel,
-.app-reborn .zen-notes-column .list-panel,
-.app-reborn .zen-editor-column .editor-panel {
+.app-reborn .locoris-library-column .sidebar-panel,
+.app-reborn .locoris-library-column .topology-panel,
+.app-reborn .locoris-notes-column .list-panel,
+.app-reborn .locoris-editor-column .editor-panel {
   padding-bottom: 12px;
 }
 
@@ -5286,7 +5286,7 @@ button {
 }
 
 .app-reborn .notes-hub-modes::-webkit-scrollbar,
-.app-reborn .zen-context-strip::-webkit-scrollbar {
+.app-reborn .locoris-context-strip::-webkit-scrollbar {
   display: none;
 }
 
@@ -5353,7 +5353,7 @@ button {
   margin: 0;
 }
 
-.app-reborn .zen-editor-column .editor-panel {
+.app-reborn .locoris-editor-column .editor-panel {
   height: 100%;
   min-height: 0;
   background:
@@ -5362,14 +5362,14 @@ button {
     rgba(10, 11, 30, 0.92);
 }
 
-.app-reborn .zen-editor-column .empty-editor {
+.app-reborn .locoris-editor-column .empty-editor {
   margin: 0;
   display: grid;
   place-content: center;
   min-height: calc(100vh - 182px);
 }
 
-.app-reborn .zen-editor-column .note-hero-card {
+.app-reborn .locoris-editor-column .note-hero-card {
   margin: 14px 14px 0;
   padding: 16px;
   border-radius: 24px;
@@ -5380,27 +5380,27 @@ button {
   box-shadow: 0 18px 42px rgba(4, 6, 16, 0.22);
 }
 
-.app-reborn .zen-editor-column .editor-action-rail,
-.app-reborn .zen-editor-column .note-metric-grid,
-.app-reborn .zen-editor-column .editor-surface-switcher,
-.app-reborn .zen-editor-column .editor-shell,
-.app-reborn .zen-editor-column .editor-info-panel {
+.app-reborn .locoris-editor-column .editor-action-rail,
+.app-reborn .locoris-editor-column .note-metric-grid,
+.app-reborn .locoris-editor-column .editor-surface-switcher,
+.app-reborn .locoris-editor-column .editor-shell,
+.app-reborn .locoris-editor-column .editor-info-panel {
   margin-inline: 14px;
 }
 
-.app-reborn .zen-editor-column .note-metric-grid {
+.app-reborn .locoris-editor-column .note-metric-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.app-reborn .zen-editor-column .note-metric-card,
-.app-reborn .zen-editor-column .editor-info-card {
+.app-reborn .locoris-editor-column .note-metric-card,
+.app-reborn .locoris-editor-column .editor-info-card {
   border-radius: 20px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
     rgba(12, 13, 34, 0.9);
 }
 
-.app-reborn .zen-editor-column .editor-workspace {
+.app-reborn .locoris-editor-column .editor-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 14px;
@@ -5408,7 +5408,7 @@ button {
   min-height: 0;
 }
 
-.app-reborn .zen-editor-column .editor-shell {
+.app-reborn .locoris-editor-column .editor-shell {
   border-radius: 22px;
   border-color: rgb(var(--line-rgb) / 0.16);
   background:
@@ -5416,26 +5416,26 @@ button {
     rgba(8, 9, 24, 0.95);
 }
 
-.app-reborn .zen-editor-column .editor-shell .bn-container,
-.app-reborn .zen-editor-column .editor-shell .bn-editor {
+.app-reborn .locoris-editor-column .editor-shell .bn-container,
+.app-reborn .locoris-editor-column .editor-shell .bn-editor {
   min-height: 62vh;
 }
 
-.app-reborn .zen-editor-column .editor-info-panel {
+.app-reborn .locoris-editor-column .editor-info-panel {
   align-content: start;
 }
 
-.app-reborn .zen-editor-column .editor-info-card {
+.app-reborn .locoris-editor-column .editor-info-card {
   position: sticky;
   top: 86px;
 }
 
-.app-reborn .zen-mobile-dock {
+.app-reborn .locoris-mobile-dock {
   display: none;
 }
 
 @media (max-width: 1380px) {
-  .app-reborn .zen-workbench {
+  .app-reborn .locoris-workbench {
     grid-template-columns: minmax(280px, 320px) minmax(320px, 390px) minmax(0, 1fr);
   }
 
@@ -5444,11 +5444,11 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-editor-column .editor-workspace {
+  .app-reborn .locoris-editor-column .editor-workspace {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-editor-column .editor-info-card {
+  .app-reborn .locoris-editor-column .editor-info-card {
     position: static;
   }
 }
@@ -5467,7 +5467,7 @@ button {
     background-size: 56px 56px;
   }
 
-  .app-reborn .zen-topbar {
+  .app-reborn .locoris-topbar {
     top: 10px;
     flex-direction: column;
     gap: 12px;
@@ -5475,20 +5475,20 @@ button {
     border-radius: 24px;
   }
 
-  .app-reborn .zen-topbar-actions,
-  .app-reborn .zen-status-group,
-  .app-reborn .zen-quick-actions {
+  .app-reborn .locoris-topbar-actions,
+  .app-reborn .locoris-status-group,
+  .app-reborn .locoris-quick-actions {
     width: 100%;
     justify-content: space-between;
   }
 
-  .app-reborn .zen-quick-actions {
+  .app-reborn .locoris-quick-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
-  .app-reborn .zen-workbench {
+  .app-reborn .locoris-workbench {
     grid-template-columns: 1fr;
     gap: 12px;
     min-height: auto;
@@ -5498,20 +5498,20 @@ button {
     display: none;
   }
 
-  .app-reborn .zen-library-stack {
+  .app-reborn .locoris-library-stack {
     max-height: none;
     overflow: visible;
   }
 
-  .app-reborn .zen-editor-column .editor-panel {
+  .app-reborn .locoris-editor-column .editor-panel {
     height: auto;
   }
 
-  .app-reborn .zen-editor-column .note-metric-grid {
+  .app-reborn .locoris-editor-column .note-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .app-reborn .zen-mobile-dock {
+  .app-reborn .locoris-mobile-dock {
     display: grid;
     position: fixed;
     left: 10px;
@@ -5531,7 +5531,7 @@ button {
     box-shadow: 0 16px 40px rgba(4, 6, 16, 0.42);
   }
 
-  .app-reborn .zen-mobile-dock button {
+  .app-reborn .locoris-mobile-dock button {
     min-height: 50px;
     border-radius: 15px;
     background: transparent;
@@ -5546,21 +5546,21 @@ button {
 }
 
 @media (max-width: 720px) {
-  .app-reborn .zen-topbar {
+  .app-reborn .locoris-topbar {
     padding: 12px;
   }
 
-  .app-reborn .zen-context-strip {
+  .app-reborn .locoris-context-strip {
     flex-wrap: nowrap;
     overflow: auto;
     padding-bottom: 2px;
   }
 
-  .app-reborn .zen-quick-actions {
+  .app-reborn .locoris-quick-actions {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-workbench .panel-head {
+  .app-reborn .locoris-workbench .panel-head {
     flex-direction: column;
     align-items: stretch;
   }
@@ -5572,11 +5572,11 @@ button {
   .app-reborn .notes-hub-meta,
   .app-reborn .tree-list,
   .app-reborn .tag-list,
-  .app-reborn .zen-editor-column .editor-action-rail,
-  .app-reborn .zen-editor-column .note-metric-grid,
-  .app-reborn .zen-editor-column .editor-surface-switcher,
-  .app-reborn .zen-editor-column .editor-shell,
-  .app-reborn .zen-editor-column .editor-info-panel {
+  .app-reborn .locoris-editor-column .editor-action-rail,
+  .app-reborn .locoris-editor-column .note-metric-grid,
+  .app-reborn .locoris-editor-column .editor-surface-switcher,
+  .app-reborn .locoris-editor-column .editor-shell,
+  .app-reborn .locoris-editor-column .editor-info-panel {
     margin-inline: 10px;
     padding-inline: 0;
   }
@@ -5584,7 +5584,7 @@ button {
   .app-reborn .tree-root,
   .app-reborn .tree-edit-row,
   .app-reborn .tag-create-row,
-  .app-reborn .zen-editor-column .note-hero-card {
+  .app-reborn .locoris-editor-column .note-hero-card {
     margin-inline: 10px;
   }
 
@@ -5593,11 +5593,11 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-editor-column .note-metric-grid {
+  .app-reborn .locoris-editor-column .note-metric-grid {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-editor-column .editor-shell .bn-editor {
+  .app-reborn .locoris-editor-column .editor-shell .bn-editor {
     padding: 15px 12px 22px;
   }
 }
@@ -5626,7 +5626,7 @@ button {
   opacity: 0.42;
 }
 
-.app-reborn .zen-appframe {
+.app-reborn .locoris-appframe {
   position: relative;
   z-index: 1;
   display: grid;
@@ -5635,7 +5635,7 @@ button {
   min-height: calc(100vh - 48px);
 }
 
-.app-reborn .zen-side-rail {
+.app-reborn .locoris-side-rail {
   display: grid;
   grid-template-rows: auto auto auto 1fr;
   gap: 14px;
@@ -5649,14 +5649,14 @@ button {
   align-content: start;
 }
 
-.app-reborn .zen-rail-brand {
+.app-reborn .locoris-rail-brand {
   display: grid;
   gap: 12px;
   justify-items: center;
   text-align: center;
 }
 
-.app-reborn .zen-rail-mark {
+.app-reborn .locoris-rail-mark {
   position: relative;
   width: 54px;
   height: 54px;
@@ -5664,49 +5664,49 @@ button {
   place-items: center;
 }
 
-.app-reborn .zen-rail-mark-core,
-.app-reborn .zen-rail-mark-ring {
+.app-reborn .locoris-rail-mark-core,
+.app-reborn .locoris-rail-mark-ring {
   position: absolute;
   border-radius: 999px;
 }
 
-.app-reborn .zen-rail-mark-core {
+.app-reborn .locoris-rail-mark-core {
   width: 14px;
   height: 14px;
   background: radial-gradient(circle, #ffe08a, #ff9a4c 70%);
   box-shadow: 0 0 22px rgb(var(--gold-rgb) / 0.7);
 }
 
-.app-reborn .zen-rail-mark-ring-outer {
+.app-reborn .locoris-rail-mark-ring-outer {
   inset: 0;
   border: 1px solid rgb(var(--cyan-rgb) / 0.4);
 }
 
-.app-reborn .zen-rail-mark-ring-inner {
+.app-reborn .locoris-rail-mark-ring-inner {
   inset: 11px;
   border: 1px solid rgba(209, 137, 255, 0.28);
 }
 
-.app-reborn .zen-rail-brand-copy {
+.app-reborn .locoris-rail-brand-copy {
   display: grid;
   gap: 4px;
 }
 
-.app-reborn .zen-rail-brand-copy h1 {
+.app-reborn .locoris-rail-brand-copy h1 {
   margin: 0;
   font-size: 0.9rem;
   letter-spacing: 0.1em;
 }
 
-.app-reborn .zen-rail-brand-copy p {
+.app-reborn .locoris-rail-brand-copy p {
   margin: 0;
   color: var(--text-dim);
   font-size: 0.68rem;
   line-height: 1.5;
 }
 
-.app-reborn .zen-rail-block,
-.app-reborn .zen-rail-summary {
+.app-reborn .locoris-rail-block,
+.app-reborn .locoris-rail-summary {
   display: grid;
   gap: 10px;
   padding: 12px 10px;
@@ -5715,26 +5715,26 @@ button {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.app-reborn .zen-rail-block-head {
+.app-reborn .locoris-rail-block-head {
   display: grid;
   gap: 3px;
 }
 
-.app-reborn .zen-rail-block-head strong {
+.app-reborn .locoris-rail-block-head strong {
   color: var(--text);
   font-size: 0.74rem;
   letter-spacing: 0.04em;
   line-height: 1.35;
 }
 
-.app-reborn .zen-rail-mode-list,
-.app-reborn .zen-rail-switches {
+.app-reborn .locoris-rail-mode-list,
+.app-reborn .locoris-rail-switches {
   display: grid;
   gap: 8px;
 }
 
-.app-reborn .zen-rail-mode,
-.app-reborn .zen-rail-switch {
+.app-reborn .locoris-rail-mode,
+.app-reborn .locoris-rail-switch {
   width: 100%;
   display: grid;
   gap: 4px;
@@ -5749,16 +5749,16 @@ button {
   transition: border-color 160ms ease, transform 160ms ease, background 160ms ease, color 160ms ease;
 }
 
-.app-reborn .zen-rail-mode strong,
-.app-reborn .zen-rail-switch strong {
+.app-reborn .locoris-rail-mode strong,
+.app-reborn .locoris-rail-switch strong {
   color: var(--text);
   font-size: 0.76rem;
 }
 
-.app-reborn .zen-rail-mode:hover,
-.app-reborn .zen-rail-switch:hover,
-.app-reborn .zen-rail-mode.is-active,
-.app-reborn .zen-rail-switch.is-active {
+.app-reborn .locoris-rail-mode:hover,
+.app-reborn .locoris-rail-switch:hover,
+.app-reborn .locoris-rail-mode.is-active,
+.app-reborn .locoris-rail-switch.is-active {
   color: var(--text);
   border-color: rgb(var(--gold-rgb) / 0.2);
   background:
@@ -5767,11 +5767,11 @@ button {
   transform: translateY(-1px);
 }
 
-.app-reborn .zen-rail-summary {
+.app-reborn .locoris-rail-summary {
   align-content: start;
 }
 
-.app-reborn .zen-rail-summary-card {
+.app-reborn .locoris-rail-summary-card {
   display: grid;
   gap: 4px;
   padding: 10px 11px;
@@ -5779,25 +5779,25 @@ button {
   background: rgba(9, 10, 27, 0.56);
 }
 
-.app-reborn .zen-rail-summary-card span {
+.app-reborn .locoris-rail-summary-card span {
   color: var(--text-dim);
   font-size: 0.66rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.app-reborn .zen-rail-summary-card strong {
+.app-reborn .locoris-rail-summary-card strong {
   color: var(--text);
   font-size: 1rem;
 }
 
-.app-reborn .zen-rail-footer {
+.app-reborn .locoris-rail-footer {
   display: grid;
   gap: 8px;
   align-content: end;
 }
 
-.app-reborn .zen-core-shell {
+.app-reborn .locoris-core-shell {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 16px;
@@ -5805,7 +5805,7 @@ button {
   min-height: 0;
 }
 
-.app-reborn .zen-commandbar {
+.app-reborn .locoris-commandbar {
   display: grid;
   grid-template-columns: minmax(230px, 0.8fr) minmax(320px, 1.2fr) minmax(290px, 0.9fr);
   gap: 16px;
@@ -5820,15 +5820,15 @@ button {
   box-shadow: 0 22px 52px rgba(4, 5, 16, 0.28);
 }
 
-.app-reborn .zen-commandbar-copy,
-.app-reborn .zen-commandbar-searchcluster,
-.app-reborn .zen-commandbar-side {
+.app-reborn .locoris-commandbar-copy,
+.app-reborn .locoris-commandbar-searchcluster,
+.app-reborn .locoris-commandbar-side {
   display: grid;
   gap: 10px;
   min-width: 0;
 }
 
-.app-reborn .zen-commandbar-title {
+.app-reborn .locoris-commandbar-title {
   margin: 0;
   color: var(--text);
   font-size: clamp(1.3rem, 1.8vw, 2rem);
@@ -5836,14 +5836,14 @@ button {
   line-height: 1.1;
 }
 
-.app-reborn .zen-commandbar-description {
+.app-reborn .locoris-commandbar-description {
   margin: 0;
   color: var(--text-dim);
   font-size: 0.84rem;
   line-height: 1.6;
 }
 
-.app-reborn .zen-searchbar {
+.app-reborn .locoris-searchbar {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -5855,13 +5855,13 @@ button {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.app-reborn .zen-searchbar-mark {
+.app-reborn .locoris-searchbar-mark {
   color: var(--text-emphasis, var(--accent-primary, var(--cyan)));
   font-size: 0.74rem;
   letter-spacing: 0.18em;
 }
 
-.app-reborn .zen-searchbar input {
+.app-reborn .locoris-searchbar input {
   width: 100%;
   border: 0;
   outline: 0;
@@ -5870,56 +5870,56 @@ button {
   font: inherit;
 }
 
-.app-reborn .zen-searchbar input::placeholder {
+.app-reborn .locoris-searchbar input::placeholder {
   color: rgba(183, 176, 216, 0.72);
 }
 
-.app-reborn .zen-context-strip {
+.app-reborn .locoris-context-strip {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: flex-start;
 }
 
-.app-reborn .zen-commandbar-side {
+.app-reborn .locoris-commandbar-side {
   align-content: space-between;
 }
 
-.app-reborn .zen-commandbar-modes {
+.app-reborn .locoris-commandbar-modes {
   padding: 0;
   gap: 8px;
   overflow: auto;
 }
 
-.app-reborn .zen-commandbar-actions {
+.app-reborn .locoris-commandbar-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.app-reborn .zen-tabbar {
+.app-reborn .locoris-tabbar {
   display: none;
 }
 
-.app-reborn .zen-body {
+.app-reborn .locoris-body {
   display: grid;
   grid-template-columns: minmax(300px, 338px) minmax(320px, 392px) minmax(0, 1fr);
   gap: 16px;
   min-height: 0;
 }
 
-.app-reborn .zen-library-surface,
-.app-reborn .zen-stream-surface,
-.app-reborn .zen-editor-surface {
+.app-reborn .locoris-library-surface,
+.app-reborn .locoris-stream-surface,
+.app-reborn .locoris-editor-surface {
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.app-reborn .zen-library-surface .panel,
-.app-reborn .zen-stream-surface .panel,
-.app-reborn .zen-editor-surface .panel {
+.app-reborn .locoris-library-surface .panel,
+.app-reborn .locoris-stream-surface .panel,
+.app-reborn .locoris-editor-surface .panel {
   border-radius: 26px;
   border: 1px solid rgb(var(--line-rgb) / 0.12);
   background:
@@ -5929,9 +5929,9 @@ button {
   box-shadow: 0 18px 46px rgba(4, 5, 16, 0.24);
 }
 
-.app-reborn .zen-library-surface .panel-head,
-.app-reborn .zen-stream-surface .panel-head,
-.app-reborn .zen-editor-surface .panel-head {
+.app-reborn .locoris-library-surface .panel-head,
+.app-reborn .locoris-stream-surface .panel-head,
+.app-reborn .locoris-editor-surface .panel-head {
   padding: 18px 18px 0;
 }
 
@@ -5942,7 +5942,7 @@ button {
   line-height: 1.5;
 }
 
-.app-reborn .zen-library-tabs {
+.app-reborn .locoris-library-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -5952,7 +5952,7 @@ button {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.app-reborn .zen-library-tabs button {
+.app-reborn .locoris-library-tabs button {
   min-height: 46px;
   border: 0;
   border-radius: 16px;
@@ -5963,20 +5963,20 @@ button {
   transition: background 160ms ease, color 160ms ease;
 }
 
-.app-reborn .zen-library-tabs button.is-active {
+.app-reborn .locoris-library-tabs button.is-active {
   background:
     linear-gradient(180deg, rgb(var(--gold-rgb) / 0.1), rgba(255, 255, 255, 0.02)),
     rgba(255, 255, 255, 0.04);
   color: var(--text);
 }
 
-.app-reborn .zen-library-panel {
+.app-reborn .locoris-library-panel {
   min-height: 0;
   flex: 1;
   display: flex;
 }
 
-.app-reborn .zen-library-panel > .panel {
+.app-reborn .locoris-library-panel > .panel {
   width: 100%;
   height: 100%;
 }
@@ -6210,31 +6210,31 @@ button {
   gap: 6px;
 }
 
-.app-reborn .zen-editor-surface .editor-panel {
+.app-reborn .locoris-editor-surface .editor-panel {
   height: 100%;
   min-height: 0;
 }
 
-.app-reborn .zen-editor-surface .empty-editor {
+.app-reborn .locoris-editor-surface .empty-editor {
   margin: 0;
   display: grid;
   place-content: center;
   min-height: calc(100vh - 220px);
 }
 
-.app-reborn .zen-editor-surface .note-hero-card {
+.app-reborn .locoris-editor-surface .note-hero-card {
   margin: 18px 18px 0;
 }
 
-.app-reborn .zen-editor-surface .editor-action-rail,
-.app-reborn .zen-editor-surface .note-metric-grid,
-.app-reborn .zen-editor-surface .editor-surface-switcher,
-.app-reborn .zen-editor-surface .editor-shell,
-.app-reborn .zen-editor-surface .editor-info-panel {
+.app-reborn .locoris-editor-surface .editor-action-rail,
+.app-reborn .locoris-editor-surface .note-metric-grid,
+.app-reborn .locoris-editor-surface .editor-surface-switcher,
+.app-reborn .locoris-editor-surface .editor-shell,
+.app-reborn .locoris-editor-surface .editor-info-panel {
   margin-inline: 18px;
 }
 
-.app-reborn .zen-editor-surface .editor-workspace {
+.app-reborn .locoris-editor-surface .editor-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 312px;
   gap: 16px;
@@ -6242,39 +6242,39 @@ button {
   min-height: 0;
 }
 
-.app-reborn .zen-editor-surface .editor-info-card {
+.app-reborn .locoris-editor-surface .editor-info-card {
   position: sticky;
   top: 18px;
 }
 
 @media (max-width: 1520px) {
-  .app-reborn .zen-commandbar {
+  .app-reborn .locoris-commandbar {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-body {
+  .app-reborn .locoris-body {
     grid-template-columns: minmax(280px, 320px) minmax(300px, 360px) minmax(0, 1fr);
   }
 
-  .app-reborn .zen-editor-surface .editor-workspace {
+  .app-reborn .locoris-editor-surface .editor-workspace {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-editor-surface .editor-info-card {
+  .app-reborn .locoris-editor-surface .editor-info-card {
     position: static;
   }
 }
 
 @media (max-width: 1180px) {
-  .app-reborn .zen-appframe {
+  .app-reborn .locoris-appframe {
     grid-template-columns: 88px minmax(0, 1fr);
   }
 
-  .app-reborn .zen-body {
+  .app-reborn .locoris-body {
     grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
   }
 
-  .app-reborn .zen-editor-surface {
+  .app-reborn .locoris-editor-surface {
     grid-column: 1 / -1;
   }
 }
@@ -6289,39 +6289,39 @@ button {
     border-radius: 0;
   }
 
-  .app-reborn .zen-appframe {
+  .app-reborn .locoris-appframe {
     grid-template-columns: 1fr;
     min-height: auto;
   }
 
-  .app-reborn .zen-side-rail {
+  .app-reborn .locoris-side-rail {
     display: none;
   }
 
-  .app-reborn .zen-core-shell {
+  .app-reborn .locoris-core-shell {
     grid-template-rows: auto auto minmax(0, 1fr);
   }
 
-  .app-reborn .zen-commandbar {
+  .app-reborn .locoris-commandbar {
     padding: 16px;
     border-radius: 24px;
   }
 
-  .app-reborn .zen-commandbar-actions {
+  .app-reborn .locoris-commandbar-actions {
     grid-template-columns: 1fr 1fr;
   }
 
-  .app-reborn .zen-body {
+  .app-reborn .locoris-body {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-library-surface.is-mobile-hidden,
-  .app-reborn .zen-stream-surface.is-mobile-hidden,
-  .app-reborn .zen-editor-surface.is-mobile-hidden {
+  .app-reborn .locoris-library-surface.is-mobile-hidden,
+  .app-reborn .locoris-stream-surface.is-mobile-hidden,
+  .app-reborn .locoris-editor-surface.is-mobile-hidden {
     display: none;
   }
 
-  .app-reborn .zen-tabbar {
+  .app-reborn .locoris-tabbar {
     display: grid;
     position: fixed;
     left: 10px;
@@ -6340,7 +6340,7 @@ button {
     box-shadow: 0 16px 40px rgba(4, 6, 16, 0.42);
   }
 
-  .app-reborn .zen-tabbar button {
+  .app-reborn .locoris-tabbar button {
     min-height: 50px;
     border: 0;
     border-radius: 15px;
@@ -6349,46 +6349,46 @@ button {
     font: inherit;
   }
 
-  .app-reborn .zen-tabbar button.is-active {
+  .app-reborn .locoris-tabbar button.is-active {
     background:
       linear-gradient(180deg, rgb(var(--gold-rgb) / 0.11), rgba(255, 255, 255, 0.03)),
       rgba(255, 255, 255, 0.04);
     color: var(--text);
   }
 
-  .app-reborn .zen-library-tabs {
+  .app-reborn .locoris-library-tabs {
     position: sticky;
     top: 0;
     z-index: 4;
   }
 
-  .app-reborn .zen-editor-surface .editor-panel {
+  .app-reborn .locoris-editor-surface .editor-panel {
     height: auto;
   }
 }
 
 @media (max-width: 720px) {
-  .app-reborn .zen-commandbar {
+  .app-reborn .locoris-commandbar {
     padding: 14px;
   }
 
-  .app-reborn .zen-commandbar-actions {
+  .app-reborn .locoris-commandbar-actions {
     grid-template-columns: 1fr;
   }
 
-  .app-reborn .zen-context-strip,
-  .app-reborn .zen-commandbar-modes {
+  .app-reborn .locoris-context-strip,
+  .app-reborn .locoris-commandbar-modes {
     flex-wrap: nowrap;
     overflow: auto;
     scrollbar-width: none;
   }
 
-  .app-reborn .zen-context-strip::-webkit-scrollbar,
-  .app-reborn .zen-commandbar-modes::-webkit-scrollbar {
+  .app-reborn .locoris-context-strip::-webkit-scrollbar,
+  .app-reborn .locoris-commandbar-modes::-webkit-scrollbar {
     display: none;
   }
 
-  .app-reborn .zen-library-tabs,
+  .app-reborn .locoris-library-tabs,
   .app-reborn .notes-hub-head {
     grid-template-columns: 1fr;
   }
@@ -6409,18 +6409,18 @@ button {
   .app-reborn .notes-hub-filters,
   .app-reborn .notes-hub-list,
   .app-reborn .orbit-preview-trigger,
-  .app-reborn .zen-editor-surface .note-hero-card,
-  .app-reborn .zen-editor-surface .editor-action-rail,
-  .app-reborn .zen-editor-surface .note-metric-grid,
-  .app-reborn .zen-editor-surface .editor-surface-switcher,
-  .app-reborn .zen-editor-surface .editor-shell,
-  .app-reborn .zen-editor-surface .editor-info-panel {
+  .app-reborn .locoris-editor-surface .note-hero-card,
+  .app-reborn .locoris-editor-surface .editor-action-rail,
+  .app-reborn .locoris-editor-surface .note-metric-grid,
+  .app-reborn .locoris-editor-surface .editor-surface-switcher,
+  .app-reborn .locoris-editor-surface .editor-shell,
+  .app-reborn .locoris-editor-surface .editor-info-panel {
     margin-inline: 12px;
   }
 
-  .app-reborn .zen-library-surface .panel-head,
-  .app-reborn .zen-stream-surface .panel-head,
-  .app-reborn .zen-editor-surface .panel-head {
+  .app-reborn .locoris-library-surface .panel-head,
+  .app-reborn .locoris-stream-surface .panel-head,
+  .app-reborn .locoris-editor-surface .panel-head {
     padding-inline: 12px;
   }
 }

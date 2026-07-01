@@ -583,6 +583,13 @@ export default function PlannerSurface({
         : null,
     [habitSummariesForStats, selectedHabitId]
   );
+  const showMobileCreateFab =
+    isMobile &&
+    (isTaskView || isHabitView) &&
+    !isComposerOpen &&
+    !isHabitComposerOpen &&
+    !(isTaskView && selectedTask && !isCalendarOpen) &&
+    !(isHabitView && selectedHabitId);
 
   useEffect(() => {
     if (selectedTaskId && !tasks.some((task) => task.id === selectedTaskId)) {
@@ -841,6 +848,14 @@ export default function PlannerSurface({
         status: "archived"
       },
       language === "ru" ? "Привычка отправлена в архив" : "Habit archived"
+    );
+  };
+
+  const handleRenameHabit = async (summary: PlannerHabitSummary, title: string) => {
+    await handleUpdateHabitWithUndo(
+      summary,
+      { title },
+      language === "ru" ? "Привычка переименована" : "Habit renamed"
     );
   };
 
@@ -1322,6 +1337,7 @@ export default function PlannerSurface({
           summary={selectedHabitSummary}
           language={language}
           onToggleToday={(habitId) => void handleToggleHabitToday(habitId)}
+          onRename={handleRenameHabit}
           onTogglePaused={handleToggleHabitPaused}
           onArchive={handleArchiveHabit}
           onDelete={(summary) => void handleDeleteHabitWithUndo(summary)}
@@ -1345,7 +1361,7 @@ export default function PlannerSurface({
         />
       ) : null}
 
-      {isMobile && (isTaskView || isHabitView) ? (
+      {showMobileCreateFab ? (
         <button
           type="button"
           className="planner-mobile-create-fab"
@@ -1411,6 +1427,35 @@ export default function PlannerSurface({
             onToggleDone={(taskId, done, occurrenceStartAt) => void handleToggleTaskDone(taskId, done, occurrenceStartAt)}
             onDelete={(taskId) => void handleDeleteTaskWithUndo(taskId)}
           />
+        </div>
+      ) : null}
+
+      {isMobile && isHabitView && selectedHabitSummary && !isCalendarOpen ? (
+        <div
+          className="planner-mobile-sheet-layer"
+          role="dialog"
+          aria-modal="true"
+          style={{ "--planner-keyboard-inset": `${keyboardInset}px` } as CSSProperties}
+        >
+          <button
+            type="button"
+            className="planner-mobile-sheet-backdrop"
+            onClick={() => setSelectedHabitId(null)}
+            aria-label={language === "ru" ? "Закрыть" : "Close"}
+          />
+          <section key={selectedHabitSummary.habit.id} className="planner-habit-mobile-detail-sheet">
+            <PlannerHabitInspectorPanel
+              summary={selectedHabitSummary}
+              language={language}
+              variant="sheet"
+              onClose={() => setSelectedHabitId(null)}
+              onToggleToday={(habitId) => void handleToggleHabitToday(habitId)}
+              onRename={handleRenameHabit}
+              onTogglePaused={handleToggleHabitPaused}
+              onArchive={handleArchiveHabit}
+              onDelete={(summary) => void handleDeleteHabitWithUndo(summary)}
+            />
+          </section>
         </div>
       ) : null}
 

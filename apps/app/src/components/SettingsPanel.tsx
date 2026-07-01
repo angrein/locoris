@@ -112,6 +112,7 @@ interface SettingsPanelProps {
       refreshToken?: string | null;
     }
   ) => void | Promise<void>;
+  onRefreshHostedConnectionCredentials: (connection: SyncConnection) => void | Promise<void>;
   onBindVault: (input: {
     localVaultId: string;
     connectionId: string;
@@ -379,6 +380,7 @@ export default function SettingsPanel({
   onCreateConnection,
   onDeleteConnection,
   onUpdateConnection,
+  onRefreshHostedConnectionCredentials,
   onBindVault,
   onImportRemoteVault,
   onDeleteRemoteVault,
@@ -897,6 +899,7 @@ export default function SettingsPanel({
         onCreateConnection={onCreateConnection}
         onDeleteConnection={onDeleteConnection}
         onUpdateConnection={onUpdateConnection}
+        onRefreshHostedConnectionCredentials={onRefreshHostedConnectionCredentials}
         onBindVault={onBindVault}
         onImportRemoteVault={onImportRemoteVault}
         onDeleteRemoteVault={onDeleteRemoteVault}

@@ -31,6 +31,7 @@ export const GOOGLE_DRIVE_FILES_BASE_URL = "https://www.googleapis.com/drive/v3/
 export const GOOGLE_DRIVE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about";
 export const GOOGLE_DRIVE_APP_DATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 export const GOOGLE_DRIVE_APP_FOLDER = "appDataFolder";
+// Legacy Google Drive appDataFolder manifest name. Keep until a dual-read migration exists.
 export const GOOGLE_DRIVE_MANIFEST_FILE = "zen-sync-manifest.json";
 export const GOOGLE_DRIVE_VAULT_PREFIX = "vault-";
 export const GOOGLE_DRIVE_VAULT_JOURNAL_SUFFIX = ".journal.json";
@@ -821,7 +822,7 @@ async function uploadGoogleDriveJsonFile<T extends object>(input: {
   payload: T;
   parents?: string[];
 }) {
-  const boundary = `zen-notes-${crypto.randomUUID()}`;
+  const boundary = `locoris-${crypto.randomUUID()}`;
   const metadata = {
     name: input.name,
     ...(input.parents?.length ? { parents: input.parents } : {})

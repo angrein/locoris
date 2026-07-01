@@ -28,6 +28,7 @@ type AppAccentTheme = {
   cssVars: Record<string, string>;
 };
 
+// Legacy preference key. Rename only with a compatibility migration.
 export const APP_ACCENT_THEME_STORAGE_KEY = "zen-notes.appAccentThemeId";
 export const DEFAULT_APP_ACCENT_THEME_ID: AppAccentThemeId = "classic";
 

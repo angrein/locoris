@@ -483,9 +483,12 @@
 .planner-habit-legend {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 7px;
   margin-top: 10px;
   padding: 8px;
+  min-height: 42px;
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 16px;
   background:
@@ -495,15 +498,19 @@
 
 .planner-habit-legend span {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
-  min-height: 24px;
+  min-height: 28px;
   padding: 0 8px;
+  box-sizing: border-box;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.055);
   color: rgba(226, 235, 248, 0.68);
   font-size: 0.68rem;
   font-weight: 820;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .planner-habit-legend i {
@@ -861,12 +868,39 @@
   box-shadow: 0 0 30px color-mix(in srgb, var(--planner-habit-color, var(--planner-accent)) 22%, transparent);
 }
 
+.planner-habit-title-input,
 .planner-habit-detail-head strong,
 .planner-habit-detail-head em {
   display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.planner-habit-title-input {
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  outline: none;
+  color: color-mix(in srgb, var(--planner-habit-heading) 42%, #fff 58%);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 940;
+  line-height: 1.18;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.planner-habit-title-input:focus {
+  color: #fff;
+  text-shadow: 0 0 22px color-mix(in srgb, var(--planner-habit-color, var(--planner-accent)) 22%, transparent);
+}
+
+.planner-habit-title-input::placeholder {
+  color: rgba(230, 238, 255, 0.38);
 }
 
 .planner-habit-detail-head strong {
@@ -1258,6 +1292,11 @@
   padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
 }
 
+.planner-habits-surface.is-mobile.has-selection {
+  z-index: 90;
+  overflow: visible;
+}
+
 .planner-habits-surface.is-mobile .planner-habits-board {
   display: contents;
   border: 0;
@@ -1314,8 +1353,10 @@
 
 .planner-habits-surface.is-mobile .planner-habit-legend {
   margin-top: 0;
-  padding: 10px;
+  min-height: 56px;
+  padding: 12px 10px;
   overflow-x: auto;
+  overflow-y: visible;
   flex-wrap: nowrap;
 }
 
@@ -1366,23 +1407,29 @@
 }
 
 .planner-habit-mobile-sheet-layer {
+  --planner-habit-top-chrome-offset: clamp(92px, 11dvh, 124px);
+  --planner-habit-bottom-nav-offset: clamp(86px, 10dvh, 106px);
   position: fixed;
-  inset: 0;
-  z-index: 2147483000;
+  inset:
+    calc(var(--planner-habit-top-chrome-offset) + env(safe-area-inset-top, 0px))
+    0
+    calc(var(--planner-habit-bottom-nav-offset) + env(safe-area-inset-bottom, 0px) + var(--planner-keyboard-inset, 0px))
+    0;
+  z-index: 2147483600;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   box-sizing: border-box;
   overflow: hidden;
   padding:
-    max(12px, env(safe-area-inset-top, 0px))
+    8px
     max(10px, env(safe-area-inset-right, 0px))
-    calc(max(14px, env(safe-area-inset-bottom, 0px)) + var(--planner-keyboard-inset, 0px) + 8px)
+    8px
     max(10px, env(safe-area-inset-left, 0px));
 }
 
 .planner-habit-mobile-sheet-backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
   border: 0;
   background:
@@ -1397,7 +1444,7 @@
   z-index: 1;
   box-sizing: border-box;
   width: min(100%, 620px);
-  max-height: min(720px, calc(100dvh - var(--planner-keyboard-inset, 0px) - 32px));
+  max-height: 100%;
   min-width: 0;
   padding: 12px;
   overflow: auto;
@@ -1418,9 +1465,11 @@
 .planner-habit-mobile-detail-sheet {
   display: flex;
   flex-direction: column;
+  height: 100%;
   gap: 10px;
   padding: 14px;
   border-radius: 24px;
+  scroll-padding-top: 16px;
 }
 
 .planner-habit-mobile-sheet.is-composer {
@@ -1522,12 +1571,10 @@
 }
 
 .planner-habit-mobile-detail-sheet .planner-habit-detail-content.is-sheet {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   padding: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
+  overflow: visible;
 }
 
 .planner-habit-sheet-close {
@@ -1562,7 +1609,16 @@
 }
 
 .planner-habit-mobile-detail-sheet .planner-habit-detail-head {
+  position: static;
+  z-index: 3;
   grid-template-columns: 46px minmax(0, 1fr) auto;
+  margin: 0;
+  padding: 0;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--planner-habit-color, var(--planner-accent)) 18%, transparent), transparent 58%),
+    color-mix(in srgb, #08111f 86%, var(--planner-habit-color, var(--planner-accent)) 8%);
+  backdrop-filter: blur(18px) saturate(140%);
 }
 
 .planner-habit-mobile-detail-sheet .planner-habit-detail-grid {
@@ -1570,7 +1626,7 @@
 }
 
 .planner-habit-mobile-detail-sheet .planner-habit-detail-actions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
 }
 
 .planner-habit-mobile-detail-sheet .planner-habit-detail-actions button {

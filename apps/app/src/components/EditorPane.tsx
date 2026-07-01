@@ -1355,7 +1355,7 @@ export default function EditorPane({
       },
       domAttributes: {
         editor: {
-          class: "zen-editor-surface"
+          class: "locoris-editor-surface"
         }
       }
     },

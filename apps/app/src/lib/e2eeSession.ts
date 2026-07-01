@@ -12,6 +12,7 @@ import {
   writeSecureSecret
 } from "./secureSecretStore";
 
+// Legacy optional passphrase cache prefix. Rename only with a compatibility migration.
 const VAULT_PERSISTENT_STORAGE_PREFIX = "zen-notes.vault-passphrase:";
 
 function normalizeLocalVaultId(localVaultId: string) {

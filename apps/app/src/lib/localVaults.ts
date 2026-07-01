@@ -28,6 +28,7 @@ interface LocalVaultRegistryState {
   vaults: LocalVaultProfile[];
 }
 
+// Legacy storage key. Rename only with a migration that preserves existing vault discovery.
 const REGISTRY_STORAGE_KEY = "zen-notes.local-vaults";
 const DEFAULT_LOCAL_VAULT_ID = "local-default";
 const DEFAULT_LOCAL_VAULT_NAMES = {
@@ -181,6 +182,7 @@ function buildRegistryState(vaults: LocalVaultProfile[], activeVaultId: string):
 }
 
 export function buildLocalVaultDatabaseName(localVaultId: string) {
+  // Legacy IndexedDB prefix. Existing local vault databases depend on this name.
   return `zen-notes-db-${localVaultId}`;
 }
 

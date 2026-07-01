@@ -1580,14 +1580,15 @@
   white-space: nowrap;
 }
 
-.planner-calendar-time-editor-row > div {
-  display: grid;
-  grid-template-columns: 34px minmax(70px, 1fr) 34px;
+.planner-calendar-time-editor-presets {
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  align-items: center;
+  min-width: 0;
 }
 
-.planner-calendar-time-editor button {
+.planner-calendar-time-editor-presets button,
+.planner-calendar-time-editor-summary button {
   display: inline-grid;
   min-width: 0;
   min-height: 34px;
@@ -1601,18 +1602,18 @@
   cursor: pointer;
 }
 
-.planner-calendar-time-editor-row strong {
-  display: inline-grid;
-  min-width: 0;
-  min-height: 34px;
-  place-items: center;
-  padding: 0 9px;
-  border-radius: 13px;
-  background: rgba(3, 9, 19, 0.28);
+.planner-calendar-time-editor-presets button {
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: rgba(230, 239, 250, 0.72);
+  font-size: 0.74rem;
+}
+
+.planner-calendar-time-editor-presets button.is-active {
+  border-color: color-mix(in srgb, var(--planner-calendar-accent) 50%, rgba(255, 255, 255, 0.16));
+  background: color-mix(in srgb, var(--planner-calendar-accent) 16%, rgba(255, 255, 255, 0.06));
   color: #fff;
-  font-size: 0.86rem;
-  font-weight: 920;
-  white-space: nowrap;
 }
 
 .planner-calendar-time-editor-summary {
@@ -2060,7 +2061,7 @@
   border-top: 0;
 }
 
-  .planner-calendar-layer.is-mobile .planner-calendar-head {
+.planner-calendar-layer.is-mobile .planner-calendar-head {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
@@ -2092,8 +2093,20 @@
 .planner-calendar-layer.is-mobile .planner-calendar-filter-row button {
   flex: 0 0 auto;
   min-height: 36px;
-  max-width: 150px;
+  max-width: min(220px, 72vw);
   padding: 0 10px;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-mobile-filters {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-mobile-filters .planner-calendar-filter-row {
+  width: 100%;
+  max-width: none;
+  margin-top: 0;
+  padding: 0 2px 4px;
 }
 
 .planner-calendar-layer.is-mobile .planner-calendar-head-actions {
@@ -2145,12 +2158,71 @@
 
 .planner-calendar-layer.is-mobile .planner-calendar-grid {
   min-width: 0;
-  min-height: 480px;
+  min-height: 0;
+  align-content: start;
+  gap: 8px;
+  padding: 8px;
 }
 
 .planner-calendar-layer.is-mobile .planner-calendar-grid.is-month {
   min-width: 0;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(104px, 26vw, 168px), 1fr));
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-day-cell {
+  min-height: 108px;
+  padding: 8px;
+  border-radius: 16px;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-day-cell header {
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-day-cell header span {
+  font-size: 0.58rem;
+  letter-spacing: 0.035em;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-day-cell header strong {
+  min-width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  font-size: 0.78rem;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-day-stack {
+  gap: 5px;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-event.is-month {
+  grid-template-columns: 7px minmax(0, 1fr);
+  gap: 5px;
+  min-height: 28px;
+  padding: 5px 6px;
+  border-radius: 11px;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-event.is-month .planner-calendar-event-copy {
+  gap: 0;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-event.is-month .planner-calendar-event-copy strong {
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-event.is-month .planner-calendar-event-copy small,
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-event.is-month .planner-calendar-event-actions {
+  display: none;
+}
+
+.planner-calendar-layer.is-mobile .planner-calendar-grid.is-month .planner-calendar-more {
+  min-height: 25px;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 0.68rem;
 }
 
 .planner-calendar-layer.is-mobile .planner-calendar-grid.is-week {
